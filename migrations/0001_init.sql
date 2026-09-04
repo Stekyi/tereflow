@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS analysis_runs (
   id              TEXT PRIMARY KEY,
   started_at      TEXT NOT NULL DEFAULT (datetime('now')),
   finished_at     TEXT,
-  trigger         TEXT NOT NULL DEFAULT 'cron' CHECK (trigger IN ('cron','manual','backfill')),
+  trigger         TEXT NOT NULL DEFAULT 'cron'
+                    CHECK (trigger IN ('cron','manual','backfill','local')),
   status          TEXT NOT NULL DEFAULT 'running'
                     CHECK (status IN ('running','ok','partial','failed')),
   entities_total  INTEGER NOT NULL DEFAULT 0,

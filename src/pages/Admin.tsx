@@ -248,9 +248,14 @@ export default function Admin() {
       )}
 
       <p className="tiny dim" style={{ marginTop: 18 }}>
-        Ticking a country puts it in the weekly pipeline: its data is fetched, cross-referenced with
-        the international and regional bodies, analysed, and published to its dashboard. The
-        scheduled run is every Friday at 21:00 GMT.
+        Ticking a country puts it in the pipeline: its data is fetched, cross-referenced with the
+        international and regional bodies, analysed, and published to its dashboard.
+      </p>
+      <p className="tiny dim">
+        The scheduled run happens on your own machine, not in the cloud, and publishes finished
+        analysis here. Friday 21:00 GMT by default. The buttons above are for spot checks: “Run
+        analysis” here is capped at a couple of countries per press by Cloudflare’s per-request
+        limits, which is exactly why the real pipeline runs locally.
       </p>
     </>
   );

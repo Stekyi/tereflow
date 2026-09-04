@@ -18,7 +18,7 @@ Working name only — change `APP_NAME` in `wrangler.toml` and the `<title>` in
 | Admin form with three link slots per data category | done |
 | Activation tick per record, plus bulk tick | done |
 | Weekly analysis agent | done |
-| Cron trigger, Friday 21:00 GMT | done |
+| Local pipeline, scheduled Friday 21:00 GMT | done |
 | Country dashboard: trend, products, partners, recommendations | done |
 | Early-signal engine behind a premium gate | done |
 | Free registration and sessions | done |
@@ -244,6 +244,7 @@ npx wrangler kv namespace create CACHE   # paste the id into wrangler.toml
 npx wrangler d1 migrations apply tereflow --remote
 npx wrangler d1 execute tereflow --remote --file=./data/seed.sql
 npx wrangler d1 execute tereflow --remote --file=./data/playbooks.sql
+npm run data:restore:remote   # optional: the analysed-data snapshot
 npx wrangler secret put ADMIN_TOKEN
 npm run deploy
 ```
@@ -251,58 +252,121 @@ npm run deploy
 Optional secrets:
 
 ```bash
-npx wrangler secret put COMTRADE_API_KEY      # lifts the weekly run to 90 countries
 npx wrangler secret put STRIPE_SECRET_KEY     # switches billing from stub to real
 npx wrangler secret put STRIPE_WEBHOOK_SECRET # required for entitlement to move
 ```
+
+`COMTRADE_API_KEY` is **not** a Worker secret. The Worker no longer fetches
+anything; it belongs in `local/.env` instead.
 
 Point the Stripe webhook at `https://your-domain/api/premium/billing/webhook`
 and subscribe it to `checkout.session.completed`, `invoice.payment_succeeded`,
 `invoice.payment_failed` and `customer.subscription.deleted`.
 
-### Rate limits, and why you want a Comtrade key
+---
 
-Without `COMTRADE_API_KEY` the preview endpoint allows one year per call, so a
-country costs about 23 subrequests. Cloudflare's free plan caps an invocation at
-50 subrequests, so the weekly run processes **2 countries per invocation**,
-oldest first, and rotates.
+## Running the pipeline
 
-Get a free key at <https://comtradedeveloper.un.org/> and set it:
+**The pipeline does not run in the cloud.** Fetching and analysing happen on a
+machine you control, which then pushes finished analysis to the Worker.
 
-```bash
-npx wrangler secret put COMTRADE_API_KEY
+Three reasons:
+
+**It is the only way to cover the whole registry.** Workers cap subrequests per
+invocation at 50 on the free plan. Keyless, one country costs about 23 calls,
+because the UN Comtrade preview endpoint accepts a single year per request. A
+cloud run managed two countries and rotated, so a full pass took six weeks.
+Locally there is no cap: 90 countries finish in roughly an hour.
+
+**It costs nothing.** The heavy work runs on hardware you already own. The
+Worker stays on the free tier doing what it is genuinely good at, which is
+serving readers fast from the edge.
+
+**Rate limits become predictable.** The public APIs throttle per source IP. One
+machine and one address is a throttle you control, rather than requests arriving
+from whichever Cloudflare edge happened to run the job.
+
+```
+  your machine                                    Cloudflare
+  ────────────                                    ──────────
+  UN Comtrade ──┐
+  World Bank  ──┼─> fetch ─> analyse ─> POST /api/admin/ingest/* ─> D1
+                │                                                    │
+                └─ the slow, rate-limited, CPU-heavy part            │
+                                                     readers <───────┘
 ```
 
-That collapses a country to ~9 calls and raises the per-run budget to 90
-countries, which covers the whole registry in one Friday run.
+Feed fan-out stays in the cloud on purpose: it reads subscriptions and writes
+feed items, which are personal data that should never leave the platform.
+
+### Setting it up
+
+```bash
+cp local/.env.example local/.env     # then edit it
+npm run pipeline:build
+```
+
+`local/.env` needs the API URL and the `ADMIN_TOKEN` that matches the Worker.
+
+```bash
+npm run pipeline:dry                 # analyse everything, publish nothing
+npm run pipeline                     # the real thing
+node local/dist/pipeline.mjs --slug ghana
+node local/dist/pipeline.mjs --limit 10
+```
+
+A dry run is the safe way to check a change: it fetches and analyses exactly as
+normal and prints the headline figures, but touches nothing in the cloud.
+
+### Scheduling it
+
+Friday 21:00 GMT, on your machine or any always-on box.
+
+**Windows**, from an elevated prompt:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File local\schedule-windows.ps1
+```
+
+It converts 21:00 UTC to your local time, registers the task, and sets
+*wake to run* and *start when available* so a laptop that was shut on Friday
+evening catches up rather than silently skipping a week.
+
+**Linux or macOS:**
+
+```bash
+bash local/schedule-unix.sh
+```
+
+Uses `CRON_TZ=UTC` so publication time does not drift with the host's timezone.
+
+Logs land in `local/logs/`, one file per run, gitignored.
+
+### Timing, and why you want a Comtrade key
+
+Keyless, a country takes about 45 seconds: roughly 30s fetching (one request
+per year, per flow) and 15s publishing. Ninety countries is a little over an
+hour, which is fine for an overnight job.
+
+A free key at <https://comtradedeveloper.un.org/> lets the adapter request
+several years in one call, cutting a country to about 9 requests. Put it in
+`local/.env` as `COMTRADE_API_KEY`. It is not a Worker secret any more, because
+the Worker no longer fetches anything.
+
+### Running it against production
+
+Point `TEREFLOW_API_URL` at the deployed Worker and use the real `ADMIN_TOKEN`.
+Everything else is identical. The push is ordinary HTTPS, so the machine needs
+no Cloudflare credentials, only the admin token.
 
 ---
 
-## The weekly job
+## Manual runs from Admin
 
-`wrangler.toml` sets:
-
-```toml
-[triggers]
-crons = ["0 21 * * 5"]
-```
-
-Friday 21:00 UTC, which is 21:00 GMT. On each fire the worker:
-
-1. Picks activated countries, oldest ingest first.
-2. Pulls Comtrade and World Bank, replaces that country's facts (replace, never
-   append, so a re-run cannot double count).
-3. Recomputes every analysis payload and the opportunity signals.
-4. Health-checks a batch of registered official links.
-
-Miniflare does not fire cron locally. Test with:
-
-```bash
-npx wrangler dev --test-scheduled
-curl "http://127.0.0.1:8787/__scheduled?cron=0+21+*+*+5"
-```
-
-Or just hit **Run analysis** in the admin console.
+The **Run analysis** button still works, and is useful for a spot check on a
+single country. It is capped at a couple of countries per press by the
+subrequest limit described above, which is precisely why the scheduled pipeline
+runs locally.
 
 ---
 
@@ -312,37 +376,83 @@ Or just hit **Run analysis** in the admin console.
 migrations/     0001 registry + facts + analysis
                 0002 network (users, cards, messages, ratings, feed, playbooks)
                 0003 premium (playbook sourcing, billing events, feed dedupe)
+                0004 record locally-produced runs
+local/          THE PIPELINE. Runs on your machine, not in the cloud.
+  pipeline.ts   fetch, analyse, publish
+  build.mjs     bundles it to local/dist/pipeline.mjs with esbuild
+  schedule-windows.ps1 / schedule-unix.sh
+  .env.example  copy to local/.env
 worker/
-  index.ts      Hono app, SPA fallback, scheduled() handler
+  index.ts      Hono app, SPA fallback. No scheduled() handler by design.
   lib/
     db.ts       bindings, D1 helpers, chunked IN clauses
     auth.ts     admin shared-token gate
     session.ts  PBKDF2 hashing, sessions, cookies, entitlement
     ratelimit.ts KV fixed-window limiter
   routes/
-    admin.ts    registry CRUD, activation, runs, link checks
+    admin.ts    registry CRUD, activation, ingest endpoints, link checks
     public.ts   dashboards, rankings, registry browser
     auth.ts     register, login, logout, me, dev tier switch
     network.ts  cards, discovery, conversations, messages, ratings
     premium.ts  subscriptions, feed, playbooks, billing, Stripe webhook
   agent/
-    run.ts      orchestrator, budget and rotation
     analyse.ts  all the maths and the plain-English layer
-    feed.ts     weekly fan-out, push-and-pull, ISO-week dedupe
     codes.ts    ISO3 <-> M49, HS chapter labels, sector grouping
     adapters/   comtrade.ts, worldbank.ts
+    feed.ts     weekly fan-out, push-and-pull, ISO-week dedupe
     linkcheck.ts
+    run.ts      in-Worker run, kept for single-country spot checks
 src/
   pages/        Home, Explore, Country, Registry, Admin, AdminForm,
                 Auth, Network, CardDetail, CardEditor, Messages, Thread, Me,
                 Feed, Playbooks, PlaybookDetail, Upgrade
-  components/   ui.tsx, Markdown.tsx
-  lib/          api.ts, auth.tsx (session context)
+  components/   ui.tsx, Markdown.tsx, Term.tsx
+  lib/          api.ts, auth.tsx, glossary.ts, theme.ts
   styles/       app.css
-shared/types.ts shared between worker and UI
+shared/types.ts shared between worker, UI and pipeline
 scripts/        build-seed.mjs, build-playbooks.mjs, gen-country-names.mjs,
-                e2e-network.mjs, e2e-premium.mjs
+                export-data.mjs, restore-data.mjs, e2e-*.mjs
 ```
+
+`worker/agent/analyse.ts` and the adapters are imported by **both** the Worker
+and the local pipeline, so there is exactly one implementation of the maths.
+esbuild resolves the TypeScript imports when bundling the pipeline.
+
+---
+
+## What is in `data/`
+
+Everything the app needs to stand up with real content, so a fresh clone is not
+an empty shell.
+
+| Path | What it is |
+|---|---|
+| `data/research/*.json` | The verified source registry as researched: 142 publishers, every URL HTTP-checked. The input to the seed. |
+| `data/seed.sql` | Generated from the above. 142 entities and 600 source links. |
+| `data/playbooks.sql` | The 11 playbooks with their citations. |
+| `data/snapshot/*.sql` | A point-in-time export of the analysed numbers: 20,822 trade facts, 64 analysis payloads, 79 opportunity signals, 43 run records. |
+
+The first three are authored and cannot be regenerated from the repo alone;
+they are the output of research passes over ~40 institutional sources.
+
+The snapshot is different: the weekly agent regenerates it. It is kept so a
+fresh clone shows working dashboards immediately rather than empty ones, and
+because it records what the sources said on a given date, which matters when a
+figure is later revised.
+
+```bash
+npm run data:export           # rebuild the snapshot from the local database
+npm run data:restore          # apply it locally
+npm run data:restore:remote   # apply it to the deployed D1
+```
+
+The snapshot is split into ~350KB parts on purpose. `wrangler d1 execute --file`
+streams a file in one request and dies with an undici body timeout on anything
+large; a single 2.94MB file timed out after five minutes. The parts apply in
+sequence in about a minute.
+
+**No personal data is exported.** Users, business cards, messages, ratings,
+sessions, subscriptions, feed items and billing events are excluded by design.
 
 ---
 

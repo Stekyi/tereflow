@@ -9,9 +9,15 @@ directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
-# Weekly analysis run: Friday 21:00 UTC (= 21:00 GMT).
-[triggers]
-crons = ["0 21 * * 5"]
+# No [triggers] block on purpose.
+#
+# The ingest and analysis pipeline runs on a machine you control and pushes
+# finished results to /api/admin/ingest/*. See local/pipeline.ts and the
+# "Running the pipeline" section of the README.
+#
+# Workers cap subrequests per invocation, which limited a cloud run to two
+# countries per fire. Locally the whole registry finishes in one pass, and the
+# heavy work costs nothing on hardware you already own.
 
 # Local dev works with these placeholders. Before the first remote deploy run:
 #   npm run db:create      -> paste the real database_id here

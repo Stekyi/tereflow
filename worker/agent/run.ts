@@ -7,13 +7,16 @@ import { fanOutFeed } from './feed';
 import type { FactRow } from './types';
 
 /**
- * How many entities one invocation will process.
+ * How many entities one Worker invocation will process.
  *
- * Cloudflare caps subrequests per invocation (50 on the free plan, 1000 on
- * paid). Keyless, each country costs ~23 fetches because the Comtrade preview
- * endpoint only accepts one year per call. With COMTRADE_API_KEY set that drops
- * to ~9 and the paid budget applies. Entities are processed oldest-first so
- * coverage rotates fairly rather than always refreshing the same few.
+ * This path is the manual "Run analysis" button in Admin, kept for spot checks
+ * on a single country. The scheduled pipeline runs locally instead: see
+ * local/pipeline.ts.
+ *
+ * The limit is why. Workers cap subrequests per invocation at 50 on the free
+ * plan, and keyless a single country costs about 23 calls because the Comtrade
+ * preview endpoint accepts one year at a time. Two countries is all that fits.
+ * Locally there is no cap and the whole registry finishes in about an hour.
  */
 const MAX_ENTITIES_FREE = 2;
 const MAX_ENTITIES_PAID = 90;

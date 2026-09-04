@@ -42,22 +42,17 @@ app.get('*', (c) => c.env.ASSETS.fetch(c.req.raw));
 
 export default {
   fetch: app.fetch,
-
-  /**
-   * Friday 21:00 UTC. Re-reads the sources for every activated country,
-   * rebuilds the analysis the dashboards sit on, and health-checks the
-   * registered official links.
-   */
-  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(
-      (async () => {
-        const { runAnalysis } = await import('./agent/run');
-        const { checkAllLinks } = await import('./agent/linkcheck');
-        const result = await runAnalysis(env, 'cron');
-        console.log('[cron] analysis', JSON.stringify(result));
-        const links = await checkAllLinks(env, 120);
-        console.log('[cron] linkcheck', JSON.stringify(links));
-      })(),
-    );
-  },
 } satisfies ExportedHandler<Env>;
+
+/**
+ * There is deliberately no scheduled() handler.
+ *
+ * Fetching and analysing runs on a machine you control, not on Workers. It
+ * pushes finished analysis to /api/admin/ingest/*. See local/pipeline.ts.
+ *
+ * Two reasons. Workers cap subrequests per invocation, which limited a cloud
+ * run to two countries and forced it to rotate; locally the whole registry
+ * finishes in one pass. And the heavy work costs nothing on hardware you
+ * already own, so the Worker stays on the free tier doing what it is good at,
+ * which is serving readers.
+ */

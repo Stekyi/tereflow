@@ -7,3 +7,9 @@ dist/
 *.log
 .DS_Store
 
+# Local pipeline: secrets, build output and run logs stay on the machine.
+local/.env
+local/dist/
+local/logs/
+local/run-pipeline.cmd
+

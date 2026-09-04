@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    // The pipeline imports the Worker's adapter and analysis code, so it needs
+    // the same ambient types even though it runs under Node.
+    "types": ["@cloudflare/workers-types", "node"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.local.tsbuildinfo"
+  },
+  "include": ["local/**/*.ts", "worker", "shared"]
+}

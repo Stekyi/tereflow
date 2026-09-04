@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
-const RESEARCH_DIR =
-  'C:\\Users\\danieltekyi\\.scout\\copilot\\session-state\\11bde2a8-881a-43ca-ac19-f1d5105b7fab\\files';
+// Source JSON lives in the repo so the seed can be rebuilt or amended without
+// re-running the research pass that produced it.
+const RESEARCH_DIR = 'data/research';
 
 const INPUTS = [
   'seed-orgs.json',
@@ -10,7 +11,7 @@ const INPUTS = [
   'seed-americas.json',
 ];
 
-const OUT = new URL('../data/seed.sql', import.meta.url).pathname.replace(/^\//, '');
+const OUT = 'data/seed.sql';
 
 /**
  * Countries ticked on out of the box so the dashboard has something in it.
@@ -57,7 +58,7 @@ const bySlug = new Map();
 const warnings = [];
 
 for (const file of INPUTS) {
-  const path = `${RESEARCH_DIR}\\${file}`;
+  const path = `${RESEARCH_DIR}/${file}`;
   if (!existsSync(path)) {
     warnings.push(`missing input: ${file}`);
     continue;

@@ -1,12 +1,17 @@
 import type {
+  BusinessCard,
+  BusinessCardInput,
+  ConversationSummary,
   CountryDashboard,
   Entity,
   EntityInput,
   EntityWithSources,
+  Message,
+  Rating,
+  SessionUser,
 } from '../../shared/types';
 
 const ADMIN_TOKEN_KEY = 'ta_admin_token';
-const TIER_KEY = 'ta_tier';
 
 export function getAdminToken(): string {
   return localStorage.getItem(ADMIN_TOKEN_KEY) ?? '';
@@ -16,25 +21,16 @@ export function setAdminToken(token: string) {
   else localStorage.removeItem(ADMIN_TOKEN_KEY);
 }
 
-/** Phase 1 stand-in for real billing so the premium gate can be demonstrated. */
-export function getTier(): 'free' | 'premium' {
-  return localStorage.getItem(TIER_KEY) === 'premium' ? 'premium' : 'free';
-}
-export function setTier(tier: 'free' | 'premium') {
-  localStorage.setItem(TIER_KEY, tier);
-}
-
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set('accept', 'application/json');
   if (init.body) headers.set('content-type', 'application/json');
-  headers.set('x-ta-tier', getTier());
   if (path.startsWith('/api/admin')) {
     const token = getAdminToken();
     if (token) headers.set('authorization', `Bearer ${token}`);
   }
 
-  const res = await fetch(path, { ...init, headers });
+  const res = await fetch(path, { ...init, headers, credentials: 'same-origin' });
   const text = await res.text();
   let body: unknown = null;
   try {
@@ -141,5 +137,73 @@ export const api = {
         '/api/admin/sources/check',
         { method: 'POST' },
       ),
+  },
+
+  auth: {
+    me: () =>
+      req<{
+        user: SessionUser | null;
+        has_card?: boolean;
+        card_published?: boolean;
+        unread?: number;
+      }>('/api/auth/me'),
+    register: (input: {
+      email: string;
+      password: string;
+      full_name: string;
+      country_iso3?: string;
+    }) =>
+      req<{ user: SessionUser }>('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    login: (input: { email: string; password: string }) =>
+      req<{ user: SessionUser }>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    logout: () => req<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
+    setTier: (tier: 'free' | 'premium') =>
+      req<{ tier: string }>('/api/auth/tier', { method: 'POST', body: JSON.stringify({ tier }) }),
+  },
+
+  network: {
+    myCard: () => req<{ card: BusinessCard | null }>('/api/network/cards/me'),
+    saveCard: (input: BusinessCardInput) =>
+      req<{ card: BusinessCard }>('/api/network/cards/me', {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
+    discover: (params: Record<string, string | undefined> = {}) => {
+      const qs = new URLSearchParams();
+      for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v);
+      const s = qs.toString();
+      return req<{ cards: BusinessCard[]; count: number }>(
+        `/api/network/cards${s ? `?${s}` : ''}`,
+      );
+    },
+    card: (id: string) =>
+      req<{ card: BusinessCard; ratings: Rating[] }>(`/api/network/cards/${id}`),
+    startConversation: (input: { to_user_id: string; subject?: string; body?: string }) =>
+      req<{ conversation_id: string }>('/api/network/conversations', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    conversations: () =>
+      req<{ conversations: ConversationSummary[] }>('/api/network/conversations'),
+    messages: (id: string) =>
+      req<{ messages: Message[]; other: { id: string; name: string; company: string | null } }>(
+        `/api/network/conversations/${id}/messages`,
+      ),
+    send: (id: string, body: string) =>
+      req<{ message: Message }>(`/api/network/conversations/${id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ body }),
+      }),
+    rate: (input: { subject_id: string; score: number; dealt_in?: string; comment?: string }) =>
+      req<{ ok: true }>('/api/network/ratings', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
   },
 };

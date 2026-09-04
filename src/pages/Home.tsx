@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, getTier, setTier, type HomeStats } from '../lib/api';
+import { api, type HomeStats } from '../lib/api';
+import { useSession } from '../lib/auth';
 import { Empty, Skeletons } from '../components/ui';
 import type { Entity } from '../../shared/types';
 
@@ -8,7 +9,8 @@ export default function Home() {
   const [stats, setStats] = useState<HomeStats | null>(null);
   const [active, setActive] = useState<Entity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tier, setTierState] = useState(getTier());
+  const { user, refresh } = useSession();
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     Promise.all([api.stats(), api.entities({ kind: 'country' })])
@@ -20,10 +22,15 @@ export default function Home() {
       .finally(() => setLoading(false));
   }, []);
 
-  function toggleTier() {
-    const next = tier === 'premium' ? 'free' : 'premium';
-    setTier(next);
-    setTierState(next);
+  async function toggleTier() {
+    if (!user) return;
+    setBusy(true);
+    try {
+      await api.auth.setTier(user.tier === 'premium' ? 'free' : 'premium');
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -95,13 +102,38 @@ export default function Home() {
               title="Your watchlist"
               body="Follow a product or a market and get the push-and-pull analysis in your feed each week."
             />
-            <button className="btn block" onClick={toggleTier} style={{ marginTop: 12 }}>
-              {tier === 'premium' ? 'Premium preview on — turn off' : 'Preview premium features'}
+            <button className="btn block" onClick={toggleTier} style={{ marginTop: 12 }} disabled={busy}>
+              {user
+                ? user.tier === 'premium'
+                  ? 'Premium preview on — turn off'
+                  : 'Preview premium features'
+                : 'Join free to preview premium'}
             </button>
+            {!user && (
+              <Link className="btn ghost block" to="/join" style={{ marginTop: 8 }}>
+                Create free account
+              </Link>
+            )}
             <p className="tiny dim" style={{ margin: '8px 0 0', textAlign: 'center' }}>
               Preview toggle stands in for billing until Phase 3.
             </p>
           </div>
+
+          <div className="section-head">
+            <h2>Find people to trade with</h2>
+            <Link className="hint" to="/network">
+              Open network ›
+            </Link>
+          </div>
+          <Link className="list-item" to="/network">
+            <span className="grow">
+              <span className="name">Buyers, sellers, suppliers and distributors</span>
+              <span className="tiny dim">
+                Search by product or market, then message them directly
+              </span>
+            </span>
+            <span className="dim">›</span>
+          </Link>
 
           {stats?.last_run && (
             <p className="tiny dim" style={{ textAlign: 'center', marginTop: 18 }}>

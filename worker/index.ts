@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import type { Env } from './lib/db';
 import { admin } from './routes/admin';
 import { pub } from './routes/public';
+import { auth } from './routes/auth';
+import { network } from './routes/network';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -10,6 +12,8 @@ app.get('/api/health', (c) =>
 );
 
 app.route('/api/admin', admin);
+app.route('/api/auth', auth);
+app.route('/api/network', network);
 app.route('/api', pub);
 
 app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404));

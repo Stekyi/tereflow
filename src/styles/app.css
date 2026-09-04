@@ -170,6 +170,102 @@ main {
   height: 22px;
 }
 
+.tab-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-badge {
+  position: absolute;
+  top: -4px;
+  right: -9px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--down);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* ---------- message thread ---------- */
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 96px;
+}
+
+.bubble {
+  max-width: 82%;
+  padding: 10px 13px 20px;
+  border-radius: 16px;
+  font-size: 14.5px;
+  line-height: 1.45;
+  position: relative;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bubble.mine {
+  align-self: flex-end;
+  background: var(--brand);
+  color: #04101f;
+  border-bottom-right-radius: 5px;
+}
+
+.bubble.theirs {
+  align-self: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 5px;
+}
+
+.bubble .stamp {
+  position: absolute;
+  right: 11px;
+  bottom: 6px;
+  font-size: 10px;
+  opacity: 0.6;
+  font-weight: 600;
+}
+
+.composer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  z-index: 45;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 10px var(--pad);
+  background: rgba(11, 18, 32, 0.96);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+}
+
+.composer textarea {
+  flex: 1;
+  min-height: 44px;
+  max-height: 120px;
+  margin: 0;
+  border-radius: 14px;
+}
+
+.composer .btn {
+  flex: none;
+  height: 44px;
+}
+
 /* ---------- primitives ---------- */
 
 .card {

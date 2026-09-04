@@ -10,7 +10,7 @@ Working name only — change `APP_NAME` in `wrangler.toml` and the `<title>` in
 
 ## What is built
 
-**Phase 1 is complete and running.**
+**Phases 1 and 2 are complete and running.**
 
 | Piece | State |
 |---|---|
@@ -21,11 +21,15 @@ Working name only — change `APP_NAME` in `wrangler.toml` and the `<title>` in
 | Cron trigger, Friday 21:00 GMT | done |
 | Country dashboard: trend, products, partners, recommendations | done |
 | Early-signal engine behind a premium gate | done |
-| Mobile-first React shell with bottom tab bar | done |
+| Free registration and sessions | done |
+| Business cards with buying / selling / supplying intent | done |
+| Discovery search by product, sector, intent and country | done |
+| Direct messages with unread counts | done |
+| Peer ratings, restricted to people you have dealt with | done |
+| Mobile-first React shell with five-tab bottom bar | done |
 
-Phase 2 (accounts, business cards, DMs, ratings) and Phase 3 (billing,
-playbooks, personal feed) have their database schema in `migrations/0002` but no
-UI yet.
+Phase 3 (billing, expert playbooks, personalised feed) has its database schema
+in `migrations/0002` but no UI yet.
 
 ---
 
@@ -111,6 +115,42 @@ Early signal   Metal ores & ash — +108%/yr, rank 7, projected 1
 
 ---
 
+## The network
+
+Registration is three fields — name, email, password. The business card is a
+separate optional step, so nobody is blocked at the door.
+
+A card carries what actually matters for finding a counterparty: **intent**
+(buying, selling, supplying, distributing, partnering, agent, logistics,
+finance), sectors, the products in the words a buyer would search for, and the
+markets they want to reach. Discovery searches all of it through SQLite FTS5,
+with a LIKE fallback so a search never hard-fails on odd punctuation.
+
+Messaging is a straight thread per pair. Conversations are keyed on the sorted
+user pair, so A messaging B and B messaging A can never produce two threads.
+Unread counts drive the badge on the Messages tab and clear when the thread is
+opened.
+
+Ratings are one per rater per subject, and you can only rate someone you have
+actually exchanged messages with. Re-rating updates the existing score rather
+than stacking a second one. The average is recomputed on the card each time.
+
+Passwords are PBKDF2-SHA256 at 100,000 iterations via WebCrypto, since Workers
+have no native bcrypt. Sessions are opaque ids in D1 behind an HttpOnly,
+SameSite=Lax cookie; the Secure flag is set only over https so local dev works.
+
+Login failures return the same message whether or not the account exists, and
+burn comparable time on a missing account, so the form cannot be used to
+enumerate users.
+
+### The premium gate
+
+The tier is read from the signed-in session server-side. An earlier build
+trusted an `x-ta-tier` request header, which meant anyone could unlock premium
+with curl. There is a test for that specific regression.
+
+---
+
 ## Running it
 
 ```bash
@@ -193,7 +233,15 @@ Or just hit **Run analysis** in the admin console.
 migrations/     0001 registry + facts + analysis, 0002 network + premium
 worker/
   index.ts      Hono app, SPA fallback, scheduled() handler
-  routes/       admin.ts (CRUD, activation, runs), public.ts (dashboards)
+  lib/
+    db.ts       bindings, D1 helpers, chunked IN clauses
+    auth.ts     admin shared-token gate
+    session.ts  PBKDF2 hashing, sessions, cookies
+  routes/
+    admin.ts    registry CRUD, activation, runs, link checks
+    public.ts   dashboards, rankings, registry browser
+    auth.ts     register, login, logout, me, tier
+    network.ts  cards, discovery, conversations, messages, ratings
   agent/
     run.ts      orchestrator, budget and rotation
     analyse.ts  all the maths and the plain-English layer
@@ -201,21 +249,34 @@ worker/
     adapters/   comtrade.ts, worldbank.ts
     linkcheck.ts
 src/
-  pages/        Home, Explore, Country, Registry, Admin, AdminForm
+  pages/        Home, Explore, Country, Registry, Admin, AdminForm,
+                Auth, Network, CardDetail, CardEditor, Messages, Thread, Me
   components/   ui.tsx
+  lib/          api.ts, auth.tsx (session context)
   styles/       app.css
 shared/types.ts shared between worker and UI
-scripts/        build-seed.mjs, gen-country-names.mjs, extract-research.mjs
+scripts/        build-seed.mjs, gen-country-names.mjs, e2e-network.mjs
 ```
+
+---
+
+## Tests
+
+```bash
+npx wrangler dev                 # terminal 1
+node scripts/e2e-network.mjs     # terminal 2
+```
+
+47 checks across registration, cards, discovery, messaging, ratings,
+authorisation guardrails and the premium gate. Exits non-zero on any failure.
 
 ---
 
 ## Next
 
-**Phase 2 — the network.** Free registration, the business-card profile (intent:
-buying, selling, supplying, distributing, partnering), search by product or
-market, direct messages, peer ratings after a dealing. Schema is already in
-`0002_network.sql`.
+**Phase 3 — premium.** Billing, the expert playbook library (`playbooks` table
+exists), and fanning subscribed products into a personal weekly feed
+(`subscriptions` and `feed_items` tables exist).
 
-**Phase 3 — premium.** Billing, the expert playbook library, and fanning
-subscribed products into a personal weekly feed.
+Worth doing alongside it: email verification, password reset, rate limiting on
+login and message send, and image upload for card avatars.

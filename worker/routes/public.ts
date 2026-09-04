@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { attachSources, bad, getEntityBySlug, json } from '../lib/db';
+import { currentUser } from '../lib/session';
 import type {
   CountryDashboard,
   Entity,
@@ -97,7 +98,9 @@ pub.get('/dashboard/:slug', async (c) => {
     );
   }
 
-  const isPremium = c.req.header('x-ta-tier') === 'premium';
+  // The gate is the signed-in user's tier. A client header cannot buy premium.
+  const viewer = await currentUser(c.req.raw, c.env);
+  const isPremium = viewer?.tier === 'premium';
 
   const [overview, topExports, topImports, services, partnersExport, partnersImport, trend, recs] =
     await Promise.all([
@@ -143,7 +146,7 @@ pub.get('/dashboard/:slug', async (c) => {
     computed_at: computed?.at ?? null,
   };
 
-  return json(payload, 200, { 'cache-control': 'public, max-age=900' });
+  return json(payload, 200, { 'cache-control': 'private, max-age=300' });
 });
 
 /** Where the numbers came from — shown under every dashboard. */

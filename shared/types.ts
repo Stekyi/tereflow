@@ -185,6 +185,107 @@ export const INTENT_LABEL: Record<Intent, string> = {
   financier: 'Finance',
 };
 
+// --- network layer ----------------------------------------------------------
+
+export interface SessionUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: 'member' | 'admin';
+  tier: 'free' | 'premium';
+  country_iso3: string | null;
+}
+
+export interface BusinessCard {
+  id: string;
+  user_id: string;
+  display_name: string;
+  company: string | null;
+  headline: string | null;
+  bio: string | null;
+  country_iso3: string;
+  city: string | null;
+  website: string | null;
+  whatsapp: string | null;
+  intents: Intent[];
+  sectors: string[];
+  hs_codes: string[];
+  target_markets: string[];
+  is_published: 0 | 1;
+  is_verified: 0 | 1;
+  rating_avg: number;
+  rating_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BusinessCardInput {
+  display_name: string;
+  company?: string | null;
+  headline?: string | null;
+  bio?: string | null;
+  country_iso3: string;
+  city?: string | null;
+  website?: string | null;
+  whatsapp?: string | null;
+  intents: Intent[];
+  sectors?: string[];
+  hs_codes?: string[];
+  target_markets?: string[];
+  is_published?: boolean;
+}
+
+export interface ConversationSummary {
+  id: string;
+  other_user_id: string;
+  other_name: string;
+  other_company: string | null;
+  other_country: string | null;
+  last_message: string | null;
+  last_message_at: string | null;
+  unread: number;
+}
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  body: string;
+  read_at: string | null;
+  created_at: string;
+  mine: boolean;
+}
+
+export interface Rating {
+  id: string;
+  rater_id: string;
+  rater_name: string;
+  score: number;
+  dealt_in: string | null;
+  comment: string | null;
+  created_at: string;
+}
+
+/** Rough sector list to keep card creation to a couple of taps. */
+export const SECTOR_OPTIONS = [
+  'Agriculture & food',
+  'Minerals & energy',
+  'Chemicals',
+  'Plastics & rubber',
+  'Textiles & apparel',
+  'Wood & paper',
+  'Metals',
+  'Machinery & electronics',
+  'Transport equipment',
+  'Construction materials',
+  'Pharmaceuticals & health',
+  'Consumer goods',
+  'Logistics & freight',
+  'Financial services',
+  'Professional services',
+  'Technology & software',
+] as const;
+
 export function fmtUsd(v: number | null | undefined): string {
   if (v == null || !isFinite(v)) return '—';
   const abs = Math.abs(v);

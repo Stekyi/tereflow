@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
   Area,
   AreaChart,
@@ -10,7 +10,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { api, getTier } from '../lib/api';
+import { api } from '../lib/api';
+import { useSession } from '../lib/auth';
 import { BarRow, Chips, Empty, Skeletons, Stat } from '../components/ui';
 import {
   fmtPct,
@@ -35,7 +36,8 @@ export default function Country() {
   const [tab, setTab] = useState<Tab>('summary');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const tier = getTier();
+  const { user } = useSession();
+  const tier = user?.tier ?? 'free';
 
   useEffect(() => {
     setLoading(true);
@@ -331,7 +333,15 @@ export default function Country() {
                 Products growing fast enough to change this market inside four years, while they are
                 still outside the headline rankings.
               </p>
-              <span className="badge premium">Premium feature</span>
+              {user ? (
+                <Link className="btn primary" to="/me">
+                  Turn on premium preview
+                </Link>
+              ) : (
+                <Link className="btn primary" to={`/join?next=/country/${slug}`}>
+                  Join free to unlock
+                </Link>
+              )}
             </div>
           )}
         </>

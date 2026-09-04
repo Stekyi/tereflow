@@ -18,7 +18,7 @@
     "seed:local": "wrangler d1 execute tereflow --local --file=./data/seed.sql",
     "seed:remote": "wrangler d1 execute tereflow --remote --file=./data/seed.sql",
     "agent:local": "node scripts/run-agent-local.mjs",
-    "test:reset": "node -e \"require('fs').rmSync('.wrangler/state/v3/kv',{recursive:true,force:true})\"",
+    "test:reset": "node scripts/reset-ratelimit.mjs",
     "test:e2e": "npm run test:reset && node scripts/e2e-network.mjs && node scripts/e2e-premium.mjs"
   },
   "dependencies": {

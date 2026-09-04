@@ -350,14 +350,25 @@ scripts/        build-seed.mjs, build-playbooks.mjs, gen-country-names.mjs,
 
 ```bash
 npx wrangler dev                 # terminal 1
-node scripts/e2e-network.mjs     # 47 checks
-node scripts/e2e-premium.mjs     # 48 checks
+npm run test:e2e                 # terminal 2
 ```
 
 95 checks across registration, cards, discovery, messaging, ratings,
 subscriptions, feed fan-out and dedupe, playbook gating, billing, entitlement
 expiry, webhook signature handling, rate limiting, and every authorisation
-boundary. Both exit non-zero on failure, so they drop straight into CI.
+boundary. Exits non-zero on any failure, so it drops straight into CI.
+
+The suites can also be run individually:
+
+```bash
+node scripts/e2e-network.mjs     # 47 checks
+node scripts/e2e-premium.mjs     # 48 checks
+```
+
+`npm run test:e2e` tries to clear the local rate-limit state first. On Windows
+that fails while `wrangler dev` holds the KV files open, which is harmless and
+reported rather than fatal. If a run ever reports 429s, stop the dev server and
+run it again.
 
 ---
 

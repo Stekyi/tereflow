@@ -1,0 +1,1357 @@
+[
+  {
+    "slug": "china",
+    "name": "China",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "CHN",
+    "agency_name": "General Administration of Customs (GACC) / National Bureau of Statistics",
+    "homepage": "https://www.stats.gov.cn/english/",
+    "sources": {
+      "export": [
+        {
+          "url": "http://english.customs.gov.cn/statics/report/monthly.html",
+          "label": "GACC Monthly Trade Statistics Bulletin",
+          "fmt": "html"
+        },
+        {
+          "url": "http://english.customs.gov.cn/statics/report/preliminary.html",
+          "label": "GACC Preliminary Monthly Release",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "http://english.customs.gov.cn/statics/report/monthly.html",
+          "label": "GACC Monthly Trade Statistics Bulletin (imports)",
+          "fmt": "html"
+        },
+        {
+          "url": "http://english.customs.gov.cn/statics/report/preliminary.html",
+          "label": "GACC Preliminary Monthly Release",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.stats.gov.cn/english/",
+          "label": "NBS China - English statistics portal",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "No open public API. GACC publishes monthly HTML/XLS bulletins; NBS data.stats.gov.cn easyquery endpoint exists but returns 403 to non-browser clients. Scraping/headless required."
+  },
+  {
+    "slug": "japan",
+    "name": "Japan",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "JPN",
+    "agency_name": "Ministry of Finance Customs / e-Stat (Statistics Bureau of Japan)",
+    "homepage": "https://www.e-stat.go.jp/en",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.e-stat.go.jp/api/",
+          "label": "e-Stat REST API (appId required)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.customs.go.jp/toukei/info/index_e.htm",
+          "label": "Trade Statistics of Japan - MOF Customs",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.e-stat.go.jp/en",
+          "label": "e-Stat English portal",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.e-stat.go.jp/api/",
+          "label": "e-Stat REST API (appId required)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.customs.go.jp/toukei/info/index_e.htm",
+          "label": "Trade Statistics of Japan - Imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.e-stat.go.jp/api/",
+          "label": "e-Stat API - services trade / retail-wholesale indices",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.e-stat.go.jp/en",
+          "label": "e-Stat English portal",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "e-Stat provides a free REST API (getStatsData/getStatsList) requiring a free application ID; base host www.e-stat.go.jp/api. English UI at /en. MOF Customs publishes monthly CSV/XLS."
+  },
+  {
+    "slug": "india",
+    "name": "India",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "IND",
+    "agency_name": "Ministry of Commerce & Industry (TRADESTAT / DGCI&S); MoSPI",
+    "homepage": "https://tradestat.commerce.gov.in/eidb/commodity_wise_export",
+    "sources": {
+      "export": [
+        {
+          "url": "https://tradestat.commerce.gov.in/eidb/commodity_wise_export",
+          "label": "TRADESTAT - Commodity-wise exports (EIDB)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://tradestat.commerce.gov.in/eidb/commodity_wise_import",
+          "label": "TRADESTAT - Commodity-wise imports (EIDB)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.mospi.gov.in/",
+          "label": "MoSPI - National Accounts / GDP by economic activity",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "No public REST API. TRADESTAT is a session-based ASP.NET form app (POST queries, session cookie + no-back JS); requires form-post scraping. Root https://tradestat.commerce.gov.in/ 302-redirects to /eidb/commodity_wise_export."
+  },
+  {
+    "slug": "south-korea",
+    "name": "South Korea",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "KOR",
+    "agency_name": "Statistics Korea (KOSIS) / Korea Customs Service Trade Statistics",
+    "homepage": "https://kosis.kr/eng/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://kosis.kr/openapi/index/index.jsp",
+          "label": "KOSIS OpenAPI (key required)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://tradedata.go.kr/cts/index.do",
+          "label": "Korea Customs Service trade statistics portal",
+          "fmt": "html"
+        },
+        {
+          "url": "https://kosis.kr/eng/",
+          "label": "KOSIS English portal",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://kosis.kr/openapi/index/index.jsp",
+          "label": "KOSIS OpenAPI (key required)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://tradedata.go.kr/cts/index.do",
+          "label": "Korea Customs Service - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://kosis.kr/openapi/index/index.jsp",
+          "label": "KOSIS OpenAPI - retail/wholesale & services",
+          "fmt": "api"
+        },
+        {
+          "url": "https://kosis.kr/eng/",
+          "label": "KOSIS English portal",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "KOSIS OpenAPI is free with registration key; JSON/XML. Korea Customs Service moved from unipass.customs.go.kr/ets to tradedata.go.kr (302). KCS also has its own open API via data.go.kr."
+  },
+  {
+    "slug": "indonesia",
+    "name": "Indonesia",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "IDN",
+    "agency_name": "Badan Pusat Statistik (BPS - Statistics Indonesia)",
+    "homepage": "https://webapi.bps.go.id/documentation/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://webapi.bps.go.id/documentation/",
+          "label": "BPS WebAPI documentation (key required)",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://webapi.bps.go.id/documentation/",
+          "label": "BPS WebAPI - dynamic tables (imports)",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://webapi.bps.go.id/documentation/",
+          "label": "BPS WebAPI - GDP by economic activity / trade turnover",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "BPS WebAPI is free JSON with a key token from the API portal (2-3 tokens per user). www.bps.go.id returns 403 to non-browser agents, so the API is the only machine-usable path."
+  },
+  {
+    "slug": "saudi-arabia",
+    "name": "Saudi Arabia",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "SAU",
+    "agency_name": "General Authority for Statistics (GASTAT)",
+    "homepage": "https://www.stats.gov.sa/en",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.stats.gov.sa/en/statistics-tabs/-/categories/522",
+          "label": "GASTAT International Trade statistics category",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.stats.gov.sa/en",
+          "label": "GASTAT English portal",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.stats.gov.sa/en/statistics-tabs/-/categories/522",
+          "label": "GASTAT International Trade - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.stats.gov.sa/en/statistics-tabs/-/categories/523",
+          "label": "GASTAT economic statistics category (national accounts)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "No documented public REST API. GASTAT publishes XLSX/PDF bulletins on a Liferay portal; category IDs are stable path segments."
+  },
+  {
+    "slug": "taiwan",
+    "name": "Taiwan",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "TWN",
+    "agency_name": "Ministry of Finance - Customs Administration Trade Statistics",
+    "homepage": "https://portal.sw.nat.gov.tw/APGA/GA30E",
+    "sources": {
+      "export": [
+        {
+          "url": "https://portal.sw.nat.gov.tw/APGA/GA30E",
+          "label": "MOF Trade Statistics Database Query (English)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.mof.gov.tw/eng",
+          "label": "Ministry of Finance (English)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://portal.sw.nat.gov.tw/APGA/GA30E",
+          "label": "MOF Trade Statistics - Total Imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.mof.gov.tw/eng",
+          "label": "MOF English statistics releases",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "MOF trade portal is a JSF query app with CSV/XLS export per query; no documented REST API. Release calendar published (e.g. 2026/8 preliminary due 2026-09-10)."
+  },
+  {
+    "slug": "israel",
+    "name": "Israel",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "ISR",
+    "agency_name": "Central Bureau of Statistics (CBS Israel)",
+    "homepage": "https://www.cbs.gov.il/en/Pages/default.aspx",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.cbs.gov.il/en/subjects/Pages/Foreign-Trade.aspx",
+          "label": "CBS Foreign Trade subject page (English)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://api.cbs.gov.il/index/data/price?id=120010&format=json&download=false",
+          "label": "CBS public JSON API (api.cbs.gov.il) - index/series service",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.cbs.gov.il/en/subjects/Pages/Foreign-Trade.aspx",
+          "label": "CBS Foreign Trade - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://api.cbs.gov.il/index/data/price?id=120010&format=json&download=false",
+          "label": "CBS API - price/turnover indices",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.cbs.gov.il/en/Pages/default.aspx",
+          "label": "CBS English home / main indicators",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "api.cbs.gov.il is open, no key, JSON (verified live). Hebrew field labels even in JSON. Note apiportal.cbs.gov.il does not resolve; use api.cbs.gov.il directly."
+  },
+  {
+    "slug": "thailand",
+    "name": "Thailand",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "THA",
+    "agency_name": "Ministry of Commerce (Trade Report) / Thai Customs Department",
+    "homepage": "https://tradereport.moc.go.th/en",
+    "sources": {
+      "export": [
+        {
+          "url": "https://tradereport.moc.go.th/en",
+          "label": "MOC Thailand Trade Statistics (English)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.customs.go.th/statistic_report.php?lang=en&left_menu=menu_report",
+          "label": "Thai Customs statistical reports",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://tradereport.moc.go.th/en",
+          "label": "MOC Trade Statistics - imports",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.customs.go.th/statistic_report.php?lang=en&left_menu=menu_report",
+          "label": "Thai Customs statistical reports (imports)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://tradereport.moc.go.th/en",
+          "label": "MOC trade dashboards",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "MOC tradereport is an Angular SPA with XLSX export endpoints; no documented public API. NSO Thailand (nso.go.th) blocks automated clients (HTTP 418)."
+  },
+  {
+    "slug": "uae",
+    "name": "United Arab Emirates",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "ARE",
+    "agency_name": "Federal Competitiveness and Statistics Centre (FCSC) - UAE Stat",
+    "homepage": "https://fcsc.gov.ae/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://uaestat.fcsc.gov.ae/",
+          "label": "UAE Stat data explorer (.Stat Suite)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://fcsc.gov.ae/",
+          "label": "FCSC official statistics portal",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://uaestat.fcsc.gov.ae/",
+          "label": "UAE Stat data explorer - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://uaestat.fcsc.gov.ae/",
+          "label": "UAE Stat - national accounts by activity",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "uaestat.fcsc.gov.ae runs the OECD .Stat Suite Data Explorer, which normally exposes an SDMX REST endpoint - worth probing for /rest/data. FCSC legacy SharePoint statistics pages now 301 to the WordPress root."
+  },
+  {
+    "slug": "singapore",
+    "name": "Singapore",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "SGP",
+    "agency_name": "Department of Statistics Singapore (SingStat) / Enterprise Singapore",
+    "homepage": "https://www.singstat.gov.sg/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://tablebuilder.singstat.gov.sg/api/table/tabledata/M451091",
+          "label": "SingStat TableBuilder API - exports/re-exports by commodity (M451091)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.singstat.gov.sg/",
+          "label": "SingStat portal",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://tablebuilder.singstat.gov.sg/api/table/tabledata/M451111",
+          "label": "SingStat TableBuilder API - merchandise imports (M451111)",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://tablebuilder.singstat.gov.sg/api/table/tabledata/M451091",
+          "label": "TableBuilder API root pattern for services/retail tables",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.singstat.gov.sg/",
+          "label": "SingStat portal - services & retail indices",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "SingStat TableBuilder REST API is FREE and needs NO key: GET https://tablebuilder.singstat.gov.sg/api/table/tabledata/{resourceId}. Verified live JSON with metadata + footnotes. Resource-search endpoint requires correct query params (bare ?keyword= returns 400)."
+  },
+  {
+    "slug": "philippines",
+    "name": "Philippines",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "PHL",
+    "agency_name": "Philippine Statistics Authority (PSA) - OpenSTAT",
+    "homepage": "https://openstat.psa.gov.ph/PXWeb/api/v1/en/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://openstat.psa.gov.ph/PXWeb/api/v1/en/",
+          "label": "PSA OpenSTAT PxWeb API root (database 'DB')",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://openstat.psa.gov.ph/PXWeb/api/v1/en/",
+          "label": "PSA OpenSTAT PxWeb API - imports tables",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://openstat.psa.gov.ph/PXWeb/api/v1/en/",
+          "label": "PSA OpenSTAT PxWeb API - GDP by industry",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "PSA runs PxWeb: GET /PXWeb/api/v1/en/ returns [{\"dbid\":\"DB\"}]; navigate /en/DB/... then POST a JSON query for JSON-stat. NOTE: psa.gov.ph and openstat.psa.gov.ph HTML pages return 403 to non-browser clients, but the PxWeb API path responds 200."
+  },
+  {
+    "slug": "vietnam",
+    "name": "Vietnam",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "VNM",
+    "agency_name": "General Department of Vietnam Customs / National Statistics Office (NSO, formerly GSO)",
+    "homepage": "https://www.nso.gov.vn/en/homepage/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.customs.gov.vn/index.jsp?pageId=6&cid=1145",
+          "label": "Vietnam Customs statistics section",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.customs.gov.vn/",
+          "label": "General Department of Vietnam Customs",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.customs.gov.vn/index.jsp?pageId=6&cid=1145",
+          "label": "Vietnam Customs statistics - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.nso.gov.vn/en/homepage/",
+          "label": "National Statistics Office of Vietnam (English)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "No public API. GSO was renamed National Statistics Office; www.gso.gov.vn now fails TLS/DNS from some clients - use www.nso.gov.vn. Customs site is Vietnamese-only with XLS downloads."
+  },
+  {
+    "slug": "bangladesh",
+    "name": "Bangladesh",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "BGD",
+    "agency_name": "Bangladesh Bureau of Statistics (BBS) / Export Promotion Bureau (EPB)",
+    "homepage": "https://bbs.gov.bd",
+    "sources": {
+      "export": [
+        {
+          "url": "https://epb.gov.bd/",
+          "label": "Export Promotion Bureau - export statistics",
+          "fmt": "html"
+        },
+        {
+          "url": "https://bbs.gov.bd",
+          "label": "Bangladesh Bureau of Statistics",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://bbs.gov.bd",
+          "label": "BBS - external trade / import statistics",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://bbs.gov.bd",
+          "label": "BBS - national accounts / GDP by activity",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "No API. BBS and EPB publish PDF/XLSX; sites are largely Bengali. Note www.bbs.gov.bd 301s to bbs.gov.bd (no www) and www.bb.org.bd (Bangladesh Bank) did not resolve during verification."
+  },
+  {
+    "slug": "malaysia",
+    "name": "Malaysia",
+    "kind": "country",
+    "continent": "Asia",
+    "iso3": "MYS",
+    "agency_name": "Department of Statistics Malaysia (DOSM) / OpenDOSM",
+    "homepage": "https://www.dosm.gov.my/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://developer.data.gov.my/",
+          "label": "data.gov.my OpenAPI documentation (DOSM datasets)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://open.dosm.gov.my/",
+          "label": "OpenDOSM external trade dashboards",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.dosm.gov.my/",
+          "label": "DOSM official portal",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://developer.data.gov.my/",
+          "label": "data.gov.my OpenAPI - trade data catalogue",
+          "fmt": "api"
+        },
+        {
+          "url": "https://open.dosm.gov.my/",
+          "label": "OpenDOSM dashboards - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://open.dosm.gov.my/",
+          "label": "OpenDOSM - GDP by economic activity, wholesale & retail index",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "data.gov.my exposes a free keyless OpenAPI (api.data.gov.my/data-catalogue?id=...) documented at developer.data.gov.my; exact dataset ids must be looked up from the catalogue (bare id=trade returns 404). api.dosm.gov.my does not resolve."
+  },
+  {
+    "slug": "germany",
+    "name": "Germany",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "DEU",
+    "agency_name": "Statistisches Bundesamt (Destatis) - GENESIS-Online",
+    "homepage": "https://www.destatis.de/EN/Themes/Economy/Foreign-Trade/_node.html",
+    "sources": {
+      "export": [
+        {
+          "url": "https://genesis.destatis.de/genesisWS/rest/2020/helloworld/whoami",
+          "label": "GENESIS-Online REST API v2020 (base; free account required)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.destatis.de/EN/Themes/Economy/Foreign-Trade/_node.html",
+          "label": "Destatis Foreign Trade (English)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN",
+          "label": "Eurostat mirror - intra/extra EU trade",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://genesis.destatis.de/genesisWS/rest/2020/helloworld/whoami",
+          "label": "GENESIS-Online REST API (tables 51000 series)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.destatis.de/EN/Themes/Economy/Foreign-Trade/_node.html",
+          "label": "Destatis Foreign Trade - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://genesis.destatis.de/genesisWS/rest/2020/helloworld/whoami",
+          "label": "GENESIS API - retail/wholesale turnover indices, GDP by activity",
+          "fmt": "api"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN",
+          "label": "Eurostat dissemination API",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "GENESIS-Online REST API base is https://genesis.destatis.de/genesisWS/rest/2020/ (verified via helloworld/whoami, returns JSON). IMPORTANT: the old www-genesis.destatis.de host now 307-redirects to genesis.destatis.de - use the new host. Free registration gives a username/password or token for data calls."
+  },
+  {
+    "slug": "united-kingdom",
+    "name": "United Kingdom",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "GBR",
+    "agency_name": "HM Revenue & Customs (uktradeinfo) / Office for National Statistics",
+    "homepage": "https://www.uktradeinfo.com/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://api.uktradeinfo.com/",
+          "label": "HMRC uktradeinfo OData API - Export entity set",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.uktradeinfo.com/",
+          "label": "uktradeinfo trade data tools",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.ons.gov.uk/economy/nationalaccounts/balanceofpayments/bulletins/uktrade/latest",
+          "label": "ONS UK Trade bulletin",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://api.uktradeinfo.com/",
+          "label": "HMRC uktradeinfo OData API - Import entity set",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.uktradeinfo.com/",
+          "label": "uktradeinfo imports tools",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://api.beta.ons.gov.uk/v1/datasets",
+          "label": "ONS Beta REST API - dataset catalogue (services/retail)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.ons.gov.uk/economy/nationalaccounts/balanceofpayments/bulletins/uktrade/latest",
+          "label": "ONS UK Trade (services included)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "BEST-IN-CLASS: api.uktradeinfo.com is a keyless OData v4 service; the service document lists entity sets Commodity, CommoditySearch, Country, Date, Export, FlowType, Import, Port, SITC, Trader. ONS api.beta.ons.gov.uk/v1/datasets is keyless JSON."
+  },
+  {
+    "slug": "france",
+    "name": "France",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "FRA",
+    "agency_name": "INSEE / Direction generale des douanes (Le Kiosque)",
+    "homepage": "https://lekiosque.finances.gouv.fr/portail_default.asp",
+    "sources": {
+      "export": [
+        {
+          "url": "https://bdm.insee.fr/series/sdmx/dataflow",
+          "label": "INSEE BDM SDMX 2.1 API - dataflow list (keyless)",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://lekiosque.finances.gouv.fr/portail_default.asp",
+          "label": "Douanes 'Le Kiosque' foreign trade statistics",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.douane.gouv.fr/la-douane/opendata",
+          "label": "French Customs open data",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://bdm.insee.fr/series/sdmx/dataflow",
+          "label": "INSEE BDM SDMX API - import series",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://lekiosque.finances.gouv.fr/portail_default.asp",
+          "label": "Le Kiosque - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://bdm.insee.fr/series/sdmx/dataflow",
+          "label": "INSEE SDMX - services trade, retail turnover, GDP by branch",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN",
+          "label": "Eurostat dissemination API",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "INSEE SDMX is reachable KEYLESS at https://bdm.insee.fr/series/sdmx/ (dataflow / data / datastructure). api.insee.fr (the token-gated developer portal) did not resolve during verification - prefer bdm.insee.fr."
+  },
+  {
+    "slug": "italy",
+    "name": "Italy",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "ITA",
+    "agency_name": "Istituto Nazionale di Statistica (ISTAT)",
+    "homepage": "https://www.istat.it/en/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://esploradati.istat.it/SDMXWS/rest/dataflow/IT1",
+          "label": "ISTAT SDMX 2.1 web service - dataflows (agency IT1, keyless)",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://www.istat.it/en/",
+          "label": "ISTAT English portal",
+          "fmt": "html"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN",
+          "label": "Eurostat mirror",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://esploradati.istat.it/SDMXWS/rest/dataflow/IT1",
+          "label": "ISTAT SDMX - import dataflows",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://www.istat.it/en/",
+          "label": "ISTAT English portal - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://esploradati.istat.it/SDMXWS/rest/dataflow/IT1",
+          "label": "ISTAT SDMX - services trade, retail trade index, value added by activity",
+          "fmt": "sdmx"
+        }
+      ]
+    },
+    "api_notes": "ISTAT SDMX endpoint https://esploradati.istat.it/SDMXWS/rest/ (NSI Web Service v9.11) is keyless and returned valid SDMX-ML 2.1. The old coeweb.istat.it foreign-trade portal did not respond during verification; the /databrowser/ UI root returned a server error but the SDMX web service works."
+  },
+  {
+    "slug": "spain",
+    "name": "Spain",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "ESP",
+    "agency_name": "Instituto Nacional de Estadistica (INE) / Secretaria de Estado de Comercio (DataComex)",
+    "homepage": "https://www.ine.es/en/index.htm",
+    "sources": {
+      "export": [
+        {
+          "url": "https://datacomex.comercio.es/",
+          "label": "DataComex - Spanish foreign trade database (Customs + Eurostat)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.ine.es/en/index.htm",
+          "label": "INE English portal",
+          "fmt": "html"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN",
+          "label": "Eurostat mirror",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://datacomex.comercio.es/",
+          "label": "DataComex - imports",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.ine.es/en/index.htm",
+          "label": "INE English portal",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.ine.es/en/index.htm",
+          "label": "INE - services sector indicators / GDP by activity",
+          "fmt": "html"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN",
+          "label": "Eurostat dissemination API",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "INE has a JSON API (servicios.ine.es/wstempus/js/EN/...) but it returned HTTP 502 at verification time, so it is NOT included; retry later - it is keyless when up. Old comercio.serviciosmin.gob.es/datacomex is retired and points to datacomex.comercio.es."
+  },
+  {
+    "slug": "netherlands",
+    "name": "Netherlands",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "NLD",
+    "agency_name": "Centraal Bureau voor de Statistiek (CBS) - StatLine OpenData",
+    "homepage": "https://opendata.cbs.nl/ODataCatalog/Tables?$format=json",
+    "sources": {
+      "export": [
+        {
+          "url": "https://opendata.cbs.nl/ODataApi/odata/84407ENG",
+          "label": "CBS OData - International trade; import and export value, SITC-1, countries, from 1917",
+          "fmt": "api"
+        },
+        {
+          "url": "https://opendata.cbs.nl/ODataCatalog/Tables?$format=json",
+          "label": "CBS OData catalogue (all tables, keyless)",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://opendata.cbs.nl/ODataApi/odata/84407ENG",
+          "label": "CBS OData 84407ENG - imports by SITC and country",
+          "fmt": "api"
+        },
+        {
+          "url": "https://opendata.cbs.nl/ODataCatalog/Tables?$format=json",
+          "label": "CBS OData catalogue",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://opendata.cbs.nl/ODataApi/odata/84765ENG",
+          "label": "CBS OData - International trade; imports and exports of SERVICES by country, quarter",
+          "fmt": "api"
+        },
+        {
+          "url": "https://opendata.cbs.nl/ODataCatalog/Tables?$format=json",
+          "label": "CBS OData catalogue",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "CBS OpenData is fully keyless OData v3: /ODataApi/odata/{id}/TypedDataSet, /UntypedDataSet, /TableInfos. English tables end in ENG. Catalogue supports $filter=substringof('International trade',Title). Other useful ids found: 84668ENG (trade & transit by transport mode), 85427ENG/85428ENG (goods, change of ownership)."
+  },
+  {
+    "slug": "turkey",
+    "name": "Turkey",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "TUR",
+    "agency_name": "Turkish Statistical Institute (TUIK / TurkStat)",
+    "homepage": "https://www.tuik.gov.tr/Home/Index",
+    "sources": {
+      "export": [
+        {
+          "url": "https://veriportali.tuik.gov.tr/Kategori/GetKategori?p=Foreign-Trade-104&dil=2",
+          "label": "TUIK Data Portal - Foreign Trade category (English, dil=2)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.tuik.gov.tr/Home/Index",
+          "label": "TurkStat main portal",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://veriportali.tuik.gov.tr/Kategori/GetKategori?p=Foreign-Trade-104&dil=2",
+          "label": "TUIK Foreign Trade category - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://veriportali.tuik.gov.tr/Kategori/GetKategori?p=Foreign-Trade-104&dil=2",
+          "label": "TUIK data portal (services trade, retail sales index under other categories)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "TUIK moved its data portal: data.tuik.gov.tr now 302-redirects to veriportali.tuik.gov.tr. dil=2 selects English. The portal is a JS SPA backed by internal JSON endpoints (/Kategori/GetKategori) - scrapeable, no documented public API key."
+  },
+  {
+    "slug": "switzerland",
+    "name": "Switzerland",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "CHE",
+    "agency_name": "Federal Office for Customs and Border Security (BAZG) / Federal Statistical Office (BFS)",
+    "homepage": "https://www.bazg.admin.ch/en/foreign-trade-statistics",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.bazg.admin.ch/en/foreign-trade-statistics",
+          "label": "Swiss foreign trade statistics (BAZG, English)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.pxweb.bfs.admin.ch/api/v1/en/",
+          "label": "BFS PxWeb API root (keyless)",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.bazg.admin.ch/en/foreign-trade-statistics",
+          "label": "BAZG foreign trade - imports",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.pxweb.bfs.admin.ch/api/v1/en/",
+          "label": "BFS PxWeb API",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.pxweb.bfs.admin.ch/api/v1/en/",
+          "label": "BFS PxWeb API - retail trade turnover, GDP by activity",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "BFS runs PxWeb keyless at https://www.pxweb.bfs.admin.ch/api/v1/en/ (returns db list px-x-*). Swiss-Impex (www.swiss-impex.admin.ch and gate.ezv.admin.ch/swissimpex) returned 403/404 to automated fetches - the BAZG topic page is the stable entry."
+  },
+  {
+    "slug": "poland",
+    "name": "Poland",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "POL",
+    "agency_name": "Statistics Poland (GUS) - Local Data Bank (BDL)",
+    "homepage": "https://stat.gov.pl/en/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://bdl.stat.gov.pl/api/v1/subjects?format=json",
+          "label": "GUS BDL REST API v1 (keyless for low volume)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://stat.gov.pl/en/topics/prices-trade/",
+          "label": "Statistics Poland - Prices, Trade topic (English)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN",
+          "label": "Eurostat mirror",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://bdl.stat.gov.pl/api/v1/subjects?format=json",
+          "label": "GUS BDL API - import variables",
+          "fmt": "api"
+        },
+        {
+          "url": "https://stat.gov.pl/en/topics/prices-trade/",
+          "label": "GUS Prices & Trade (imports)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://bdl.stat.gov.pl/api/v1/subjects?format=json",
+          "label": "GUS BDL API - retail/wholesale turnover, GDP by activity",
+          "fmt": "api"
+        },
+        {
+          "url": "https://stat.gov.pl/en/",
+          "label": "Statistics Poland English portal",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "BDL API v1 (bdl.stat.gov.pl/api/v1) is keyless with rate limits; a free X-ClientId raises quotas. Paged JSON with HAL-style links. Note: /en/topics/prices-trade/foreign-trade/ is 404 - the valid parent path is /en/topics/prices-trade/."
+  },
+  {
+    "slug": "belgium",
+    "name": "Belgium",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "BEL",
+    "agency_name": "Statbel (Statistics Belgium) / National Bank of Belgium (foreign trade compiler)",
+    "homepage": "https://statbel.fgov.be/en",
+    "sources": {
+      "export": [
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN",
+          "label": "Eurostat dissemination API (Belgian trade, keyless)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://statbel.fgov.be/en",
+          "label": "Statbel English portal",
+          "fmt": "html"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/web/international-trade-in-goods/database",
+          "label": "Eurostat COMEXT / ITGS database",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN",
+          "label": "Eurostat dissemination API - imports",
+          "fmt": "api"
+        },
+        {
+          "url": "https://statbel.fgov.be/en",
+          "label": "Statbel English portal",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://statbel.fgov.be/en",
+          "label": "Statbel - turnover indices / national accounts",
+          "fmt": "html"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/web/international-trade-in-goods/database",
+          "label": "Eurostat ITGS database",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "WEAKEST EUROPEAN ENTRY. stat.nbb.be and www.nbb.be returned HTTP 520/connection failures and every statbel /en/themes/... foreign-trade path tested returned 404, so only the Statbel root and the Eurostat mirror are verified. Re-crawl statbel theme slugs later."
+  },
+  {
+    "slug": "sweden",
+    "name": "Sweden",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "SWE",
+    "agency_name": "Statistics Sweden (SCB)",
+    "homepage": "https://api.scb.se/OV0104/v1/doris/en/ssd/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://api.scb.se/OV0104/v1/doris/en/ssd/HA",
+          "label": "SCB PxWeb API - HA0201 Foreign trade, exports and imports of goods",
+          "fmt": "api"
+        },
+        {
+          "url": "https://api.scb.se/OV0104/v1/doris/en/ssd/",
+          "label": "SCB PxWeb API root (English, keyless)",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://api.scb.se/OV0104/v1/doris/en/ssd/HA",
+          "label": "SCB PxWeb API - HA0201 imports of goods",
+          "fmt": "api"
+        },
+        {
+          "url": "https://api.scb.se/OV0104/v1/doris/en/ssd/",
+          "label": "SCB PxWeb API root",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://api.scb.se/OV0104/v1/doris/en/ssd/HA",
+          "label": "SCB - HA0202 trade in services, HA0101 turnover in service sector, HA0104 service production index",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "SCB PxWeb API is keyless: https://api.scb.se/OV0104/v1/doris/en/ssd/. Verified subject HA returns HA0201 (goods trade), HA0202 (services trade), HA0101 (service-sector turnover), HA0103 (food sales), HA0104 (service production index) - covers export, import AND commerce in one tree. Rate limit ~30 calls/10s."
+  },
+  {
+    "slug": "ireland",
+    "name": "Ireland",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "IRL",
+    "agency_name": "Central Statistics Office (CSO) - PxStat",
+    "homepage": "https://www.cso.ie/en/statistics/externaltrade/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://ws.cso.ie/public/api.restful/PxStat.Data.Cube_API.ReadCollection",
+          "label": "CSO PxStat RESTful API - dataset collection (JSON-stat 2.0, keyless)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.cso.ie/en/statistics/externaltrade/",
+          "label": "CSO External Trade statistics",
+          "fmt": "html"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN",
+          "label": "Eurostat mirror",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://ws.cso.ie/public/api.restful/PxStat.Data.Cube_API.ReadCollection",
+          "label": "CSO PxStat API - goods imports cubes",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.cso.ie/en/statistics/externaltrade/",
+          "label": "CSO External Trade - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://ws.cso.ie/public/api.restful/PxStat.Data.Cube_API.ReadCollection",
+          "label": "CSO PxStat API - services trade, retail sales index, GDP by sector",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "CSO PxStat is keyless JSON-RPC/REST: ReadCollection lists cubes; ReadDataset returns JSON-stat 2.0 e.g. /PxStat.Data.Cube_API.ReadDataset/{matrix}/JSON-stat/2.0/en."
+  },
+  {
+    "slug": "austria",
+    "name": "Austria",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "AUT",
+    "agency_name": "Statistik Austria",
+    "homepage": "https://www.statistik.at/en/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://data.statistik.gv.at/web/catalog.jsp?publicationId=OGD_aussenhandel",
+          "label": "Statistik Austria open government data - foreign trade (aussenhandel) datasets",
+          "fmt": "csv"
+        },
+        {
+          "url": "https://data.statistik.gv.at/web/catalog.jsp",
+          "label": "Statistik Austria OGD catalogue",
+          "fmt": "html"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN",
+          "label": "Eurostat mirror",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://data.statistik.gv.at/web/catalog.jsp",
+          "label": "Statistik Austria OGD catalogue - imports",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.statistik.at/en/",
+          "label": "Statistik Austria English portal",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://data.statistik.gv.at/web/catalog.jsp",
+          "label": "Statistik Austria OGD - national accounts / trade turnover",
+          "fmt": "html"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN",
+          "label": "Eurostat dissemination API",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "data.statistik.gv.at serves OGD datasets as downloadable CSV + JSON metadata per publicationId (DCAT-AP.at). Every /en/statistics/... foreign-trade slug tested returned 404, so only the English root and OGD catalogue are verified. STATcube requires session redirects."
+  },
+  {
+    "slug": "norway",
+    "name": "Norway",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "NOR",
+    "agency_name": "Statistics Norway (SSB)",
+    "homepage": "https://www.ssb.no/en/utenriksokonomi/utenrikshandel/statistikk/utenrikshandel-med-varer",
+    "sources": {
+      "export": [
+        {
+          "url": "https://data.ssb.no/api/v0/en/table/08792",
+          "label": "SSB PxWeb API table 08792 - External trade in goods, main figures (NOK million)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://data.ssb.no/api/v0/en/table/",
+          "label": "SSB PxWeb API root (English, keyless)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.ssb.no/en/utenriksokonomi/utenrikshandel/statistikk/utenrikshandel-med-varer",
+          "label": "SSB External trade in goods statistic page",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://data.ssb.no/api/v0/en/table/08792",
+          "label": "SSB table 08792 - import trade flows (Itot etc.)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://data.ssb.no/api/v0/en/table/",
+          "label": "SSB PxWeb API root",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://data.ssb.no/api/v0/en/table/",
+          "label": "SSB PxWeb API - retail sales index, services exports, GDP by industry",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "SSB PxWeb API v0 is keyless (GET metadata, POST JSON query -> JSON-stat2). Table 08792 verified: dimensions HovedVareStrommer (trade flow: Itot/Etot/Hbtot ...), ContentsCode, Tid (month)."
+  },
+  {
+    "slug": "denmark",
+    "name": "Denmark",
+    "kind": "country",
+    "continent": "Europe",
+    "iso3": "DNK",
+    "agency_name": "Statistics Denmark (Danmarks Statistik) - StatBank",
+    "homepage": "https://www.statbank.dk/statbank5a/default.asp?w=1920",
+    "sources": {
+      "export": [
+        {
+          "url": "https://api.statbank.dk/v1/subjects",
+          "label": "StatBank Denmark REST API v1 - subject tree (keyless)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://api.statbank.dk/console",
+          "label": "StatBank API console / documentation",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.statbank.dk/statbank5a/default.asp?w=1920",
+          "label": "StatBank Denmark UI",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://api.statbank.dk/v1/subjects",
+          "label": "StatBank API - external trade subject tables",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.statbank.dk/statbank5a/default.asp?w=1920",
+          "label": "StatBank Denmark UI - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://api.statbank.dk/v1/subjects",
+          "label": "StatBank API - retail trade index, services, GDP by industry",
+          "fmt": "api"
+        },
+        {
+          "url": "https://api.statbank.dk/console",
+          "label": "StatBank API console",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "StatBank REST API (api.statbank.dk/v1: subjects, tables, tableinfo, data) is keyless; ?lang=en for English but subject descriptions returned Danish at /v1/subjects. Verified /v1/tableinfo/UHV1?lang=en - note UHV1 is flagged \"active\": false (discontinued), so resolve the current external-trade table id via /v1/tables before ingesting. Current API build 1.7.0 (11 May 2026)."
+  }
+]

@@ -1,0 +1,1238 @@
+[
+  {
+    "slug": "south-africa",
+    "name": "South Africa",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "ZAF",
+    "agency_name": "Statistics South Africa / South African Revenue Service",
+    "homepage": "https://www.statssa.gov.za/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.sars.gov.za/customs-and-excise/trade-statistics/",
+          "label": "SARS merchandise trade statistics (exports)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.sars.gov.za/customs-and-excise/trade-statistics/",
+          "label": "SARS merchandise trade statistics (imports)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.statssa.gov.za/",
+          "label": "Stats SA GDP, retail & wholesale trade releases",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "SARS is the legal compiler of merchandise trade and publishes monthly xlsx/csv bulk files from the trade-statistics landing page - programmatically ingestible. statssa.gov.za sits behind Imperva/Incapsula and returns a JS challenge to non-browser clients, so Stats SA releases (GDP, retail/wholesale trade) need a headless browser or manual mirroring."
+  },
+  {
+    "slug": "egypt",
+    "name": "Egypt",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "EGY",
+    "agency_name": "Central Agency for Public Mobilization and Statistics (CAPMAS)",
+    "homepage": "https://www.capmas.gov.eg/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.capmas.gov.eg/Pages/Publications.aspx?page_id=5104",
+          "label": "CAPMAS publications - foreign trade bulletins",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.capmas.gov.eg/Pages/Publications.aspx?page_id=5104",
+          "label": "CAPMAS publications - foreign trade bulletins",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.capmas.gov.eg/",
+          "label": "CAPMAS statistical portal (national accounts, services)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "No public API. CAPMAS uses ASP.NET query-string paging; bulletins are pdf/xlsx behind page_id parameters. Central Bank of Egypt external-trade statistics page is blocked by its WAF for automated clients, so CAPMAS is the ingestion path; UN Comtrade recommended as a mirror."
+  },
+  {
+    "slug": "nigeria",
+    "name": "Nigeria",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "NGA",
+    "agency_name": "National Bureau of Statistics (NBS)",
+    "homepage": "https://nigerianstat.gov.ng/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://nigerianstat.gov.ng/elibrary",
+          "label": "NBS e-Library - Foreign Trade in Goods Statistics (quarterly)",
+          "fmt": "xlsx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://nigerianstat.gov.ng/elibrary",
+          "label": "NBS e-Library - Foreign Trade in Goods Statistics (quarterly)",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://nigerianstat.gov.ng/elibrary",
+          "label": "NBS e-Library - GDP by economic activity (quarterly)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.cbn.gov.ng/",
+          "label": "CBN statistical bulletin / economic reports",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "NBS e-Library serves pdf + xlsx downloads per report id - bulk ingestible by scraping the e-library index. No documented API. statistics.cbn.gov.ng now 301-redirects to an unrelated /shop path and should not be used."
+  },
+  {
+    "slug": "algeria",
+    "name": "Algeria",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "DZA",
+    "agency_name": "Office National des Statistiques (ONS) / Direction Generale des Douanes",
+    "homepage": "https://www.ons.dz/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.douane.gov.dz/",
+          "label": "Douanes algeriennes - statistiques du commerce exterieur",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.ons.dz/",
+          "label": "ONS - statistiques du commerce exterieur",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.douane.gov.dz/",
+          "label": "Douanes algeriennes - importations",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.ons.dz/",
+          "label": "ONS - importations",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.ons.dz/",
+          "label": "ONS - comptes nationaux / PIB par branche",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Customs (Douanes) is the real compiler of merchandise trade; ONS republishes. Both roots verified live (ONS last updated 2 Sept 2026). Deep-link paths are SPIP query strings that change; crawl from the roots. No API, releases are pdf/xls."
+  },
+  {
+    "slug": "ethiopia",
+    "name": "Ethiopia",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "ETH",
+    "agency_name": "Ethiopian Statistical Service (ESS)",
+    "homepage": "https://ess.gov.et/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://ess.gov.et/",
+          "label": "ESS economic statistics / external trade reports",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://ess.gov.et/",
+          "label": "ESS economic statistics / external trade reports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://ess.gov.et/",
+          "label": "ESS national accounts / GDP by activity",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "The old host www.statsethiopia.gov.et no longer resolves (NXDOMAIN); the live portal is ess.gov.et (WordPress, 200). Trade data in Ethiopia is compiled by Customs and the National Bank of Ethiopia; ESS publishes pdf reports only. Recommend UN Comtrade as the machine-readable fallback."
+  },
+  {
+    "slug": "morocco",
+    "name": "Morocco",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "MAR",
+    "agency_name": "Office des Changes / Haut-Commissariat au Plan (HCP)",
+    "homepage": "https://www.oc.gov.ma/en",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.oc.gov.ma/en",
+          "label": "Office des Changes - statistiques des echanges exterieurs (exports)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.oc.gov.ma/en",
+          "label": "Office des Changes - statistiques des echanges exterieurs (imports)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.hcp.ma/",
+          "label": "HCP - comptes nationaux, PIB par branche, indices d'activite",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Office des Changes (FX/trade authority), not the NSO, is the official publisher of Moroccan merchandise trade; it issues monthly xls/pdf 'Indicateurs des echanges exterieurs'. Only the site root verified 200 - the /en/etudes-et-statistiques/... deep paths returned 404, so crawl from the root. HCP covers national accounts/services."
+  },
+  {
+    "slug": "kenya",
+    "name": "Kenya",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "KEN",
+    "agency_name": "Kenya National Bureau of Statistics (KNBS)",
+    "homepage": "https://www.knbs.or.ke/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.knbs.or.ke/all-reports/",
+          "label": "KNBS reports - Leading Economic Indicators / Economic Survey (exports)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.centralbank.go.ke/statistics/",
+          "label": "CBK statistics - trade and balance of payments",
+          "fmt": "xlsx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.knbs.or.ke/all-reports/",
+          "label": "KNBS reports - Leading Economic Indicators (imports)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.centralbank.go.ke/statistics/",
+          "label": "CBK statistics - imports by category",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.knbs.or.ke/all-reports/",
+          "label": "KNBS Quarterly GDP report / GDP by economic activity",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "KNBS uses the Download Monitor plugin (dlm-version 5.0.23) - each report is a stable file URL, so bulk xlsx/pdf ingestion works by scraping /all-reports/. CBK publishes monthly trade series in xlsx. No REST API on either."
+  },
+  {
+    "slug": "angola",
+    "name": "Angola",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "AGO",
+    "agency_name": "Instituto Nacional de Estatistica (INE) / Banco Nacional de Angola",
+    "homepage": "https://www.bna.ao/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.bna.ao/",
+          "label": "BNA - estatisticas do sector externo (exportacoes)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.bna.ao/",
+          "label": "BNA - estatisticas do sector externo (importacoes)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.bna.ao/",
+          "label": "BNA - boletim estatistico / contas externas",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "INE Angola (ine.gov.ao and www.ine.gov.ao) failed to connect on repeated attempts - portal effectively offline/unreachable from outside, likely TLS or host failure. Banco Nacional de Angola is used as the working publisher. Fall back to UN Comtrade for HS-level merchandise detail."
+  },
+  {
+    "slug": "tanzania",
+    "name": "Tanzania",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "TZA",
+    "agency_name": "National Bureau of Statistics (NBS Tanzania)",
+    "homepage": "https://www.nbs.go.tz/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.nbs.go.tz/",
+          "label": "NBS Tanzania - foreign trade statistics",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.bot.go.tz/",
+          "label": "Bank of Tanzania - Monthly Economic Review (exports)",
+          "fmt": "pdf"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.nbs.go.tz/",
+          "label": "NBS Tanzania - foreign trade statistics",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.bot.go.tz/",
+          "label": "Bank of Tanzania - Monthly Economic Review (imports)",
+          "fmt": "pdf"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.nbs.go.tz/",
+          "label": "NBS Tanzania - National Accounts / GDP by activity",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "Bank of Tanzania publishes the timeliest monthly goods trade series (Monthly Economic Review, pdf + xlsx annexes); NBS publishes annual/quarterly trade and national accounts in xlsx. No API."
+  },
+  {
+    "slug": "cote-divoire",
+    "name": "Cote d'Ivoire",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "CIV",
+    "agency_name": "Institut National de la Statistique (INS) / BCEAO",
+    "homepage": "https://www.bceao.int/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.bceao.int/",
+          "label": "BCEAO - statistiques du commerce exterieur (UEMOA/Cote d'Ivoire)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.bceao.int/",
+          "label": "BCEAO - importations",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.bceao.int/",
+          "label": "BCEAO - comptes nationaux et indicateurs economiques",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "www.ins.ci failed to connect at verification (unreachable). Per rule 3, the central bank (BCEAO, the shared WAEMU central bank) is used as the real publisher - it issues monthly/annual trade and BoP series per member state in pdf/xls via its statistical database. UN Comtrade recommended as HS-level fallback."
+  },
+  {
+    "slug": "ghana",
+    "name": "Ghana",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "GHA",
+    "agency_name": "Ghana Statistical Service",
+    "homepage": "https://statsghana.gov.gh/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://statsghana.gov.gh/data-statistics/business-industry-and-trade-statistics",
+          "label": "GSS Business, Industry & Trade Statistics (merchandise exports)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.bog.gov.gh/publications/statistical-bulletin/",
+          "label": "Bank of Ghana Statistical Bulletin - monthly merchandise exports",
+          "fmt": "pdf"
+        },
+        {
+          "url": "https://www.bog.gov.gh/economic-data/",
+          "label": "Bank of Ghana economic data - external sector time series",
+          "fmt": "xlsx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://statsghana.gov.gh/data-statistics/business-industry-and-trade-statistics",
+          "label": "GSS Business, Industry & Trade Statistics (merchandise imports)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.bog.gov.gh/publications/statistical-bulletin/",
+          "label": "Bank of Ghana Statistical Bulletin - monthly merchandise imports",
+          "fmt": "pdf"
+        },
+        {
+          "url": "https://www.bog.gov.gh/economic-data/",
+          "label": "Bank of Ghana economic data - imports time series",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://statsghana.gov.gh/data-statistics/economic-statistics",
+          "label": "GSS Economic Statistics - quarterly GDP by economic activity, services",
+          "fmt": "html"
+        },
+        {
+          "url": "https://statsghana.gov.gh/publications/monthly-wrap-and-policy-brief",
+          "label": "GSS Monthly Wrap & Policy Brief",
+          "fmt": "pdf"
+        }
+      ]
+    },
+    "api_notes": "No API. GSS relaunched on a Next.js site in 2026; trade and GDP releases are pdf + xlsx under /data-statistics/*. GSS's own StatsBank portal (https://statsbank.statsghana.gov.gh/) FAILED TO CONNECT at verification - do not depend on it for ingestion. Bank of Ghana is the timeliest publisher (monthly merchandise exports/imports in the Statistical Bulletin and the economic-data time series); Ghana Revenue Authority customs data is not published openly. UN Comtrade for HS-level detail."
+  },
+  {
+    "slug": "dr-congo",
+    "name": "DR Congo",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "COD",
+    "agency_name": "Institut National de la Statistique (INS-RDC) / Banque Centrale du Congo",
+    "homepage": "https://www.bcc.cd/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.bcc.cd/",
+          "label": "BCC - condense d'informations statistiques (exportations)",
+          "fmt": "pdf"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.bcc.cd/",
+          "label": "BCC - condense d'informations statistiques (importations)",
+          "fmt": "pdf"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.bcc.cd/",
+          "label": "BCC - rapport annuel / comptes nationaux",
+          "fmt": "pdf"
+        }
+      ]
+    },
+    "api_notes": "www.ins-rdc.org returns HTTP 403 to automated clients (WAF/bot block) - probably reachable in a browser but not ingestible, so it is excluded. Banque Centrale du Congo publishes the weekly 'Condense d'informations statistiques' with trade aggregates in pdf/xls. Use UN Comtrade for HS detail."
+  },
+  {
+    "slug": "uganda",
+    "name": "Uganda",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "UGA",
+    "agency_name": "Uganda Bureau of Statistics (UBOS)",
+    "homepage": "https://www.ubos.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.ubos.org/explore-statistics/",
+          "label": "UBOS statistics explorer - external trade statistics",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.bou.or.ug/",
+          "label": "Bank of Uganda - trade statistics / BoP",
+          "fmt": "xlsx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.ubos.org/explore-statistics/",
+          "label": "UBOS statistics explorer - imports",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.bou.or.ug/",
+          "label": "Bank of Uganda - imports data",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.ubos.org/explore-statistics/",
+          "label": "UBOS - GDP by economic activity / national accounts",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "UBOS publishes downloadable xlsx datasets under /explore-statistics/ (numbered topic ids); Bank of Uganda mirrors monthly trade in its statistics section. No REST API."
+  },
+  {
+    "slug": "tunisia",
+    "name": "Tunisia",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "TUN",
+    "agency_name": "Institut National de la Statistique (INS Tunisie)",
+    "homepage": "https://www.ins.tn/en",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.ins.tn/en/statistiques/57",
+          "label": "INS - foreign trade statistics tables (exports)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.ins.tn/en/statistiques/57",
+          "label": "INS - foreign trade statistics tables (imports)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.ins.tn/en/statistiques/106",
+          "label": "INS - national accounts / activity indicators tables",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "INS serves numbered statistics pages that render HTML tables plus xls/csv export buttons - the most machine-readable African NSO in this set after ABS/StatsNZ. Quarterly GDP releases confirmed current (Q2 2026 published 15-08-2026)."
+  },
+  {
+    "slug": "cameroon",
+    "name": "Cameroon",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "CMR",
+    "agency_name": "Institut National de la Statistique (INS Cameroun)",
+    "homepage": "https://ins-cameroun.cm/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://ins-cameroun.cm/",
+          "label": "INS Cameroun - commerce exterieur / annuaire statistique",
+          "fmt": "pdf"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://ins-cameroun.cm/",
+          "label": "INS Cameroun - importations",
+          "fmt": "pdf"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://ins-cameroun.cm/",
+          "label": "INS Cameroun - comptes nationaux / PIB par branche",
+          "fmt": "pdf"
+        }
+      ]
+    },
+    "api_notes": "Site root verified live (French, WordPress). Trade is compiled jointly with the Directorate General of Customs and published in the annual statistical yearbook and quarterly notes (pdf/xls). BEAC (regional central bank) also publishes Cameroon trade aggregates. No API - UN Comtrade recommended for HS-level."
+  },
+  {
+    "slug": "libya",
+    "name": "Libya",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "LBY",
+    "agency_name": "Central Bank of Libya (Bureau of Statistics portal offline)",
+    "homepage": "https://cbl.gov.ly/en/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://cbl.gov.ly/en/",
+          "label": "CBL economic bulletin - oil and non-oil exports",
+          "fmt": "pdf"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://cbl.gov.ly/en/",
+          "label": "CBL economic bulletin - imports / letters of credit",
+          "fmt": "pdf"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://cbl.gov.ly/en/",
+          "label": "CBL annual/quarterly economic bulletin",
+          "fmt": "pdf"
+        }
+      ]
+    },
+    "api_notes": "CRITICAL: the Libyan Bureau of Statistics and Census domain bsc.ly is no longer a government site - it now serves an online-casino squatter page. There is no working national statistics portal. Central Bank of Libya is the only live official publisher (verified 200). Use UN Comtrade / IMF DOTS for Libyan merchandise trade."
+  },
+  {
+    "slug": "zambia",
+    "name": "Zambia",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "ZMB",
+    "agency_name": "Zambia Statistics Agency (ZamStats)",
+    "homepage": "https://www.zamstats.gov.zm/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.zamstats.gov.zm/economic-statistics/",
+          "label": "ZamStats economic statistics - monthly external trade",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.zamstats.gov.zm/publications/",
+          "label": "ZamStats publications library (trade bulletins)",
+          "fmt": "pdf"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.zamstats.gov.zm/economic-statistics/",
+          "label": "ZamStats economic statistics - imports",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.zamstats.gov.zm/publications/",
+          "label": "ZamStats publications library",
+          "fmt": "pdf"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.zamstats.gov.zm/economic-statistics/",
+          "label": "ZamStats - GDP by economic activity / national accounts",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.boz.zm/",
+          "label": "Bank of Zambia statistics",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "ZamStats is unusually current - the homepage published July 2026 trade balance (K4.1bn surplus) at verification time. Monthly bulletins come as pdf plus xlsx annexes; no API. Bank of Zambia supplements with BoP."
+  },
+  {
+    "slug": "senegal",
+    "name": "Senegal",
+    "kind": "country",
+    "continent": "Africa",
+    "iso3": "SEN",
+    "agency_name": "Agence Nationale de la Statistique et de la Demographie (ANSD)",
+    "homepage": "https://www.ansd.sn/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.ansd.sn/publications",
+          "label": "ANSD publications - commerce exterieur mensuel (exportations)",
+          "fmt": "pdf"
+        },
+        {
+          "url": "https://www.bceao.int/",
+          "label": "BCEAO - Senegal external trade series",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.ansd.sn/publications",
+          "label": "ANSD publications - commerce exterieur mensuel (importations)",
+          "fmt": "pdf"
+        },
+        {
+          "url": "https://www.bceao.int/",
+          "label": "BCEAO - Senegal imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.ansd.sn/publications",
+          "label": "ANSD - comptes nationaux trimestriels / PIB par branche",
+          "fmt": "pdf"
+        }
+      ]
+    },
+    "api_notes": "ANSD /publications verified 200 (Drupal listing, pdf + some xlsx). /statistiques/economie returns 404 - do not use. BCEAO carries the harmonised WAEMU trade series for Senegal."
+  },
+  {
+    "slug": "australia",
+    "name": "Australia",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "AUS",
+    "agency_name": "Australian Bureau of Statistics (ABS)",
+    "homepage": "https://www.abs.gov.au/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.abs.gov.au/statistics/economy/international-trade/international-trade-goods",
+          "label": "International Trade in Goods (monthly) - exports",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.abs.gov.au/statistics/economy/international-trade",
+          "label": "ABS international trade topic hub",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.abs.gov.au/statistics/economy/international-trade/international-trade-goods",
+          "label": "International Trade in Goods (monthly) - imports",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.abs.gov.au/statistics/economy/international-trade/international-trade-supplementary-information-financial-year",
+          "label": "International Trade: Supplementary Information, Financial Year",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.abs.gov.au/statistics/economy/international-trade",
+          "label": "ABS international trade in services / BoP releases",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "Best-in-class: ABS releases csv/xlsx time-series data cubes with every release AND offers the ABS Data API (SDMX-JSON) at data.api.abs.gov.au - note the API root path itself returns 403, calls must target /rest/data/{dataflow}/... Release calendar confirmed live through Feb 2027."
+  },
+  {
+    "slug": "new-zealand",
+    "name": "New Zealand",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "NZL",
+    "agency_name": "Stats NZ / Tatauranga Aotearoa",
+    "homepage": "https://www.stats.govt.nz/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.stats.govt.nz/topics/imports-and-exports/",
+          "label": "Overseas merchandise trade - exports",
+          "fmt": "csv"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.stats.govt.nz/topics/imports-and-exports/",
+          "label": "Overseas merchandise trade - imports",
+          "fmt": "csv"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.stats.govt.nz/",
+          "label": "Stats NZ - GDP by industry, wholesale/retail trade surveys",
+          "fmt": "csv"
+        }
+      ]
+    },
+    "api_notes": "Monthly overseas merchandise trade published with csv/xlsx downloads. Bulk time series live in Infoshare (infoshare.stats.govt.nz) and NZ.Stat, which require a session cookie (the Infoshare root 302-redirects with AspxAutoDetectCookieSupport), so scripted ingestion should use the release-page csv links rather than Infoshare."
+  },
+  {
+    "slug": "papua-new-guinea",
+    "name": "Papua New Guinea",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "PNG",
+    "agency_name": "National Statistical Office of Papua New Guinea",
+    "homepage": "https://www.nso.gov.pg/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.nso.gov.pg/statistics/economy/",
+          "label": "NSO PNG - international merchandise trade (exports)",
+          "fmt": "pdf"
+        },
+        {
+          "url": "https://www.nso.gov.pg/statistics/",
+          "label": "NSO PNG statistics by topic",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.nso.gov.pg/statistics/economy/",
+          "label": "NSO PNG - international merchandise trade (imports)",
+          "fmt": "pdf"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.nso.gov.pg/statistics/economy/",
+          "label": "NSO PNG - GDP / balance of payments / business statistics",
+          "fmt": "pdf"
+        }
+      ]
+    },
+    "api_notes": "NSO PNG is a WordPress site using the WPFD file-directory plugin: publications are pdf/xlsx under /documents/. The IMTS release is dated (latest listed release page is the 2020 release), so Bank of PNG Quarterly Economic Bulletin and SPC Pacific Data Hub are better for recency."
+  },
+  {
+    "slug": "fiji",
+    "name": "Fiji",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "FJI",
+    "agency_name": "Fiji Bureau of Statistics",
+    "homepage": "https://www.statsfiji.gov.fj/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.statsfiji.gov.fj/statistics/economic-statistics/",
+          "label": "FBoS economic statistics - merchandise trade (exports)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://stats.pacificdata.org/",
+          "label": "SPC Pacific Data Hub - Fiji IMTS",
+          "fmt": "sdmx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.statsfiji.gov.fj/statistics/economic-statistics/",
+          "label": "FBoS economic statistics - merchandise trade (imports)",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.statsfiji.gov.fj/statistics/economic-statistics/",
+          "label": "FBoS - GDP by industry / national accounts",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.rbf.gov.fj/",
+          "label": "Reserve Bank of Fiji - economic review, trade and services",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "FBoS publishes xlsx bulletins and also feeds SDMX (its site advertises an sdmx integration with SPC). Note /statistics/economic-statistics/merchandise-trade/ is a 404 - the correct parent path is /statistics/economic-statistics/."
+  },
+  {
+    "slug": "new-caledonia",
+    "name": "New Caledonia",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "NCL",
+    "agency_name": "Institut de la statistique et des etudes economiques (ISEE-NC)",
+    "homepage": "https://isee.nc/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://isee.nc/echanges-exterieurs",
+          "label": "ISEE - echanges exterieurs, exportations (SCIM)",
+          "fmt": "xlsx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://isee.nc/echanges-exterieurs",
+          "label": "ISEE - echanges exterieurs, importations par code douanier",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://isee.nc/economie-generale",
+          "label": "ISEE - economie generale, PIB et comptes economiques",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "ISEE publishes customs-based SCIM series with downloadable xls tables by HS customs code (confidential cells marked 'x'). Note the site canonicalises to isee.nc (www.isee.nc 301s) and its sitemap.xml erroneously emits https://localhost/ hostnames - use the slugs against isee.nc. No API."
+  },
+  {
+    "slug": "french-polynesia",
+    "name": "French Polynesia",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "PYF",
+    "agency_name": "Institut de la statistique de la Polynesie francaise (ISPF)",
+    "homepage": "https://www.ispf.pf/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.ispf.pf/themes/comext",
+          "label": "ISPF - theme Commerce exterieur (exportations)",
+          "fmt": "xlsx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.ispf.pf/themes/comext",
+          "label": "ISPF - theme Commerce exterieur (importations)",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.ispf.pf/themes/pib",
+          "label": "ISPF - theme Conjoncture et PIB",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "ISPF exposes clean theme URLs (/themes/comext, /themes/pib) plus a /data section and /publication?theme=... filter; tables download as xls/csv. Verified via the site's own sitemap.xml. No API."
+  },
+  {
+    "slug": "solomon-islands",
+    "name": "Solomon Islands",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "SLB",
+    "agency_name": "Solomon Islands National Statistics Office",
+    "homepage": "https://statistics.gov.sb/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://statistics.gov.sb/",
+          "label": "SINSO - international merchandise trade statistics",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://stats.pacificdata.org/",
+          "label": "SPC Pacific Data Hub - Solomon Islands IMTS",
+          "fmt": "sdmx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://statistics.gov.sb/",
+          "label": "SINSO - imports",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.cbsi.com.sb/",
+          "label": "CBSI - monthly economic bulletin (imports)",
+          "fmt": "pdf"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.cbsi.com.sb/",
+          "label": "Central Bank of Solomon Islands - economic bulletins, GDP",
+          "fmt": "pdf"
+        }
+      ]
+    },
+    "api_notes": "IMPORTANT: use the apex host statistics.gov.sb - www.statistics.gov.sb fails to connect. CBSI /statistics/ path is a 404; crawl from the CBSI root. SPC SDMX is the machine-readable route."
+  },
+  {
+    "slug": "vanuatu",
+    "name": "Vanuatu",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "VUT",
+    "agency_name": "Vanuatu Bureau of Statistics (VNSO)",
+    "homepage": "https://vnso.gov.vu/index.php/en/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://vnso.gov.vu/index.php/en/",
+          "label": "VNSO - international merchandise trade statistics (exports)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://stats.pacificdata.org/",
+          "label": "SPC Pacific Data Hub - Vanuatu IMTS",
+          "fmt": "sdmx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://vnso.gov.vu/index.php/en/",
+          "label": "VNSO - international merchandise trade statistics (imports)",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://vnso.gov.vu/index.php/en/",
+          "label": "VNSO - national accounts / GDP by industry",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "Joomla site; the root redirects to /index.php/en/ (use that exact URL). Guessed topic paths (/statistics-by-topic/trade, /economic-statistics) all return 404, so only the verified root is cited - crawl its menu. VNSO publishes monthly trade xlsx and also syndicates to SPC's SDMX hub."
+  },
+  {
+    "slug": "samoa",
+    "name": "Samoa",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "WSM",
+    "agency_name": "Samoa Bureau of Statistics",
+    "homepage": "https://www.sbs.gov.ws/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.sbs.gov.ws/trade-imports-exports/",
+          "label": "SBS - merchandise trade reports (exports)",
+          "fmt": "pdf"
+        },
+        {
+          "url": "https://stats.pacificdata.org/",
+          "label": "SPC Pacific Data Hub - Samoa IMTS",
+          "fmt": "sdmx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.sbs.gov.ws/trade-imports-exports/",
+          "label": "SBS - merchandise trade reports (imports)",
+          "fmt": "pdf"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.sbs.gov.ws/",
+          "label": "SBS - national accounts / GDP and economic division releases",
+          "fmt": "pdf"
+        }
+      ]
+    },
+    "api_notes": "Verified: /trade-imports-exports/ lists monthly Merchandise Trade Report pdfs (file URLs under /digi/). The site also has /national-accounts/, /economy/ and /import-price-index/ pages listed in its wp-sitemap (not individually fetched). Mostly pdf - low machine-readability; prefer SPC SDMX for ingestion."
+  },
+  {
+    "slug": "tonga",
+    "name": "Tonga",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "TON",
+    "agency_name": "Tonga Statistics Department",
+    "homepage": "https://tongastats.gov.to/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://tongastats.gov.to/statistics/economics/foreign-trade/",
+          "label": "Foreign trade statistics - exports and re-exports",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://stats.pacificdata.org/",
+          "label": "SPC Pacific Data Hub - Tonga IMTS",
+          "fmt": "sdmx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://tongastats.gov.to/statistics/economics/foreign-trade/",
+          "label": "Foreign trade statistics - imports",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://tongastats.gov.to/statistics/economics/",
+          "label": "Economic statistics - national accounts, BoP, CPI",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "Verified live and actively maintained (foreign-trade page last modified July 2026). WordPress with the WPFD file-directory plugin - downloads are xlsx/pdf under stable file URLs, scrapeable. Sub-pages /national-accounts/ and /balance-of-payments/ also exist per the site sitemap."
+  },
+  {
+    "slug": "kiribati",
+    "name": "Kiribati",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "KIR",
+    "agency_name": "Kiribati National Statistics Office",
+    "homepage": "https://nso.gov.ki/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://stats.pacificdata.org/",
+          "label": "SPC Pacific Data Hub - Kiribati merchandise trade",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://nso.gov.ki/",
+          "label": "Kiribati NSO - trade statistics / statistical yearbook",
+          "fmt": "pdf"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://stats.pacificdata.org/",
+          "label": "SPC Pacific Data Hub - Kiribati imports",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://nso.gov.ki/",
+          "label": "Kiribati NSO - imports",
+          "fmt": "pdf"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://nso.gov.ki/",
+          "label": "Kiribati NSO - GDP and national accounts",
+          "fmt": "pdf"
+        }
+      ]
+    },
+    "api_notes": "NSO site is live and recently updated (homepage shows 2024 GDP per capita of AUD 2,976; root lastmod Aug 2026). Its /statistics/ and /documents/ pages exist per wp-sitemap but were not individually fetched. Trade compilation is largely done with SPC assistance - SPC's SDMX hub is the practical ingestion route."
+  },
+  {
+    "slug": "micronesia",
+    "name": "Micronesia (Federated States of)",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "FSM",
+    "agency_name": "FSM Division of Statistics (portal unreachable) / SPC Pacific Data Hub",
+    "homepage": "https://stats.pacificdata.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://stats-nsi-stable.pacificdata.org/rest/dataflow/SPC",
+          "label": "SPC SDMX REST - dataflow catalogue incl. FSM merchandise trade",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://stats.pacificdata.org/",
+          "label": "Pacific Data Hub .Stat data explorer - FSM trade",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://stats-nsi-stable.pacificdata.org/rest/dataflow/SPC",
+          "label": "SPC SDMX REST - FSM imports",
+          "fmt": "sdmx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://stats.pacificdata.org/",
+          "label": "Pacific Data Hub - FSM national accounts / GDP",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "The FSM Division of Statistics site (fsmstatistics.fm and www.fsmstatistics.fm) FAILED TO CONNECT on repeated attempts - treat as offline. SPC's Pacific Data Hub is the authoritative regional mirror and exposes a genuine SDMX 2.1 REST API (verified: /rest/dataflow/SPC returns application/vnd.sdmx.structure+xml). Note the endpoint rejects ?format=sdmx-json with 406 - use Accept headers instead."
+  },
+  {
+    "slug": "palau",
+    "name": "Palau",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "PLW",
+    "agency_name": "Palau Bureau of Budget and Planning (Office of Planning and Statistics)",
+    "homepage": "https://www.palaugov.pw/executive-branch/ministries/finance/budgetandplanning/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.palaugov.pw/executive-branch/ministries/finance/budgetandplanning/",
+          "label": "Bureau of Budget & Planning - foreign trade / statistical yearbook",
+          "fmt": "pdf"
+        },
+        {
+          "url": "https://stats-nsi-stable.pacificdata.org/rest/dataflow/SPC",
+          "label": "SPC SDMX REST - Palau merchandise trade",
+          "fmt": "sdmx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.palaugov.pw/executive-branch/ministries/finance/budgetandplanning/",
+          "label": "Bureau of Budget & Planning - imports",
+          "fmt": "pdf"
+        },
+        {
+          "url": "https://stats-nsi-stable.pacificdata.org/rest/dataflow/SPC",
+          "label": "SPC SDMX REST - Palau imports",
+          "fmt": "sdmx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://stats.pacificdata.org/",
+          "label": "Pacific Data Hub - Palau GDP / national accounts",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "Palau has no standalone NSO domain; statistics sit under palaugov.pw (verified 200) as pdf yearbooks and quarterly economic reviews. SPC Pacific Data Hub SDMX is the only machine-readable source."
+  },
+  {
+    "slug": "marshall-islands",
+    "name": "Marshall Islands",
+    "kind": "country",
+    "continent": "Oceania",
+    "iso3": "MHL",
+    "agency_name": "Economic Policy, Planning and Statistics Office (EPPSO)",
+    "homepage": "https://rmieppso.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://rmieppso.org/",
+          "label": "EPPSO - external trade / statistical yearbook",
+          "fmt": "pdf"
+        },
+        {
+          "url": "https://stats-nsi-stable.pacificdata.org/rest/dataflow/SPC",
+          "label": "SPC SDMX REST - RMI merchandise trade",
+          "fmt": "sdmx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://rmieppso.org/",
+          "label": "EPPSO - imports",
+          "fmt": "pdf"
+        },
+        {
+          "url": "https://stats-nsi-stable.pacificdata.org/rest/dataflow/SPC",
+          "label": "SPC SDMX REST - RMI imports",
+          "fmt": "sdmx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://rmieppso.org/",
+          "label": "EPPSO - GDP / national accounts and economic indicators",
+          "fmt": "pdf"
+        }
+      ]
+    },
+    "api_notes": "EPPSO site verified live (homepage carries FY2024 public-debt indicators). Outputs are pdf/xlsx yearbooks; no API. SPC Pacific Data Hub SDMX provides the ingestible mirror."
+  }
+]

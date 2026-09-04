@@ -1,0 +1,1682 @@
+[
+  {
+    "slug": "un-comtrade",
+    "name": "UN Comtrade (United Nations Trade Statistics)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "United Nations Statistics Division",
+    "homepage": "https://comtradeplus.un.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://comtradeapi.un.org/public/v1/getDA/C/A/HS",
+          "label": "Comtrade public REST API - data availability / goods flows",
+          "fmt": "api"
+        },
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "Comtrade Plus portal",
+          "fmt": "html"
+        },
+        {
+          "url": "https://comtradedeveloper.un.org/signin?returnUrl=%2F",
+          "label": "Comtrade API developer portal (key registration)",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://comtradeapi.un.org/public/v1/getDA/C/A/HS",
+          "label": "Comtrade public REST API - import flows (flowCode=M)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "Comtrade Plus portal",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://unstats.un.org/unsd/trade/data/tables.asp",
+          "label": "UNSD historical trade tables 1900-1960",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Public tier free, no key for /public/v1 metadata; data pulls need free API key (100 calls/hr, 250/day). Premium subscription for bulk. bulk.comtrade.un.org is DEAD - use comtradeapi.un.org/bulk. Licence: UN open data."
+  },
+  {
+    "slug": "unctadstat",
+    "name": "UNCTAD (UNCTADstat Data Centre)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "United Nations Conference on Trade and Development",
+    "homepage": "https://unctadstat.unctad.org/datacentre/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://unctadstat-api.unctad.org/api/reportMetadata/US.GoodsAndServicesTotal/bulkfiles",
+          "label": "UNCTADstat bulk-file metadata API",
+          "fmt": "api"
+        },
+        {
+          "url": "https://unctadstat.unctad.org/datacentre/dataviewer/US.GoodsAndServicesTotal",
+          "label": "Goods and services trade data viewer",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://unctadstat.unctad.org/datacentre/",
+          "label": "UNCTADstat Data Centre (merchandise imports)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://unctadstat-api.unctad.org/api/reportMetadata/US.GoodsAndServicesTotal/bulkfiles",
+          "label": "Bulk download metadata API",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://unctadstat.unctad.org/datacentre/dataviewer/US.GoodsAndServicesTotal",
+          "label": "Total goods + services trade (BPM6)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Free, no key. JSON metadata API + CSV/SDMX bulk files per dataset. Rate limits undocumented. Licence: CC BY 3.0 IGO."
+  },
+  {
+    "slug": "unsd",
+    "name": "UN Statistics Division",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "United Nations Statistics Division",
+    "homepage": "https://unstats.un.org/UNSDWebsite/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://unstats.un.org/unsd/trade/data/tables.asp",
+          "label": "UNSD international trade statistics tables",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://data.un.org/",
+          "label": "UNdata - merchandise trade series",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://data.un.org/",
+          "label": "UNdata national accounts / SYB CSV downloads",
+          "fmt": "csv"
+        },
+        {
+          "url": "https://unstats.un.org/UNSDWebsite/",
+          "label": "UNSD statistics home",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "UNdata offers CSV/PDF downloads of the Statistical Yearbook; SDMX API exists for SDG series only. Free, no key. Licence: UN open data."
+  },
+  {
+    "slug": "wto-stats",
+    "name": "WTO Stats",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "World Trade Organization - Economic Research and Statistics Division",
+    "homepage": "https://stats.wto.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://apiportal.wto.org/apis",
+          "label": "WTO Timeseries API (merchandise exports)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://stats.wto.org/",
+          "label": "WTO Stats portal",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://apiportal.wto.org/",
+          "label": "WTO API developer portal",
+          "fmt": "api"
+        },
+        {
+          "url": "https://stats.wto.org/",
+          "label": "WTO Stats portal (imports)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.wto.org/english/res_e/statis_e/statis_e.htm",
+          "label": "WTO statistics hub incl. trade in commercial services",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Free API key via apiportal.wto.org (Azure APIM). Timeseries API returns JSON/CSV; ~500 req/min soft limit. Bulk CSV also downloadable. Licence: CC BY 4.0."
+  },
+  {
+    "slug": "worldbank-wits",
+    "name": "World Bank WITS (World Integrated Trade Solution)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "World Bank Group",
+    "homepage": "https://wits.worldbank.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://wits.worldbank.org/API/V1/SDMX/V21/rest/dataflow/WBG_WITS/",
+          "label": "WITS SDMX 2.1 REST dataflows (TRADESTATS-TRADE)",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://wits.worldbank.org/witsapiintro.aspx",
+          "label": "WITS API documentation",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://wits.worldbank.org/API/V1/SDMX/V21/rest/dataflow/WBG_WITS/",
+          "label": "WITS SDMX 2.1 REST - import flows",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://wits.worldbank.org/",
+          "label": "WITS country/product profiles",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://wits.worldbank.org/witsapiintro.aspx",
+          "label": "WITS tariff + NTM API endpoints",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "Free, no key for SDMX endpoints (note: trailing slash required or 307). Registration needed for custom bulk extraction in UI. Data sourced from Comtrade/TRAINS. Licence: CC BY 4.0."
+  },
+  {
+    "slug": "worldbank-open-data",
+    "name": "World Bank Open Data",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "World Bank Group Development Data Group",
+    "homepage": "https://data.worldbank.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://data.worldbank.org/indicator/NE.EXP.GNFS.CD",
+          "label": "Exports of goods and services (current US$)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://datahelpdesk.worldbank.org/knowledgebase/topics/125589",
+          "label": "World Bank Indicators API v2 documentation",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://data.worldbank.org/indicator/NE.IMP.GNFS.CD",
+          "label": "Imports of goods and services (current US$)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://data.worldbank.org/indicator/BX.GSR.NFSV.CD",
+          "label": "Service exports (BoP, current US$)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Indicators API at api.worldbank.org/v2 is free, no key, JSON/XML, ~unlimited but throttled per IP; my sandbox got 502 from api.worldbank.org so the documented endpoint is cited via the help desk instead. Licence: CC BY 4.0."
+  },
+  {
+    "slug": "imf-dots",
+    "name": "IMF Direction of Trade Statistics (DOTS)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "International Monetary Fund - Statistics Department",
+    "homepage": "https://data.imf.org/en",
+    "sources": {
+      "export": [
+        {
+          "url": "https://api.imf.org/external/sdmx/2.1/dataflow",
+          "label": "IMF SDMX 2.1 REST dataflow catalogue (incl. DOT)",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://data.imf.org/en/Data%20Explorer?datasetUrn=IMF.STA:DOT(5.0.0)",
+          "label": "IMF Data Explorer - DOTS dataset",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://api.imf.org/external/sdmx/2.1/dataflow",
+          "label": "IMF SDMX 2.1 - DOT import series",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://data.imf.org/en",
+          "label": "IMF Data portal",
+          "fmt": "html"
+        }
+      ],
+      "commerce": []
+    },
+    "api_notes": "NEW endpoint: api.imf.org/external/sdmx/2.1 (legacy dataservices.imf.org JSON RESTful API retired 2025). Free, no key, SDMX-ML. Bulk CSV per dataset from data.imf.org. Licence: IMF terms, attribution required."
+  },
+  {
+    "slug": "imf-bop",
+    "name": "IMF Balance of Payments (BOP/BPM6)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "International Monetary Fund - Statistics Department",
+    "homepage": "https://data.imf.org/en",
+    "sources": {
+      "export": [
+        {
+          "url": "https://data.imf.org/en/datasets/IMF.STA:BOP",
+          "label": "BOP dataset - goods and services credits",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://data.imf.org/en/datasets/IMF.STA:BOP",
+          "label": "BOP dataset - goods and services debits",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://api.imf.org/external/sdmx/2.1/dataflow",
+          "label": "IMF SDMX 2.1 - BOP services account",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://data.imf.org/en/Data%20Explorer",
+          "label": "IMF Data Explorer",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Same SDMX 2.1 gateway as DOTS. Free, no key. BPM6 presentation; annual + quarterly. Bulk CSV/XLSX download per dataset."
+  },
+  {
+    "slug": "oecd-data-explorer",
+    "name": "OECD Data Explorer / OECD.Stat",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "Organisation for Economic Co-operation and Development",
+    "homepage": "https://data-explorer.oecd.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://sdmx.oecd.org/public/rest/dataflow/OECD.SDD.TPS/all?format=sdmx-json",
+          "label": "OECD SDMX REST - Trade and Balance of Payments dataflows",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://data-explorer.oecd.org/",
+          "label": "OECD Data Explorer UI",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_BOP@DF_BOP,1.0/all?startPeriod=2023&dimensionAtObservation=AllDimensions&format=jsondata",
+          "label": "OECD SDMX data query - BOP goods/services",
+          "fmt": "sdmx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.oecd.org/en/data.html",
+          "label": "OECD data hub (replaces retired data.oecd.org)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "sdmx.oecd.org/public/rest is free, no key, SDMX-ML 2.1 and SDMX-JSON. data.oecd.org now 301s to oecd.org/en/data.html. Rate limit ~20 req/min per IP. Licence: OECD terms, most series free."
+  },
+  {
+    "slug": "oecd-wto-tiva",
+    "name": "OECD-WTO Trade in Value Added (TiVA)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "OECD Directorate for Science, Technology and Innovation / WTO",
+    "homepage": "https://www.oecd.org/en/topics/sub-issues/trade-in-value-added.html",
+    "sources": {
+      "export": [
+        {
+          "url": "https://sdmx.oecd.org/public/rest/dataflow/OECD.SDD.TPS/all?format=sdmx-json",
+          "label": "OECD SDMX dataflows (TiVA DSD discoverable here)",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://data-explorer.oecd.org/",
+          "label": "OECD Data Explorer - TiVA indicators",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://data-explorer.oecd.org/",
+          "label": "TiVA foreign value added in imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.oecd.org/en/topics/sub-issues/trade-in-value-added.html",
+          "label": "TiVA 2023 edition - 76 economies, 1995-2020",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "TiVA distributed through the same OECD SDMX gateway; free, no key. 2023 edition covers 76 economies 1995-2020, 45 industries. Bulk CSV available from the Data Explorer."
+  },
+  {
+    "slug": "itc-trade-map",
+    "name": "ITC Trade Map",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "International Trade Centre (UN/WTO)",
+    "homepage": "https://www.trademap.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.trademap.org/",
+          "label": "Trade Map - bilateral export statistics",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.trademap.org/",
+          "label": "Trade Map - bilateral import statistics",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.macmap.org/",
+          "label": "ITC Market Access Map (tariffs/NTMs affecting commerce)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Free registration required (institutional email). No documented public REST API; XLS/CSV export capped for free accounts. Covers 220 countries, HS 6-digit, monthly/quarterly/annual. Commercial licence for bulk/API access."
+  },
+  {
+    "slug": "itc-market-access-map",
+    "name": "ITC Market Access Map (MacMap)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "International Trade Centre (UN/WTO)",
+    "homepage": "https://www.macmap.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.macmap.org/",
+          "label": "Applied tariffs faced by exporters",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.macmap.org/",
+          "label": "Import tariffs, quotas, rules of origin",
+          "fmt": "html"
+        }
+      ],
+      "commerce": []
+    },
+    "api_notes": "Free with registration. No open API; bulk tariff data available to ITC partners. Underlying TRAINS/WTO IDB data also reachable via WITS SDMX."
+  },
+  {
+    "slug": "faostat",
+    "name": "FAO FAOSTAT (agricultural trade)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "Food and Agriculture Organization of the United Nations",
+    "homepage": "https://www.fao.org/faostat/en/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.fao.org/faostat/en/#data/TCL",
+          "label": "FAOSTAT Crops and livestock products trade (TCL)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://bulks-faostat.fao.org/production/",
+          "label": "FAOSTAT bulk download server (zipped CSV)",
+          "fmt": "csv"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.fao.org/faostat/en/#data/TM",
+          "label": "FAOSTAT Detailed trade matrix (TM)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://bulks-faostat.fao.org/production/",
+          "label": "FAOSTAT bulk CSV archives",
+          "fmt": "csv"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.fao.org/faostat/en/#data/TCL",
+          "label": "Agricultural value of production and trade indices",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "faostatservices.fao.org/api/v1 returned 401 to my anonymous client - the REST API now appears to require a key/allowlist. Bulk CSV at bulks-faostat.fao.org is open and is the reliable ingestion path. Licence: CC BY 4.0."
+  },
+  {
+    "slug": "unido",
+    "name": "UNIDO Statistics (INDSTAT / IDSB)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "United Nations Industrial Development Organization",
+    "homepage": "https://stat.unido.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://stat.unido.org/data/table?dataset=indstat",
+          "label": "UNIDO Data Browser - IDSB industrial demand-supply balance (exports)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://stat.unido.org/data/table?dataset=indstat",
+          "label": "UNIDO IDSB - manufactured imports by ISIC",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://stat.unido.org/",
+          "label": "UNIDO industrial statistics home (MVA, output)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Free browser access; full INDSTAT/IDSB microdata sold by subscription. No public REST API. IDSB gives manufactured-goods exports/imports mapped to ISIC Rev.3/4."
+  },
+  {
+    "slug": "wco",
+    "name": "World Customs Organization",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "World Customs Organization",
+    "homepage": "https://www.wcoomd.org/",
+    "sources": {
+      "export": [],
+      "import": [],
+      "commerce": []
+    },
+    "api_notes": "UNVERIFIED - every fetch to wcoomd.org failed at TCP/TLS level from this environment (TypeError: fetch failed), so no URL could be confirmed live. WCO publishes the HS nomenclature and an annual illicit-trade report but no open trade-value dataset or API. Recommend manual re-check of wcoomd.org/en/topics/nomenclature."
+  },
+  {
+    "slug": "ilostat",
+    "name": "ILOSTAT (services and trade-related employment)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "International Labour Organization - Department of Statistics",
+    "homepage": "https://ilostat.ilo.org/",
+    "sources": {
+      "export": [],
+      "import": [],
+      "commerce": [
+        {
+          "url": "https://rplumber.ilo.org/__docs__/",
+          "label": "ILOSTAT SDMX/plumber REST API (OpenAPI docs)",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "ilostat.ilo.org HTML returns 403 to automated clients (bot filter) but the machine endpoint rplumber.ilo.org/__docs__/ is open and documented (OpenAPI). Free, no key. Bulk CSV at ilostat.ilo.org/data/bulk (403 to bots, works in browser). Employment by economic activity covers services/commerce. Licence: CC BY 4.0."
+  },
+  {
+    "slug": "cepii-baci",
+    "name": "CEPII BACI (reconciled bilateral trade)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "Centre d'Etudes Prospectives et d'Informations Internationales",
+    "homepage": "https://www.cepii.fr/CEPII/en/bdd_modele/bdd_modele_item.asp?id=37",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.cepii.fr/CEPII/en/bdd_modele/bdd_modele_item.asp?id=37",
+          "label": "BACI dataset - reconciled bilateral exports, HS 6-digit",
+          "fmt": "csv"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.cepii.fr/CEPII/en/bdd_modele/bdd_modele_item.asp?id=37",
+          "label": "BACI - mirrored import flows",
+          "fmt": "csv"
+        }
+      ],
+      "commerce": []
+    },
+    "api_notes": "Free bulk CSV after free registration. Derived from UN Comtrade with mirror-flow reconciliation (removes double counting, harmonises CIF/FOB). ~200 countries, 5000 products, 1995-present. No REST API - bulk zip only. Licence: free for research, citation required."
+  },
+  {
+    "slug": "oec",
+    "name": "Observatory of Economic Complexity (OEC)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "Datawheel / OEC",
+    "homepage": "https://oec.world/en",
+    "sources": {
+      "export": [
+        {
+          "url": "https://oec.world/en/resources/api",
+          "label": "OEC REST API documentation (trade flows)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://oec.world/en",
+          "label": "OEC explorer",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://oec.world/en/resources/api",
+          "label": "OEC API - import flows by HS/SITC",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://oec.world/en",
+          "label": "OEC subnational and services trade views",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Freemium: anonymous/basic tier rate-limited; paid Pro tier for bulk and subnational. JSON REST + tesseract OLAP endpoints. Covers 5000+ products, 5000+ subnational regions. Licence: CC BY-SA for free tier."
+  },
+  {
+    "slug": "harvard-atlas",
+    "name": "Harvard Growth Lab Atlas of Economic Complexity",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "Harvard Kennedy School Growth Lab",
+    "homepage": "https://atlas.hks.harvard.edu/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://atlas.hks.harvard.edu/data-downloads/",
+          "label": "Atlas bulk data downloads + GraphQL API access",
+          "fmt": "api"
+        },
+        {
+          "url": "https://atlas.hks.harvard.edu/",
+          "label": "Atlas explorer",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://atlas.hks.harvard.edu/data-downloads/",
+          "label": "Atlas cleaned bilateral import flows",
+          "fmt": "csv"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://atlas.hks.harvard.edu/data-downloads/",
+          "label": "ECI / product complexity and services trade",
+          "fmt": "csv"
+        }
+      ]
+    },
+    "api_notes": "Free GraphQL API (docs at github.com/harvard-growth-lab/api-docs/blob/main/atlas.md) plus free bulk CSV/DTA via Harvard Dataverse. Cleaned/reconciled Comtrade, 1962-present, HS and SITC. Licence: CC BY 4.0."
+  },
+  {
+    "slug": "eurostat-comext",
+    "name": "Eurostat COMEXT (EU international trade in goods)",
+    "kind": "intl_org",
+    "continent": "Europe",
+    "iso3": null,
+    "agency_name": "Eurostat - European Commission",
+    "homepage": "https://ec.europa.eu/eurostat/web/international-trade-in-goods/database",
+    "sources": {
+      "export": [
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN&time=2023",
+          "label": "Eurostat JSON-stat API - intra/extra-EU trade by product group",
+          "fmt": "api"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/dataflow/ESTAT/ext_lt_intratrd",
+          "label": "Eurostat SDMX 2.1 dataflow",
+          "fmt": "sdmx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://ec.europa.eu/eurostat/web/international-trade-in-goods/database",
+          "label": "COMEXT trade-in-goods database",
+          "fmt": "html"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN&time=2023",
+          "label": "Eurostat JSON-stat API - imports",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://ec.europa.eu/eurostat/web/main/data/database",
+          "label": "Eurostat full database incl. trade in services (BOP)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Fully open, NO key. JSON-stat 2.0 + SDMX 2.1 + bulk TSV/SDMX files. Limit 50 categories/dimension and ~1M cells per query. Monthly CN8-level detail via COMEXT bulk. Licence: CC BY 4.0 (Eurostat re-use policy)."
+  },
+  {
+    "slug": "iea",
+    "name": "International Energy Agency (energy trade)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "International Energy Agency",
+    "homepage": "https://www.iea.org/data-and-statistics",
+    "sources": {
+      "export": [],
+      "import": [],
+      "commerce": []
+    },
+    "api_notes": "UNVERIFIED - iea.org returns HTTP 403 to all automated clients (Cloudflare bot protection); loads normally in a browser. IEA energy-balance and oil/gas trade data are licensed (paid) for bulk; free interactive browsing only. Recommend a browser-based or authenticated check of iea.org/data-and-statistics/data-sets."
+  },
+  {
+    "slug": "opec",
+    "name": "OPEC (crude oil and product trade)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "Organization of the Petroleum Exporting Countries",
+    "homepage": "https://www.opec.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.opec.org/annual-statistical-bulletin.html",
+          "label": "OPEC Annual Statistical Bulletin - crude and product exports",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.opec.org/annual-statistical-bulletin.html",
+          "label": "ASB - crude and product imports by destination",
+          "fmt": "html"
+        }
+      ],
+      "commerce": []
+    },
+    "api_notes": "Free. ASB published annually with downloadable XLSX/interactive tables; no REST API. Note opec.org/data-download.html and /data-graphs.html now 302 to the 404 page after the 2025 site redesign - only the ASB page resolves. Licence: free with attribution."
+  },
+  {
+    "slug": "irena",
+    "name": "IRENA (renewable energy trade and capacity)",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "International Renewable Energy Agency",
+    "homepage": "https://www.irena.org/Data",
+    "sources": {
+      "export": [],
+      "import": [],
+      "commerce": []
+    },
+    "api_notes": "UNVERIFIED - irena.org returns 403 to automated clients and pxweb.irena.org failed TLS/DNS from this environment. IRENASTAT normally exposes a PxWeb API (px-web JSON-stat) which would be the ingestion path once reachable. Recommend browser re-check of pxweb.irena.org/pxweb/en/IRENASTAT."
+  },
+  {
+    "slug": "un-tourism",
+    "name": "UN Tourism (formerly UNWTO) tourism statistics",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "World Tourism Organization (UN Tourism)",
+    "homepage": "https://www.untourism.int/",
+    "sources": {
+      "export": [],
+      "import": [],
+      "commerce": []
+    },
+    "api_notes": "REBRANDED: unwto.org now 301s to untourism.int, which returns 403 to automated clients. Tourism Statistics Database (inbound/outbound tourism receipts and expenditure = travel services trade) is subscription-based; free summary tables only. Could not verify a live fetchable URL - flagged for manual check."
+  },
+  {
+    "slug": "us-census-trade",
+    "name": "US Census Bureau International Trade (USMCA/NAFTA reference)",
+    "kind": "intl_org",
+    "continent": "North America",
+    "iso3": "USA",
+    "agency_name": "United States Census Bureau - Foreign Trade Division",
+    "homepage": "https://usatradeonline.census.gov/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://api.census.gov/data/timeseries/intltrade/exports/hs",
+          "label": "Census International Trade API - HS exports timeseries",
+          "fmt": "api"
+        },
+        {
+          "url": "https://usatradeonline.census.gov/",
+          "label": "USA Trade Online",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://dataweb.usitc.gov/",
+          "label": "USITC DataWeb - detailed US imports",
+          "fmt": "html"
+        },
+        {
+          "url": "https://usatradeonline.census.gov/",
+          "label": "USA Trade Online imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.trade.gov/data-visualization",
+          "label": "ITA trade data and services exports visualisations",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Census API free; key optional under 500 calls/day, free key for more. JSON. Monthly HS-10 detail. USITC DataWeb free with registration and has its own REST API. Licence: US public domain."
+  },
+  {
+    "slug": "bis",
+    "name": "Bank for International Settlements",
+    "kind": "intl_org",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "Bank for International Settlements - Monetary and Economic Department",
+    "homepage": "https://data.bis.org/",
+    "sources": {
+      "export": [],
+      "import": [],
+      "commerce": [
+        {
+          "url": "https://stats.bis.org/api/v2/structure/dataflow/BIS/all",
+          "label": "BIS SDMX 2.1 REST API - full dataflow catalogue",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://data.bis.org/topics/LBS/tables-and-dashboards",
+          "label": "BIS locational banking statistics (cross-border financial services)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "MIGRATED: stats.bis.org web UI now 301s to data.bis.org, but the SDMX API lives at stats.bis.org/api/v2/ (SDMX-JSON 2.0 + SDMX-ML). Free, no key. Covers exchange rates, effective FX, credit, banking - relevant to trade finance not merchandise trade. Licence: free with attribution."
+  },
+  {
+    "slug": "european-union-eurostat",
+    "name": "European Union (Eurostat statistical system)",
+    "kind": "regional_body",
+    "continent": "Europe",
+    "iso3": null,
+    "agency_name": "Eurostat - Statistical Office of the European Union",
+    "homepage": "https://ec.europa.eu/eurostat/web/main/data/database",
+    "sources": {
+      "export": [
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/dataflow/ESTAT/ext_lt_intratrd",
+          "label": "Eurostat SDMX 2.1 dataflow registry",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ext_lt_intratrd?format=JSON&lang=EN&time=2023",
+          "label": "Eurostat JSON-stat data API",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://ec.europa.eu/eurostat/web/international-trade-in-goods/database",
+          "label": "Eurostat trade-in-goods database",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://ec.europa.eu/eurostat/web/main/data/database",
+          "label": "Eurostat database - BOP trade in services, national accounts",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Same open API stack as COMEXT entry. No key, no registration. Bulk download facility publishes gzipped TSV for every dataset nightly. Licence: CC BY 4.0."
+  },
+  {
+    "slug": "ecowas",
+    "name": "ECOWAS (Economic Community of West African States)",
+    "kind": "regional_body",
+    "continent": "Africa",
+    "iso3": null,
+    "agency_name": "ECOWAS Commission",
+    "homepage": "https://www.ecowas.int/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://ecotis.ecowas.int/",
+          "label": "ECOWAS Trade Information System (ECOTIS)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://ecotis.ecowas.int/",
+          "label": "ECOTIS - import tariffs and trade flows",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.ecowas.int/",
+          "label": "ECOWAS Commission portal",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "WARNING: the former statistics portal ecostat.ecowas.int is DEAD (NXDOMAIN). ECOTIS is live and covers the ETLS scheme, CET tariffs and trade info. No public API; HTML/PDF only. Free."
+  },
+  {
+    "slug": "african-union-afcfta",
+    "name": "African Union / AfCFTA Secretariat",
+    "kind": "regional_body",
+    "continent": "Africa",
+    "iso3": null,
+    "agency_name": "African Union Commission / AfCFTA Secretariat",
+    "homepage": "https://au.int/en",
+    "sources": {
+      "export": [
+        {
+          "url": "https://au-afcfta.org/",
+          "label": "AfCFTA Secretariat portal - tariff schedules and trade data",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://au-afcfta.org/",
+          "label": "AfCFTA import/rules-of-origin resources",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://au.int/en",
+          "label": "African Union portal",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Note: afcfta.au.int does NOT resolve (NXDOMAIN); the live Secretariat site is au-afcfta.org. HTML/PDF only, no API. AfCFTA e-tariff book access is registration-gated. Free."
+  },
+  {
+    "slug": "afdb",
+    "name": "African Development Bank (Africa Information Highway)",
+    "kind": "regional_body",
+    "continent": "Africa",
+    "iso3": null,
+    "agency_name": "African Development Bank Group - Statistics Department",
+    "homepage": "https://www.afdb.org/en/knowledge/statistics",
+    "sources": {
+      "export": [
+        {
+          "url": "https://dataportal.opendataforafrica.org/",
+          "label": "AfDB Africa Information Highway data portal",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://dataportal.opendataforafrica.org/",
+          "label": "AfDB data portal - merchandise imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.afdb.org/en/knowledge/statistics",
+          "label": "AfDB statistics and publications",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Africa Information Highway runs on Knoema; free browsing, CSV/XLSX export, and a Knoema REST/atlas API (key needed for high volume). Country-level portals link off the main dataportal. Licence: free with attribution."
+  },
+  {
+    "slug": "uneca",
+    "name": "UNECA (Economic Commission for Africa)",
+    "kind": "regional_body",
+    "continent": "Africa",
+    "iso3": null,
+    "agency_name": "United Nations Economic Commission for Africa - African Centre for Statistics",
+    "homepage": "https://ecastats.uneca.org/data/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://ecastats.uneca.org/data/",
+          "label": "ECAStats statistical data portal - trade indicators",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://ecastats.uneca.org/data/",
+          "label": "ECAStats - merchandise imports by African economy",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://ecastats.uneca.org/data/",
+          "label": "ECAStats national accounts and services",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Note the bare host ecastats.uneca.org serves only a meta-refresh; the canonical path is /data/ (http->https redirect loop if you request https://ecastats.uneca.org/data without trailing slash). Free, no key, no documented API. ECA also runs the ATPC trade policy database."
+  },
+  {
+    "slug": "sadc",
+    "name": "SADC (Southern African Development Community)",
+    "kind": "regional_body",
+    "continent": "Africa",
+    "iso3": null,
+    "agency_name": "SADC Secretariat - Statistics Unit",
+    "homepage": "https://www.sadc.int/pillars/statistics",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.sadc.int/pillars/statistics",
+          "label": "SADC Regional Statistical Programme - trade statistics",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.sadc.int/pillars/statistics",
+          "label": "SADC statistics pillar - merchandise imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": []
+    },
+    "api_notes": "Free. SADC publishes the Selected Economic and Social Indicators and a Regional Statistical Yearbook as PDF/XLSX. No API. Note /pillars/trade-goods and /pillars/trade-industry-finance-investment both 404 after the site rebuild."
+  },
+  {
+    "slug": "eac",
+    "name": "EAC (East African Community)",
+    "kind": "regional_body",
+    "continent": "Africa",
+    "iso3": null,
+    "agency_name": "East African Community Secretariat",
+    "homepage": "https://www.eac.int/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.eac.int/trade",
+          "label": "EAC Trade portal - intra- and extra-EAC trade",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.eac.int/trade",
+          "label": "EAC trade - CET and import flows",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.eac.int/",
+          "label": "EAC Secretariat portal",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Free. EAC Trade and Investment Report published annually as PDF. NOTE eac.int/statistics now 404s - use /trade. No API."
+  },
+  {
+    "slug": "comesa",
+    "name": "COMESA (Common Market for Eastern and Southern Africa)",
+    "kind": "regional_body",
+    "continent": "Africa",
+    "iso3": null,
+    "agency_name": "COMESA Secretariat - COMSTAT Data Hub",
+    "homepage": "https://comstat.comesa.int/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://comstat.comesa.int/",
+          "label": "COMSTAT Data Hub - COMESA export statistics",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://comstat.comesa.int/",
+          "label": "COMSTAT Data Hub - import statistics",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://comstat.comesa.int/",
+          "label": "COMSTAT macroeconomic and services indicators",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "COMSTAT runs on the Knoema/eGov platform: free browsing, CSV/XLSX export, embeddable widgets. NOTE the www. host (www.comstat.comesa.int) fails TLS - use the apex host comstat.comesa.int. Free."
+  },
+  {
+    "slug": "eccas",
+    "name": "ECCAS / CEEAC (Economic Community of Central African States)",
+    "kind": "regional_body",
+    "continent": "Africa",
+    "iso3": null,
+    "agency_name": "ECCAS Commission",
+    "homepage": "https://www.ceeac-eccas.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.ceeac-eccas.org/",
+          "label": "CEEAC-ECCAS portal - regional integration and trade documents",
+          "fmt": "html"
+        }
+      ],
+      "import": [],
+      "commerce": []
+    },
+    "api_notes": "Very limited statistical output. No dedicated statistics portal or API found; economic data published as PDF communiques in French. Free."
+  },
+  {
+    "slug": "uemoa-waemu",
+    "name": "UEMOA / WAEMU (West African Economic and Monetary Union)",
+    "kind": "regional_body",
+    "continent": "Africa",
+    "iso3": null,
+    "agency_name": "Commission de l'UEMOA",
+    "homepage": "https://www.uemoa.int/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.uemoa.int/",
+          "label": "UEMOA Commission portal - trade and integration statistics",
+          "fmt": "html"
+        }
+      ],
+      "import": [],
+      "commerce": [
+        {
+          "url": "https://www.uemoa.int/",
+          "label": "UEMOA economic surveillance reports",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "French-language only. Statistical output routed through BCEAO (edenpub.bceao.int) and the UEMOA multilateral surveillance reports (PDF). No API. Free."
+  },
+  {
+    "slug": "asean",
+    "name": "ASEAN (ASEANstats)",
+    "kind": "regional_body",
+    "continent": "Asia",
+    "iso3": null,
+    "agency_name": "ASEAN Secretariat - ASEANstats",
+    "homepage": "https://data.aseanstats.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://data.aseanstats.org/trade-annually",
+          "label": "ASEANstats annual international merchandise trade",
+          "fmt": "html"
+        },
+        {
+          "url": "https://data.aseanstats.org/",
+          "label": "ASEANstats Data Portal",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://data.aseanstats.org/trade-annually",
+          "label": "ASEANstats - intra/extra-ASEAN imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://data.aseanstats.org/",
+          "label": "ASEANstats - trade in services and FDI",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Free, no key. CSV/XLSX download per table; the portal exposes an internal JSON endpoint but no documented public API (my probe of /api/v1/datasets 404'd). Covers 10 AMS, intra/extra-ASEAN goods, services and FDI. Licence: free with attribution."
+  },
+  {
+    "slug": "apec",
+    "name": "APEC (StatsAPEC)",
+    "kind": "regional_body",
+    "continent": "Asia",
+    "iso3": null,
+    "agency_name": "APEC Secretariat / APEC Policy Support Unit",
+    "homepage": "https://statistics.apec.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://statistics.apec.org/",
+          "label": "StatsAPEC Key Indicators Database - merchandise exports",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://statistics.apec.org/",
+          "label": "StatsAPEC - merchandise imports by economy",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://statistics.apec.org/",
+          "label": "StatsAPEC - services trade and bilateral linkages",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "NOTE apec.org/publications/key-indicators-database now 404s - the live portal is statistics.apec.org (StatsAPEC). Free, no key, CSV/XLSX export. Covers all 21 APEC economies. No REST API."
+  },
+  {
+    "slug": "saarc",
+    "name": "SAARC (South Asian Association for Regional Cooperation)",
+    "kind": "regional_body",
+    "continent": "Asia",
+    "iso3": null,
+    "agency_name": "SAARC Secretariat",
+    "homepage": "https://www.saarc-sec.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.saarc-sec.org/",
+          "label": "SAARC Secretariat - SAFTA trade documents",
+          "fmt": "html"
+        }
+      ],
+      "import": [],
+      "commerce": []
+    },
+    "api_notes": "Minimal statistical function; SAARC does not run a data portal. Trade data for the region comes from member NSOs, SAWTEE and the ADB. HTML/PDF only, free."
+  },
+  {
+    "slug": "gcc-stat",
+    "name": "GCC Statistical Centre (GCC-Stat)",
+    "kind": "regional_body",
+    "continent": "Asia",
+    "iso3": null,
+    "agency_name": "Statistical Centre for the Cooperation Council for the Arab Countries of the Gulf",
+    "homepage": "https://www.gccstat.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.gccstat.org/",
+          "label": "GCC-Stat portal - foreign trade statistics",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.gccstat.org/",
+          "label": "GCC-Stat - GCC merchandise imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": []
+    },
+    "api_notes": "Only the apex host verified live; the /en/ locale path and /en/statistic/statistics/foreign-trade both returned 403/404 to my client. Arabic-first site. Free, XLSX/PDF bulletins, no API."
+  },
+  {
+    "slug": "mercosur",
+    "name": "Mercosur (Southern Common Market)",
+    "kind": "regional_body",
+    "continent": "South America",
+    "iso3": null,
+    "agency_name": "Secretaria del MERCOSUR",
+    "homepage": "https://www.mercosur.int/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.mercosur.int/",
+          "label": "Mercosur portal - commercial policy and trade statistics",
+          "fmt": "html"
+        }
+      ],
+      "import": [],
+      "commerce": [
+        {
+          "url": "https://www.mercosur.int/",
+          "label": "Mercosur economic and trade documents",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "NOTE mercosur.int apex 301s to www.mercosur.int - use the www host. Spanish/Portuguese. No statistical data portal or API; bloc trade data is best sourced from ALADI, CEPALSTAT or member NSOs (INDEC, IBGE). Free."
+  },
+  {
+    "slug": "andean-community",
+    "name": "Andean Community (CAN)",
+    "kind": "regional_body",
+    "continent": "South America",
+    "iso3": null,
+    "agency_name": "Secretaria General de la Comunidad Andina",
+    "homepage": "https://www.comunidadandina.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.comunidadandina.org/",
+          "label": "CAN portal - Sistema Integrado de Estadisticas de Comercio Exterior entry point",
+          "fmt": "html"
+        }
+      ],
+      "import": [],
+      "commerce": []
+    },
+    "api_notes": "PARTIAL - only the CAN homepage verified. The legacy statistics host estadisticas.comunidadandina.org is DEAD (NXDOMAIN) and every /estadisticas, /temas/estadistica and /documentos-estadisticos path returns 404 after the 2024-25 site rebuild. CAN now publishes via Tableau Public dashboards. Recommend locating the current SIICE URL manually."
+  },
+  {
+    "slug": "caricom",
+    "name": "CARICOM (Caribbean Community)",
+    "kind": "regional_body",
+    "continent": "North America",
+    "iso3": null,
+    "agency_name": "CARICOM Secretariat - Regional Statistics Programme",
+    "homepage": "https://statistics.caricom.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://statistics.caricom.org/",
+          "label": "CARICOM Statistics - merchandise trade databases",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://statistics.caricom.org/",
+          "label": "CARICOM Statistics - imports by member state",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://statistics.caricom.org/",
+          "label": "CARICOM national accounts and services",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Free, no key. Databases published as XLSX/PDF plus a Redatam/PxWeb-style browser. Covers 15 member states. No REST API."
+  },
+  {
+    "slug": "sica-sieca",
+    "name": "SICA / SIECA (Central American Economic Integration)",
+    "kind": "regional_body",
+    "continent": "North America",
+    "iso3": null,
+    "agency_name": "Secretaria de Integracion Economica Centroamericana (SIECA)",
+    "homepage": "https://www.sieca.int/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://estadisticas.sieca.int/",
+          "label": "SIECA statistics portal - Central American exports",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.sieca.int/",
+          "label": "SIECA - trade policy briefs and bulletins",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://estadisticas.sieca.int/",
+          "label": "SIECA statistics portal - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.sieca.int/",
+          "label": "SIECA regional commerce outlook",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "estadisticas.sieca.int returns 200 but serves a JS-only SPA (no server-rendered content), so scraping requires a headless browser or the underlying XHR endpoints. Free, Spanish. Covers CA-5 + Panama + Dominican Republic."
+  },
+  {
+    "slug": "spc-pacific",
+    "name": "Pacific Community (SPC) - Pacific Data Hub",
+    "kind": "regional_body",
+    "continent": "Oceania",
+    "iso3": null,
+    "agency_name": "Pacific Community - Statistics for Development Division",
+    "homepage": "https://stats.pacificdata.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://stats-nsi-stable.pacificdata.org/rest/dataflow/SPC/all",
+          "label": "Pacific Data Hub .Stat SDMX 2.1 REST API",
+          "fmt": "sdmx"
+        },
+        {
+          "url": "https://stats.pacificdata.org/",
+          "label": "Pacific Data Hub .Stat Data Explorer",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://stats-nsi-stable.pacificdata.org/rest/dataflow/SPC/all",
+          "label": "PDH .Stat SDMX - merchandise import dataflows",
+          "fmt": "sdmx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://stats.pacificdata.org/",
+          "label": "PDH .Stat - national accounts and tourism for PICTs",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "EXCELLENT for ingestion: open .Stat Suite SDMX 2.1 REST (SDMX-ML and SDMX-JSON), no key, no rate limit published. Covers 22 Pacific Island Countries and Territories. Licence: CC BY 4.0."
+  },
+  {
+    "slug": "unescap",
+    "name": "UNESCAP (Economic and Social Commission for Asia and the Pacific)",
+    "kind": "regional_body",
+    "continent": "Asia",
+    "iso3": null,
+    "agency_name": "United Nations ESCAP - Statistics Division",
+    "homepage": "https://data.unescap.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://data.unescap.org/",
+          "label": "ESCAP Data Portal - trade and SDG indicators",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://data.unescap.org/",
+          "label": "ESCAP Data Portal - merchandise imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://data.unescap.org/",
+          "label": "ESCAP Data Portal - 1000+ thematic datasets",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Runs on Opendatasoft: free CSV/JSON/XLSX export and an Explore API per dataset (my probe of the generic /api/explore/v2.1/catalog/datasets path 404'd, so the API base differs - inspect a dataset page for its exact endpoint). No key for browsing. Licence: CC BY 3.0 IGO."
+  },
+  {
+    "slug": "unece",
+    "name": "UNECE (Economic Commission for Europe)",
+    "kind": "regional_body",
+    "continent": "Europe",
+    "iso3": null,
+    "agency_name": "United Nations Economic Commission for Europe - Statistical Division",
+    "homepage": "https://w3.unece.org/PXWeb/en",
+    "sources": {
+      "export": [
+        {
+          "url": "https://w3.unece.org/PXWeb/en",
+          "label": "UNECE Statistical Database (PxWeb) - trade indicators",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://w3.unece.org/PXWeb/en",
+          "label": "UNECE PxWeb - import series",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://w3.unece.org/PXWeb/en",
+          "label": "UNECE PxWeb - national accounts, transport, forest products",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "PxWeb backend means a machine-readable px-web JSON API is available per table (POST query to /PXWeb/api/v1/en/...). Free, no key. WARNING: a site banner states economic statistics indicators have not been updated since 1 May 2026 due to database restructuring - check freshness before ingesting."
+  },
+  {
+    "slug": "uneclac-cepalstat",
+    "name": "UNECLAC / CEPAL (CEPALSTAT)",
+    "kind": "regional_body",
+    "continent": "South America",
+    "iso3": null,
+    "agency_name": "UN Economic Commission for Latin America and the Caribbean",
+    "homepage": "https://statistics.cepal.org/portal/cepalstat/index.html?lang=en",
+    "sources": {
+      "export": [
+        {
+          "url": "https://statistics.cepal.org/portal/cepalstat/index.html?lang=en",
+          "label": "CEPALSTAT - LAC exports of goods by destination",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://statistics.cepal.org/portal/cepalstat/index.html?lang=en",
+          "label": "CEPALSTAT - imports of goods",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://statistics.cepal.org/portal/cepalstat/index.html?lang=en",
+          "label": "CEPALSTAT - services trade and national accounts",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "CEPALSTAT exposes a documented public REST API (statistics.cepal.org/portal/cepalstat/api - JSON/XML, no key) alongside the UI; CSV/XLSX export per indicator. 33 LAC countries. Licence: free with attribution."
+  },
+  {
+    "slug": "unescwa",
+    "name": "UNESCWA (Economic and Social Commission for Western Asia)",
+    "kind": "regional_body",
+    "continent": "Asia",
+    "iso3": null,
+    "agency_name": "United Nations ESCWA - Statistics Division",
+    "homepage": "https://data.unescwa.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://data.unescwa.org/",
+          "label": "ESCWA Data Portal - Arab region trade indicators",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://data.unescwa.org/",
+          "label": "ESCWA Data Portal - imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://data.unescwa.org/",
+          "label": "ESCWA SDG tracking tool and national accounts",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "NOTE data.unescwa.org/portal 404s - use the site root. Free, no key. CSV/XLSX export; no documented REST API. 22 Arab states."
+  },
+  {
+    "slug": "eaeu",
+    "name": "Eurasian Economic Union (EAEU)",
+    "kind": "regional_body",
+    "continent": "Europe",
+    "iso3": null,
+    "agency_name": "Eurasian Economic Commission - Statistics Department",
+    "homepage": "https://eec.eaeunion.org/en/comission/department/dep_stat/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://eec.eaeunion.org/en/comission/department/dep_stat/",
+          "label": "EEC Statistics Department - mutual and external trade statistics",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://eec.eaeunion.org/en/comission/department/dep_stat/",
+          "label": "EEC - EAEU external trade imports",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://eec.eaeunion.org/en/comission/department/dep_stat/",
+          "label": "EEC - EAEU macroeconomic indicators",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Free. Publishes monthly/annual XLSX bulletins on mutual trade (intra-EAEU) and external trade for the 5 members. Russian-first with English mirror. No API."
+  },
+  {
+    "slug": "commonwealth-secretariat",
+    "name": "Commonwealth Secretariat",
+    "kind": "regional_body",
+    "continent": "Global",
+    "iso3": null,
+    "agency_name": "Commonwealth Secretariat - Trade, Oceans and Natural Resources Directorate",
+    "homepage": "https://thecommonwealth.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://thecommonwealth.org/",
+          "label": "Commonwealth Secretariat - trade competitiveness and Commonwealth Trade Review",
+          "fmt": "html"
+        }
+      ],
+      "import": [],
+      "commerce": [
+        {
+          "url": "https://thecommonwealth.org/",
+          "label": "Commonwealth trade and services publications",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "NOTE thecommonwealth.org/our-work/trade now 404s after the site redesign - only the root verified. Analytical publications (Commonwealth Trade Review, Trade Hot Topics) rather than a primary dataset; no API. Free."
+  },
+  {
+    "slug": "usmca-usitc-dataweb",
+    "name": "USMCA statistical portals (USITC DataWeb)",
+    "kind": "regional_body",
+    "continent": "North America",
+    "iso3": null,
+    "agency_name": "United States International Trade Commission",
+    "homepage": "https://dataweb.usitc.gov/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://dataweb.usitc.gov/",
+          "label": "USITC DataWeb - US exports to USMCA partners",
+          "fmt": "html"
+        },
+        {
+          "url": "https://api.census.gov/data/timeseries/intltrade/exports/hs",
+          "label": "Census intltrade exports API",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://dataweb.usitc.gov/",
+          "label": "USITC DataWeb - US imports incl. USMCA preference claims",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.trade.gov/data-visualization",
+          "label": "ITA trade data visualisations",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "DataWeb: free registration, has a documented REST API (dataweb.usitc.gov/api) returning JSON, plus bulk query saving. Census API free with optional key. Canada (StatCan WDS) and Mexico (INEGI DENUE/BIE) APIs cover the other two parties - StatCan WDS timed out from this sandbox so it is not cited here. US data is public domain."
+  }
+]

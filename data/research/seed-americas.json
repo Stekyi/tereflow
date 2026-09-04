@@ -1,0 +1,1256 @@
+[
+  {
+    "slug": "united-states",
+    "name": "United States",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "USA",
+    "agency_name": "U.S. Census Bureau Foreign Trade Division, USITC and BEA",
+    "homepage": "https://www.census.gov/foreign-trade/data/index.html",
+    "sources": {
+      "export": [
+        {
+          "url": "https://api.census.gov/data/timeseries/intltrade/exports/hs.html",
+          "label": "Census International Trade API - HS exports (English)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://dataweb.usitc.gov/",
+          "label": "USITC DataWeb export query tool (English)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.census.gov/foreign-trade/data/index.html",
+          "label": "Census Foreign Trade data hub (English)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://api.census.gov/data/timeseries/intltrade/imports/hs.html",
+          "label": "Census International Trade API - HS imports (English)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://dataweb.usitc.gov/",
+          "label": "USITC DataWeb import query tool with duty detail (English)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.census.gov/foreign-trade/data/index.html",
+          "label": "Census Foreign Trade data hub (English)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://apps.bea.gov/api/signup/",
+          "label": "BEA API signup and docs - services trade and GDP by industry (English)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://apps.bea.gov/iTable/?reqid=62&step=1",
+          "label": "BEA iTable international services tables (English)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Census International Trade API is free with a registered key at api.census.gov; endpoints /data/timeseries/intltrade/exports/hs and /imports/hs, monthly, HS10 detail, district and country dimensions. BEA API (apps.bea.gov/api/data) is free with a key and serves ITA (international services trade) and GDPbyIndustry datasets. USITC DataWeb requires a free login for bulk pulls but has a documented REST endpoint."
+  },
+  {
+    "slug": "canada",
+    "name": "Canada",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "CAN",
+    "agency_name": "Statistics Canada",
+    "homepage": "https://www.statcan.gc.ca/en/developers/wds/user-guide",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.statcan.gc.ca/en/developers/wds/user-guide",
+          "label": "Statistics Canada Web Data Service (WDS) API user guide (English)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1210012101",
+          "label": "Table 12-10-0121-01 merchandise trade by country and product (English)",
+          "fmt": "csv"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.statcan.gc.ca/en/developers/wds/user-guide",
+          "label": "Statistics Canada WDS API user guide (English)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1210012101",
+          "label": "Table 12-10-0121-01 merchandise imports and exports (English)",
+          "fmt": "csv"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=2010000801",
+          "label": "Table 20-10-0008-01 retail trade sales (English)",
+          "fmt": "csv"
+        },
+        {
+          "url": "https://www.statcan.gc.ca/en/developers/wds/user-guide",
+          "label": "WDS API for retail/wholesale and GDP-by-industry cubes (English)",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "StatCan WDS is a free, keyless REST API (base https://www150.statcan.gc.ca/t1/wds/rest/). getFullTableDownloadCSV/{productId}/en returns a zipped CSV of any table; getDataFromVectorsAndLatestNPeriods for series pulls. Note: the WDS endpoint timed out for my fetcher during verification while the documented user guide and table pages resolved 200 - throttle and retry with a real user agent."
+  },
+  {
+    "slug": "mexico",
+    "name": "Mexico",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "MEX",
+    "agency_name": "INEGI and Banco de Mexico (Banxico SIE)",
+    "homepage": "https://www.inegi.org.mx/programas/comext/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.inegi.org.mx/servicios/api_indicadores.html",
+          "label": "INEGI Indicadores API documentation (Spanish)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.inegi.org.mx/programas/comext/",
+          "label": "Balanza Comercial de Mercancias de Mexico - exports (Spanish)",
+          "fmt": "csv"
+        },
+        {
+          "url": "https://www.banxico.org.mx/SieAPIRest/service/v1/",
+          "label": "Banxico SIE REST API - trade balance series (Spanish)",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.inegi.org.mx/servicios/api_indicadores.html",
+          "label": "INEGI Indicadores API documentation (Spanish)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.inegi.org.mx/programas/comext/",
+          "label": "Balanza Comercial de Mercancias - imports by HS chapter (Spanish)",
+          "fmt": "csv"
+        },
+        {
+          "url": "https://www.banxico.org.mx/SieInternet/",
+          "label": "Banxico SIE interactive series browser (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.inegi.org.mx/datosabiertos/",
+          "label": "INEGI open data - commerce, services and GDP by activity (Spanish)",
+          "fmt": "csv"
+        },
+        {
+          "url": "https://www.banxico.org.mx/SieAPIRest/service/v1/",
+          "label": "Banxico SIE API - services balance and activity series (Spanish)",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "INEGI Indicadores API is free with a token (base https://www.inegi.org.mx/app/api/indicadores/desarrolladores/jsonxml/INDICATOR/...). Banxico SIE REST requires a free Bmx-Token header since 24 Mar 2023, base https://www.banxico.org.mx/SieAPIRest/service/v1/. Note https://www.inegi.org.mx/temas/comercioext/ is retired - use /programas/comext/."
+  },
+  {
+    "slug": "dominican-republic",
+    "name": "Dominican Republic",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "DOM",
+    "agency_name": "Banco Central de la Republica Dominicana (ONE portal blocks automated clients)",
+    "homepage": "https://www.bancentral.gov.do/a/d/2532-sector-externo",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.bancentral.gov.do/a/d/2532-sector-externo",
+          "label": "BCRD Sector Externo - exports series (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade fallback for DOM HS detail (English)",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.bancentral.gov.do/a/d/2532-sector-externo",
+          "label": "BCRD Sector Externo - imports series (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade fallback for DOM imports (English)",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.bancentral.gov.do/a/d/2533-sector-real",
+          "label": "BCRD Sector Real - GDP by economic activity and commerce (Spanish)",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "No public API. BCRD publishes Excel workbooks by sector. Oficina Nacional de Estadistica (www.one.gob.do) returned HTTP 403 to automated clients on 2026-09-04 so it is excluded; Direccion General de Aduanas /estadisticas/ returned 404. Use UN Comtrade for HS-level detail."
+  },
+  {
+    "slug": "guatemala",
+    "name": "Guatemala",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "GTM",
+    "agency_name": "Banco de Guatemala (Banguat) with SIECA regional portal",
+    "homepage": "https://www.banguat.gob.gt/page/estadisticas-macroeconomicas",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.banguat.gob.gt/page/estadisticas-macroeconomicas",
+          "label": "Banguat macroeconomic statistics - exports modules (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://estadisticas.sieca.int/",
+          "label": "SIECA Central America trade statistics portal (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.banguat.gob.gt/page/estadisticas-macroeconomicas",
+          "label": "Banguat macroeconomic statistics - imports modules (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://estadisticas.sieca.int/",
+          "label": "SIECA regional import statistics (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.banguat.gob.gt/",
+          "label": "Banguat portal - national accounts and GDP by activity (Spanish)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Banguat exposes a legacy SOAP web service for exchange-rate/series data; trade tables are Excel modules under Estadisticas Macroeconomicas. SIECA is the best regional machine-friendly complement. Note https://www.banguat.gob.gt/page/comercio-exterior returns 404."
+  },
+  {
+    "slug": "costa-rica",
+    "name": "Costa Rica",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "CRI",
+    "agency_name": "Banco Central de Costa Rica (BCCR) and PROCOMER",
+    "homepage": "https://www.bccr.fi.cr/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://procomer.com/",
+          "label": "PROCOMER export statistics portal (Spanish)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://www.bccr.fi.cr/",
+          "label": "BCCR economic indicators - exports (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.bccr.fi.cr/",
+          "label": "BCCR economic indicators - imports (Spanish)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://procomer.com/",
+          "label": "PROCOMER trade statistics (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.bccr.fi.cr/",
+          "label": "BCCR national accounts / GDP by activity (Spanish)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://estadisticas.sieca.int/",
+          "label": "SIECA regional commerce indicators (Spanish)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "BCCR has a public indicator web service (ServicioIndicadoresEconomicos) requiring free registration; the gee.bccr.fi.cr indicator app returned 403 to automated clients so only the main portal is listed as verified. procomer.com redirects from www.procomer.com - use the bare domain."
+  },
+  {
+    "slug": "panama",
+    "name": "Panama",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "PAN",
+    "agency_name": "Instituto Nacional de Estadistica y Censo (INEC), Contraloria General",
+    "homepage": "https://www.inec.gob.pa/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.inec.gob.pa/publicaciones/Default3.aspx?ID_CATEGORIA=5&ID_SUBCATEGORIA=27",
+          "label": "INEC publications catalogue - external trade series (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.inec.gob.pa/publicaciones/Default.aspx",
+          "label": "INEC publications index (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.inec.gob.pa/publicaciones/Default3.aspx?ID_CATEGORIA=5&ID_SUBCATEGORIA=27",
+          "label": "INEC external trade - imports tables (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.inec.gob.pa/publicaciones/Default.aspx",
+          "label": "INEC publications index (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.inec.gob.pa/publicaciones/Default3.aspx?ID_CATEGORIA=4&ID_SUBCATEGORIA=25",
+          "label": "INEC economic statistics - GDP / commerce category (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.inec.gob.pa/",
+          "label": "INEC home - annual GDP headline (Spanish)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "No API. INEC publishes ASP.NET-driven Excel cuadros; the Default3.aspx category/subcategory IDs are stable deep links and both verified live. Category-to-topic mapping should be re-checked on ingest since the page titles render client-side."
+  },
+  {
+    "slug": "cuba",
+    "name": "Cuba",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "CUB",
+    "agency_name": "Oficina Nacional de Estadistica e Informacion (ONEI) - site unreachable; UN Comtrade fallback",
+    "homepage": "https://comtradeplus.un.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade - Cuba mirrored export data (English)",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade - Cuba mirrored import data (English)",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade services/goods fallback (English)",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "NO WORKING NATIONAL SOURCE. www.onei.gob.cu, onei.gob.cu and /node/ deep links all failed connection (TLS/network) on 2026-09-04 from three attempts. Cuba also reports irregularly to Comtrade, so partner-mirror statistics are the practical source."
+  },
+  {
+    "slug": "honduras",
+    "name": "Honduras",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "HND",
+    "agency_name": "Banco Central de Honduras (BCH)",
+    "homepage": "https://www.bch.hn/estadisticas-y-publicaciones-economicas/sector-externo",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.bch.hn/estadisticas-y-publicaciones-economicas/sector-externo",
+          "label": "BCH Sector Externo - exports and maquila (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://estadisticas.sieca.int/",
+          "label": "SIECA regional trade portal (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.bch.hn/estadisticas-y-publicaciones-economicas/sector-externo",
+          "label": "BCH Sector Externo - imports (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://estadisticas.sieca.int/",
+          "label": "SIECA regional import data (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.bch.hn/estadisticas-y-publicaciones-economicas/sector-real",
+          "label": "BCH Sector Real - GDP by economic activity (Spanish)",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "BCH runs on SharePoint; deep links are stable but the root https://www.bch.hn/ intermittently failed TLS handshake for my fetcher while the two section pages returned 200. No API - Excel/PDF only."
+  },
+  {
+    "slug": "el-salvador",
+    "name": "El Salvador",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "SLV",
+    "agency_name": "Banco Central de Reserva de El Salvador (BCR)",
+    "homepage": "https://www.bcr.gob.sv/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.bcr.gob.sv/",
+          "label": "BCR statistics portal - exports (Spanish)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://estadisticas.sieca.int/",
+          "label": "SIECA regional export statistics (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.bcr.gob.sv/",
+          "label": "BCR statistics portal - imports (Spanish)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://estadisticas.sieca.int/",
+          "label": "SIECA regional import statistics (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.bcr.gob.sv/",
+          "label": "BCR national accounts / GDP by activity (Spanish)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "BCR migrated to a WordPress front end whose REST API returns 401 to anonymous callers; legacy https://www.bcr.gob.sv/bcrsite/?cat=1000 now serves a redirect notice page. Trade tables live behind the Estadisticas section as Excel. SIECA is the reliable machine-readable complement."
+  },
+  {
+    "slug": "trinidad-and-tobago",
+    "name": "Trinidad and Tobago",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "TTO",
+    "agency_name": "Central Statistical Office (CSO)",
+    "homepage": "https://cso.gov.tt/subjects/international-trade/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://cso.gov.tt/subjects/international-trade/",
+          "label": "CSO international merchandise trade - exports (English)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://cso.gov.tt/data-portals/",
+          "label": "CSO data portals hub incl. Eurotrace trade portal (English)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://cso.gov.tt/subjects/international-trade/",
+          "label": "CSO international merchandise trade - imports (English)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://cso.gov.tt/data-portals/",
+          "label": "CSO data portals hub (English)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://cso.gov.tt/subjects/economic-indicators/retail-sales-index-rsi/",
+          "label": "CSO Retail Sales Index (English)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://cso.gov.tt/subjects/national-accounts/",
+          "label": "CSO national accounts / GDP by industry (English)",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "CSO is WordPress - https://cso.gov.tt/wp-json/wp/v2/pages?search=trade is open and useful for automated link discovery. The 'INTERNATIONAL TRADE PORTAL' page 301-redirects to a Eurotrace instance at http://csottwebtext.gov.tt:8001/eurotrace/mainxtnet.do (non-TLS, non-standard port) so it is not listed as a verified URL."
+  },
+  {
+    "slug": "jamaica",
+    "name": "Jamaica",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "JAM",
+    "agency_name": "Statistical Institute of Jamaica (STATIN)",
+    "homepage": "https://statinja.gov.jm/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://statinja.gov.jm/Trade-Econ%20Statistics/InternationalMerchandiseTrade/newtrade.aspx",
+          "label": "STATIN International Merchandise Trade - exports and balance of visible trade (English)",
+          "fmt": "xlsx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://statinja.gov.jm/Trade-Econ%20Statistics/InternationalMerchandiseTrade/newtrade.aspx",
+          "label": "STATIN International Merchandise Trade - imports by SITC and end-use (English)",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://statinja.gov.jm/NationalAccounting/nationalaccountsnotes.aspx",
+          "label": "STATIN national accounts - GDP by industry (English)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://statinja.gov.jm/productionstats.aspx",
+          "label": "STATIN production statistics (English)",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "No API. STATIN is ASP.NET; the correct trade path is /Trade-Econ%20Statistics/InternationalMerchandiseTrade/newtrade.aspx (the older NewInternationalMerchandiseTrade.aspx now 404s). Tables are downloadable Excel behind each tab."
+  },
+  {
+    "slug": "nicaragua",
+    "name": "Nicaragua",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "NIC",
+    "agency_name": "Banco Central de Nicaragua (bot-walled) - SIECA and UN Comtrade fallback",
+    "homepage": "https://estadisticas.sieca.int/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://estadisticas.sieca.int/",
+          "label": "SIECA Central America statistics portal - Nicaragua exports (Spanish)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade fallback (English)",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://estadisticas.sieca.int/",
+          "label": "SIECA portal - Nicaragua imports (Spanish)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade fallback (English)",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.sieca.int/estadisticas-integracion-economica-centroamericana/",
+          "label": "SIECA regional economic integration statistics (Spanish)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "NO DIRECT NATIONAL SOURCE VERIFIABLE. Both https://www.bcn.gob.ni/ and /estadisticas-economicas redirect to a Radware validate.perfdrive.com bot challenge, so BCN cannot be crawled headlessly; a browser session is required. SIECA and Comtrade are the practical machine sources."
+  },
+  {
+    "slug": "haiti",
+    "name": "Haiti",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "HTI",
+    "agency_name": "Institut Haitien de Statistique et d'Informatique (IHSI)",
+    "homepage": "https://ihsi.gouv.ht/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://ihsi.gouv.ht/",
+          "label": "IHSI portal - economic statistics (French)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade fallback for Haiti exports (English)",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://ihsi.gouv.ht/",
+          "label": "IHSI portal - external trade (French)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade fallback for Haiti imports (English)",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://ihsi.gouv.ht/",
+          "label": "IHSI national accounts / GDP by branch (French)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Thin national office. IHSI home is live but its WordPress REST route (/wp-json/wp/v2/pages) returns 404, and no deep trade page could be verified; trade data is largely produced by BRH and AGD and released as PDF. Use UN Comtrade partner-mirror data as the reliable series."
+  },
+  {
+    "slug": "bahamas",
+    "name": "Bahamas",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "BHS",
+    "agency_name": "Central Bank of The Bahamas (Dept. of Statistics site blocks bots)",
+    "homepage": "https://www.centralbankbahamas.com/statistics",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.centralbankbahamas.com/statistics",
+          "label": "Central Bank of The Bahamas statistics - external trade (English)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade fallback (English)",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.centralbankbahamas.com/statistics",
+          "label": "Central Bank statistics - imports and external reserves (English)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade fallback (English)",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.centralbankbahamas.com/",
+          "label": "Central Bank quarterly statistical digest and GDP releases (English)",
+          "fmt": "html"
+        },
+        {
+          "url": "https://statistics.caricom.org/",
+          "label": "CARICOM regional statistics (English)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Thin/blocked national office: https://www.bahamas.gov.bs/statistics and the government portal statistics path both return 403 to automated clients, and bnsibahamas.com does not resolve. Central Bank digests plus CARICOM/Comtrade are the workable sources."
+  },
+  {
+    "slug": "barbados",
+    "name": "Barbados",
+    "kind": "country",
+    "continent": "North America",
+    "iso3": "BRB",
+    "agency_name": "Barbados Statistical Service (BSS)",
+    "homepage": "https://stats.gov.bb/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://stats.gov.bb/subjects/economic-statistics/trade-statistics/",
+          "label": "BSS trade statistics - exports (English)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://statistics.caricom.org/",
+          "label": "CARICOM regional statistics fallback (English)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://stats.gov.bb/subjects/economic-statistics/trade-statistics/",
+          "label": "BSS trade statistics - imports (English)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade fallback (English)",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://stats.gov.bb/subjects/economic-statistics/",
+          "label": "BSS economic statistics - retail price index and GDP (English)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Thin office, no API, but the site is WordPress so https://stats.gov.bb/wp-json/wp/v2/pages?search=trade is open and returns the canonical trade page link - useful for automated link refresh. CARICOM and Comtrade recommended as fallbacks."
+  },
+  {
+    "slug": "brazil",
+    "name": "Brazil",
+    "kind": "country",
+    "continent": "South America",
+    "iso3": "BRA",
+    "agency_name": "MDIC / Comex Stat and IBGE",
+    "homepage": "https://comexstat.mdic.gov.br/en/home",
+    "sources": {
+      "export": [
+        {
+          "url": "https://comexstat.mdic.gov.br/en/home",
+          "label": "Comex Stat exports query and bulk download (English)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://comexstat.mdic.gov.br/en/geral",
+          "label": "Comex Stat general query builder - exports (English)",
+          "fmt": "csv"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://comexstat.mdic.gov.br/en/home",
+          "label": "Comex Stat imports query and bulk download (English)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://comexstat.mdic.gov.br/en/geral",
+          "label": "Comex Stat general query builder - imports (English)",
+          "fmt": "csv"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://comexstat.mdic.gov.br/en/home",
+          "label": "Comex Stat municipality and services modules (English)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "Comex Stat is free and public with a JSON backend at https://api-comexstat.mdic.gov.br/general (returned HTTP 401 to a bare GET during verification - it expects a POST/query payload and a referer, so it is live but not a plain URL). Annual bulk NCM CSVs live under https://balanca.economia.gov.br/balanca/bd/comexstat-bd/ncm/ which returned 403 to my fetcher (browser UA required). IBGE SIDRA (apisidra.ibge.gov.br, servicodados.ibge.gov.br/api/v3/agregados) and www.ibge.gov.br returned HTTP 503 to every attempt on 2026-09-04, so IBGE URLs are deliberately EXCLUDED as unverified - retry later; SIDRA is normally free and keyless and covers PMC retail and PMS services."
+  },
+  {
+    "slug": "argentina",
+    "name": "Argentina",
+    "kind": "country",
+    "continent": "South America",
+    "iso3": "ARG",
+    "agency_name": "INDEC and Datos Argentina series API",
+    "homepage": "https://www.indec.gob.ar/indec/web/Nivel4-Tema-3-2-40",
+    "sources": {
+      "export": [
+        {
+          "url": "https://apis.datos.gob.ar/series/api/series/?ids=168.1_T_CAMBIOR_D_0_0_26&limit=1",
+          "label": "Datos Argentina time-series API (keyless JSON, example call) (Spanish)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.indec.gob.ar/indec/web/Nivel4-Tema-3-2-40",
+          "label": "INDEC intercambio comercial argentino - exports (Spanish)",
+          "fmt": "csv"
+        },
+        {
+          "url": "https://datos.gob.ar/dataset?q=exportaciones",
+          "label": "Datos Argentina open data catalogue - export datasets (Spanish)",
+          "fmt": "csv"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://apis.datos.gob.ar/series/api/series/?ids=168.1_T_CAMBIOR_D_0_0_26&limit=1",
+          "label": "Datos Argentina series API (swap ids for ICA import series) (Spanish)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.indec.gob.ar/indec/web/Nivel4-Tema-3-2-40",
+          "label": "INDEC ICA - imports by use and origin (Spanish)",
+          "fmt": "csv"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://datos.gob.ar/dataset?q=exportaciones",
+          "label": "Datos Argentina catalogue - commerce, services and EMAE datasets (Spanish)",
+          "fmt": "csv"
+        },
+        {
+          "url": "https://www.indec.gob.ar/indec/web/Nivel4-Tema-3-2-40",
+          "label": "INDEC economic activity and commerce series (Spanish)",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "apis.datos.gob.ar/series/api/series/ is free and keyless and returned live JSON during verification (note the TRAILING SLASH before the query string - without it you get a 301). INDEC itself publishes zipped CSV/XLS per release. comexdata.indec.gob.ar did not resolve in DNS on 2026-09-04."
+  },
+  {
+    "slug": "colombia",
+    "name": "Colombia",
+    "kind": "country",
+    "continent": "South America",
+    "iso3": "COL",
+    "agency_name": "DANE (bot-blocked) via Datos Abiertos Colombia and Banco de la Republica",
+    "homepage": "https://www.datos.gov.co/browse?q=exportaciones",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.datos.gov.co/browse?q=exportaciones",
+          "label": "Datos Abiertos Colombia (Socrata) - DANE/DIAN export datasets (Spanish)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://totoro.banrep.gov.co/estadisticas-economicas/",
+          "label": "Banco de la Republica economic statistics - trade series (Spanish)",
+          "fmt": "xlsx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.datos.gov.co/browse?q=exportaciones",
+          "label": "Datos Abiertos Colombia - import datasets via Socrata (Spanish)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://totoro.banrep.gov.co/estadisticas-economicas/",
+          "label": "Banrep balance of payments and imports (Spanish)",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://totoro.banrep.gov.co/estadisticas-economicas/",
+          "label": "Banrep GDP by economic activity and services (Spanish)",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "DANE is the true NSO but www.dane.gov.co and microdatos.dane.gov.co both returned HTTP 403 to non-browser clients on 2026-09-04, so no DANE URL is listed as verified. datos.gov.co is a Socrata instance: every dataset exposes https://www.datos.gov.co/resource/{4x4}.json with SoQL filters, free, optional app token - this is the best programmatic route to DANE/DIAN trade tables."
+  },
+  {
+    "slug": "chile",
+    "name": "Chile",
+    "kind": "country",
+    "continent": "South America",
+    "iso3": "CHL",
+    "agency_name": "Servicio Nacional de Aduanas and Banco Central de Chile",
+    "homepage": "https://www.aduana.cl/aduana/site/edic/base/port/inicio.html",
+    "sources": {
+      "export": [
+        {
+          "url": "https://si3.bcentral.cl/siete",
+          "label": "Banco Central SIETE statistics database - exports (Spanish)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.aduana.cl/aduana/site/edic/base/port/inicio.html",
+          "label": "Aduanas de Chile portal - foreign trade statistics (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://si3.bcentral.cl/siete",
+          "label": "Banco Central SIETE - imports series (Spanish)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.aduana.cl/aduana/site/edic/base/port/inicio.html",
+          "label": "Aduanas customs import records (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://si3.bcentral.cl/siete",
+          "label": "SIETE - IMACEC, GDP and GDP by activity (Spanish)",
+          "fmt": "api"
+        }
+      ]
+    },
+    "api_notes": "Banco Central de Chile offers a free SOAP/REST web service over the SIETE database requiring free registration (user + password passed as query params); the documented index pages si3.bcentral.cl/estadisticas/Principal1/Web_Services/index*.htm 302-redirect to an ErrorPage, and www.bcentral.cl is behind Incapsula, so only https://si3.bcentral.cl/siete verified. Aduanas publishes annual/monthly customs microdata (DIN/DUS files) from the portal; all deep 2016/2018-dated stat URLs I tried returned 404 - crawl from the portal root."
+  },
+  {
+    "slug": "peru",
+    "name": "Peru",
+    "kind": "country",
+    "continent": "South America",
+    "iso3": "PER",
+    "agency_name": "SUNAT (customs), INEI and BCRP",
+    "homepage": "https://estadisticas.bcrp.gob.pe/estadisticas/series/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://estadisticas.bcrp.gob.pe/estadisticas/series/",
+          "label": "BCRP statistical series - exports (Spanish)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.sunat.gob.pe/estadisticasestudios/",
+          "label": "SUNAT customs statistics and studies (Spanish)",
+          "fmt": "xlsx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://estadisticas.bcrp.gob.pe/estadisticas/series/",
+          "label": "BCRP series - imports by use (Spanish)",
+          "fmt": "api"
+        },
+        {
+          "url": "https://www.sunat.gob.pe/estadisticasestudios/",
+          "label": "SUNAT import statistics (Spanish)",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://m.inei.gob.pe/estadisticas/indice-tematico/economia/",
+          "label": "INEI economy theme - commerce and GDP by activity (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.gob.pe/institucion/inei/informes-publicaciones",
+          "label": "INEI reports and publications incl. monthly commerce index (Spanish)",
+          "fmt": "pdf"
+        }
+      ]
+    },
+    "api_notes": "BCRP exposes a free keyless series API at https://estadisticas.bcrp.gob.pe/estadisticas/series/api/{series}/json/{start}/{end} - the best machine route for Peru. SUNAT publishes customs Excel; https://www.sunat.gob.pe/estad-comExterior/ is dead (404), use /estadisticasestudios/. INEI content is mostly PDF/XLS."
+  },
+  {
+    "slug": "ecuador",
+    "name": "Ecuador",
+    "kind": "country",
+    "continent": "South America",
+    "iso3": "ECU",
+    "agency_name": "Banco Central del Ecuador and SENAE (Aduana del Ecuador)",
+    "homepage": "https://www.bce.fin.ec/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.bce.fin.ec/",
+          "label": "BCE statistical information - exports / trade balance (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.aduana.gob.ec/",
+          "label": "SENAE customs portal - foreign trade statistics (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.bce.fin.ec/",
+          "label": "BCE statistical information - imports (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.aduana.gob.ec/",
+          "label": "SENAE customs import statistics (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.bce.fin.ec/",
+          "label": "BCE national accounts / GDP by industry (Spanish)",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "BCE relaunched on WordPress in 2024-2025 and broke its legacy paths: /informacioneconomica/comercio-exterior 301s to a news article, /informacion-estadistica/ 404s, and contenido.bce.fin.ec JSP endpoints redirect through a bce_url wrapper. Only the root verified. No API; statistical bulletins are Excel/PDF. The BCE WordPress REST API (/wp-json/wp/v2/pages?search=) is open and usable for link discovery."
+  },
+  {
+    "slug": "venezuela",
+    "name": "Venezuela",
+    "kind": "country",
+    "continent": "South America",
+    "iso3": "VEN",
+    "agency_name": "Banco Central de Venezuela (BCV)",
+    "homepage": "https://www.bcv.org.ve/estadisticas/comercio-exterior",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.bcv.org.ve/estadisticas/comercio-exterior",
+          "label": "BCV comercio exterior - exports (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade partner-mirror fallback (English)",
+          "fmt": "api"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.bcv.org.ve/estadisticas/comercio-exterior",
+          "label": "BCV comercio exterior - imports (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://comtradeplus.un.org/",
+          "label": "UN Comtrade partner-mirror fallback (English)",
+          "fmt": "api"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.bcv.org.ve/estadisticas/comercio-exterior",
+          "label": "BCV external sector aggregates (Spanish)",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "INE Venezuela (www.ine.gov.ve) does not resolve in DNS. BCV publishes irregular Excel series and its /estadisticas/agregados-macroeconomicos path 404s. Data is heavily lagged - rely on UN Comtrade mirror statistics for current-year trade."
+  },
+  {
+    "slug": "uruguay",
+    "name": "Uruguay",
+    "kind": "country",
+    "continent": "South America",
+    "iso3": "URY",
+    "agency_name": "Instituto Nacional de Estadistica (INE) and Banco Central del Uruguay",
+    "homepage": "https://www.gub.uy/instituto-nacional-estadistica/datos-y-estadisticas/estadisticas",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.bcu.gub.uy/Estadisticas-e-Indicadores/Paginas/Default.aspx",
+          "label": "BCU statistics and indicators - exports / balance of payments (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.gub.uy/instituto-nacional-estadistica/datos-y-estadisticas/estadisticas",
+          "label": "INE Uruguay statistics catalogue (Spanish)",
+          "fmt": "csv"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.bcu.gub.uy/Estadisticas-e-Indicadores/Paginas/Default.aspx",
+          "label": "BCU statistics - imports (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.gub.uy/instituto-nacional-estadistica/datos-y-estadisticas/estadisticas",
+          "label": "INE statistics catalogue - external trade (Spanish)",
+          "fmt": "csv"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.gub.uy/instituto-nacional-estadistica/datos-y-estadisticas/estadisticas",
+          "label": "INE - activity, services and commerce indices (Spanish)",
+          "fmt": "csv"
+        },
+        {
+          "url": "https://www.bcu.gub.uy/Estadisticas-e-Indicadores/Paginas/Default.aspx",
+          "label": "BCU national accounts / GDP by activity (Spanish)",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "No dedicated trade API. INE publishes CSV/XLS through the gub.uy platform (which also has a catalogo.datos.gub.uy CKAN instance worth adding later); BCU publishes Excel series. Customs (DNA) operates a separate portal not verified here."
+  },
+  {
+    "slug": "bolivia",
+    "name": "Bolivia",
+    "kind": "country",
+    "continent": "South America",
+    "iso3": "BOL",
+    "agency_name": "Instituto Nacional de Estadistica (INE Bolivia)",
+    "homepage": "https://www.ine.gob.bo/index.php/estadisticas-economicas/comercio-exterior/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.ine.gob.bo/index.php/estadisticas-economicas/comercio-exterior/",
+          "label": "INE Bolivia comercio exterior - exports (Spanish)",
+          "fmt": "xlsx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.ine.gob.bo/index.php/estadisticas-economicas/comercio-exterior/",
+          "label": "INE Bolivia comercio exterior - imports (Spanish)",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.ine.gob.bo/index.php/estadisticas-economicas/",
+          "label": "INE Bolivia economic statistics - GDP by activity and commerce (Spanish)",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "No API; INE Bolivia serves XLSX/CSV per indicator from Joomla category pages. Sub-paths below /comercio-exterior/ (e.g. /exportaciones-nacionales/) return 404 - crawl the category page for current file links."
+  },
+  {
+    "slug": "paraguay",
+    "name": "Paraguay",
+    "kind": "country",
+    "continent": "South America",
+    "iso3": "PRY",
+    "agency_name": "Banco Central del Paraguay, INE Paraguay and DNIT (customs)",
+    "homepage": "https://www.bcp.gov.py/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://www.bcp.gov.py/",
+          "label": "BCP statistical annex - exports / external trade report (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.dnit.gov.py/web/portal-institucional/",
+          "label": "DNIT (ex-Aduanas) institutional portal - customs statistics (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://www.bcp.gov.py/",
+          "label": "BCP external trade report - imports (Spanish)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://www.dnit.gov.py/web/portal-institucional/",
+          "label": "DNIT customs import statistics (Spanish)",
+          "fmt": "html"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://www.ine.gov.py/",
+          "label": "INE Paraguay - economic statistics and GDP-related indicators (Spanish)",
+          "fmt": "html"
+        }
+      ]
+    },
+    "api_notes": "No API. BCP deep links of the form /...-iNNN are numeric and unstable (both /comercio-exterior-i370 and /informe-de-comercio-exterior-i385 returned 404), so only the root is listed. Paraguayan customs moved from www.aduana.gov.py to DNIT (www.dnit.gov.py) in 2023-24 - the old domain 302s there."
+  },
+  {
+    "slug": "guyana",
+    "name": "Guyana",
+    "kind": "country",
+    "continent": "South America",
+    "iso3": "GUY",
+    "agency_name": "Bureau of Statistics Guyana",
+    "homepage": "https://statisticsguyana.gov.gy/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://statisticsguyana.gov.gy/data/data-dashboards/external-trade-reports1/",
+          "label": "BoS external trade reports dashboard - exports (English)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://statisticsguyana.gov.gy/subjects/external-trade/merchandise-trade-guyana-2020-to-2026-usbillion/",
+          "label": "Merchandise trade Guyana 2020-2026 (English)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://statisticsguyana.gov.gy/publications/",
+          "label": "BoS publications index (English)",
+          "fmt": "pdf"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://statisticsguyana.gov.gy/data/data-dashboards/external-trade-reports1/",
+          "label": "BoS external trade reports - imports (English)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://statisticsguyana.gov.gy/subjects/external-trade/merchandise-trade-guyana-2020-to-2026-usbillion/",
+          "label": "Merchandise trade series incl. imports (English)",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://statisticsguyana.gov.gy/subjects/national-accounts-and-production/",
+          "label": "BoS national accounts and production - GDP by activity (English)",
+          "fmt": "xlsx"
+        },
+        {
+          "url": "https://statisticsguyana.gov.gy/data/data-tables/",
+          "label": "BoS data tables - rebased GDP series (English)",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "WordPress site with an open REST API - https://statisticsguyana.gov.gy/wp-json/wp/v2/pages?search=trade reliably enumerates current external-trade release pages (verified: returns 2026 year-to-date import releases). Note /subjects/economy/external-trade/ 404s; the live prefix is /subjects/external-trade/. No statistical API; XLSX/PDF releases."
+  },
+  {
+    "slug": "suriname",
+    "name": "Suriname",
+    "kind": "country",
+    "continent": "South America",
+    "iso3": "SUR",
+    "agency_name": "Algemeen Bureau voor de Statistiek (General Bureau of Statistics)",
+    "homepage": "https://statistics-suriname.org/",
+    "sources": {
+      "export": [
+        {
+          "url": "https://statistics-suriname.org/economic-division/trade-statistics/",
+          "label": "ABS trade statistics department - exports (English)",
+          "fmt": "xlsx"
+        }
+      ],
+      "import": [
+        {
+          "url": "https://statistics-suriname.org/economic-division/trade-statistics/",
+          "label": "ABS trade statistics department - imports (English)",
+          "fmt": "xlsx"
+        }
+      ],
+      "commerce": [
+        {
+          "url": "https://statistics-suriname.org/national-accounts/",
+          "label": "ABS national accounts - GDP macro aggregates (English)",
+          "fmt": "xlsx"
+        }
+      ]
+    },
+    "api_notes": "Thin office, no API. Bilingual site (English/Dutch); English paths verified. WordPress REST (/wp-json/wp/v2/pages?search=export) is open and is the cheapest way to refresh links. Use CARICOM (https://statistics.caricom.org/) or UN Comtrade for consistent HS-level series."
+  }
+]

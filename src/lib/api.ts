@@ -17,7 +17,7 @@ import type {
   SubscriptionKind,
 } from '../../shared/types';
 
-const ADMIN_TOKEN_KEY = 'ta_admin_token';
+const ADMIN_TOKEN_KEY = 'tf_admin_token';
 
 export function getAdminToken(): string {
   return localStorage.getItem(ADMIN_TOKEN_KEY) ?? '';

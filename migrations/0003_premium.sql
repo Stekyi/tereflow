@@ -1,4 +1,4 @@
--- TradeAtlas Phase 3: premium — playbook sourcing, billing records, feed tuning.
+-- Tereflow Phase 3: premium — playbook sourcing, billing records, feed tuning.
 
 -- Playbooks need multiple citations, not one source_url. Every claim in a
 -- playbook is attributed to a real institutional publication.

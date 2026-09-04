@@ -1,4 +1,4 @@
-# TradeAtlas
+# Tereflow
 
 Global trade data, analysed weekly, aimed at someone deciding what business to
 go into and who to do it with.
@@ -221,9 +221,9 @@ bystander on the same connection.
 
 ```bash
 npm install
-npx wrangler d1 migrations apply tradeatlas --local
+npx wrangler d1 migrations apply tereflow --local
 npm run seed:build            # regenerates data/seed.sql from the research files
-npx wrangler d1 execute tradeatlas --local --file=./data/seed.sql
+npx wrangler d1 execute tereflow --local --file=./data/seed.sql
 
 npx wrangler dev              # worker + API + SPA on :8787
 ```
@@ -241,9 +241,9 @@ Open `http://127.0.0.1:8787`, go to **Admin**, paste the token.
 ```bash
 npm run db:create             # paste the returned database_id into wrangler.toml
 npx wrangler kv namespace create CACHE   # paste the id into wrangler.toml
-npx wrangler d1 migrations apply tradeatlas --remote
-npx wrangler d1 execute tradeatlas --remote --file=./data/seed.sql
-npx wrangler d1 execute tradeatlas --remote --file=./data/playbooks.sql
+npx wrangler d1 migrations apply tereflow --remote
+npx wrangler d1 execute tereflow --remote --file=./data/seed.sql
+npx wrangler d1 execute tereflow --remote --file=./data/playbooks.sql
 npx wrangler secret put ADMIN_TOKEN
 npm run deploy
 ```

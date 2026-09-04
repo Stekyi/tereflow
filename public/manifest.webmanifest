@@ -1,6 +1,6 @@
 {
-  "name": "TradeAtlas",
-  "short_name": "TradeAtlas",
+  "name": "Tereflow",
+  "short_name": "Tereflow",
   "description": "Global trade data, analysed weekly. See what a country buys, sells and makes, then find the people to trade with.",
   "start_url": "/",
   "display": "standalone",

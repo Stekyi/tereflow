@@ -1,7 +1,7 @@
 import type { Env } from './db';
 import { uid } from './db';
 
-const SESSION_COOKIE = 'ta_session';
+const SESSION_COOKIE = 'tf_session';
 const SESSION_DAYS = 30;
 const PBKDF2_ITERATIONS = 100_000;
 

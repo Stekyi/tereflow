@@ -22,7 +22,7 @@ const PlaybookDetail = lazy(() => import('./pages/PlaybookDetail'));
 const Upgrade = lazy(() => import('./pages/Upgrade'));
 
 const TITLES: Record<string, string> = {
-  '/': 'TradeAtlas',
+  '/': 'Tereflow',
   '/explore': 'Explore markets',
   '/network': 'Network',
   '/messages': 'Messages',
@@ -34,7 +34,7 @@ const TITLES: Record<string, string> = {
   '/registry': 'Data registry',
   '/admin': 'Admin',
   '/admin/new': 'New record',
-  '/join': 'Join TradeAtlas',
+  '/join': 'Join Tereflow',
 };
 
 const ROOTS = new Set(['/', '/explore', '/network', '/messages', '/me']);
@@ -45,7 +45,7 @@ export default function App() {
   const { unread, feedUnread } = useSession();
 
   const isRoot = ROOTS.has(location.pathname);
-  const title = TITLES[location.pathname] ?? 'TradeAtlas';
+  const title = TITLES[location.pathname] ?? 'Tereflow';
 
   return (
     <div className="app">

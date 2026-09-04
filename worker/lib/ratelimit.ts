@@ -30,7 +30,11 @@ export interface Limit {
 export const LIMITS = {
   loginAccount: { max: 8, windowSeconds: 900 },
   loginIp: { max: 40, windowSeconds: 900 },
-  register: { max: 20, windowSeconds: 3600 },
+  // Registration is throttled to stop bulk automated signup, not to ration
+  // real people. A shared office or a university behind one address can
+  // legitimately produce dozens of accounts in an hour. Email verification is
+  // the actual defence against fake accounts; this is only a bot brake.
+  register: { max: 60, windowSeconds: 3600 },
   message: { max: 40, windowSeconds: 300 },
   checkout: { max: 10, windowSeconds: 3600 },
 } satisfies Record<string, Limit>;

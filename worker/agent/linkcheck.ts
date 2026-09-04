@@ -58,7 +58,7 @@ async function probe(url: string): Promise<{ status: number; tls: boolean }> {
         method,
         redirect: 'follow',
         headers: {
-          'user-agent': 'TradeAtlas-LinkCheck/1.0 (+https://tradeatlas.app)',
+          'user-agent': 'Tereflow-LinkCheck/1.0 (+https://tereflow.app)',
           ...(method === 'GET' ? { range: 'bytes=0-2048' } : {}),
         },
         signal: AbortSignal.timeout(15_000),

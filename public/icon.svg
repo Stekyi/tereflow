@@ -1,6 +1,15 @@
 ﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#0a66c2"/>
-  <circle cx="256" cy="256" r="150" fill="none" stroke="#ffffff" stroke-width="20" opacity="0.55"/>
-  <path d="M106 256h300M256 106c56 46 56 254 0 300M256 106c-56 46-56 254 0 300" fill="none" stroke="#ffffff" stroke-width="14" opacity="0.45"/>
-  <path d="M168 332l70-84 58 44 76-98" fill="none" stroke="#ffffff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="ink" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14324e"/>
+      <stop offset="1" stop-color="#0e1c2b"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#ink)"/>
+  <circle cx="256" cy="248" r="132" fill="none" stroke="#ffffff" stroke-width="14" opacity="0.28"/>
+  <path d="M124 248h264M256 116c50 40 50 224 0 264M256 116c-50 40-50 224 0 264"
+        fill="none" stroke="#ffffff" stroke-width="10" opacity="0.22"/>
+  <path d="M150 300l68-72 56 42 88-104" fill="none" stroke="#ffffff" stroke-width="30"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="176" y="404" width="160" height="7" rx="3.5" fill="#a8802c"/>
 </svg>

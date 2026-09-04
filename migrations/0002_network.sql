@@ -1,4 +1,4 @@
--- TradeAtlas: the network layer (free registration, business cards, DMs, ratings)
+-- Tereflow: the network layer (free registration, business cards, DMs, ratings)
 -- and the premium subscription layer.
 
 -- ---------------------------------------------------------------------------

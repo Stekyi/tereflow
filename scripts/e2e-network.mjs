@@ -3,7 +3,7 @@
  *   npx wrangler dev      (in one terminal)
  *   node scripts/e2e-network.mjs
  */
-const BASE = process.env.TA_BASE ?? 'http://127.0.0.1:8787';
+const BASE = process.env.TF_BASE ?? 'http://127.0.0.1:8787';
 
 let passed = 0;
 let failed = 0;
@@ -69,7 +69,7 @@ const stamp = Date.now();
 const ama = new Client('ama');
 const kwesi = new Client('kwesi');
 
-console.log(`\nTradeAtlas network end-to-end  (${BASE})\n`);
+console.log(`\nTereflow network end-to-end  (${BASE})\n`);
 
 // 1. registration ------------------------------------------------------------
 console.log('1. Registration');
@@ -79,7 +79,7 @@ let r = await ama.post('/api/auth/register', {
   full_name: 'Ama Boateng',
 });
 check('Ama registers', r.status === 201 && r.json?.user?.id, r.json?.error ?? r.json?.user?.full_name);
-check('session cookie issued', ama.cookies.has('ta_session'));
+check('session cookie issued', ama.cookies.has('tf_session'));
 check('new users start free', r.json?.user?.tier === 'free');
 
 r = await kwesi.post('/api/auth/register', {

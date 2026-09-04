@@ -3,8 +3,8 @@
  *   npx wrangler dev              (terminal 1)
  *   node scripts/e2e-premium.mjs  (terminal 2)
  */
-const BASE = process.env.TA_BASE ?? 'http://127.0.0.1:8787';
-const ADMIN_TOKEN = process.env.TA_ADMIN_TOKEN ?? 'local-dev-token';
+const BASE = process.env.TF_BASE ?? 'http://127.0.0.1:8787';
+const ADMIN_TOKEN = process.env.TF_ADMIN_TOKEN ?? 'local-dev-token';
 
 let passed = 0;
 let failed = 0;
@@ -62,7 +62,7 @@ const stamp = Date.now();
 const kojo = new Client();
 const anon = new Client();
 
-console.log(`\nTradeAtlas premium end-to-end  (${BASE})\n`);
+console.log(`\nTereflow premium end-to-end  (${BASE})\n`);
 
 // 1. subscriptions -----------------------------------------------------------
 console.log('1. Following things');

@@ -1,5 +1,5 @@
 {
-  "name": "tradeatlas",
+  "name": "tereflow",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,13 +11,15 @@
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy",
     "typecheck": "tsc -b --noEmit",
-    "db:create": "wrangler d1 create tradeatlas",
-    "db:migrate:local": "wrangler d1 migrations apply tradeatlas --local",
-    "db:migrate": "wrangler d1 migrations apply tradeatlas --remote",
+    "db:create": "wrangler d1 create tereflow",
+    "db:migrate:local": "wrangler d1 migrations apply tereflow --local",
+    "db:migrate": "wrangler d1 migrations apply tereflow --remote",
     "seed:build": "node scripts/build-seed.mjs",
-    "seed:local": "wrangler d1 execute tradeatlas --local --file=./data/seed.sql",
-    "seed:remote": "wrangler d1 execute tradeatlas --remote --file=./data/seed.sql",
-    "agent:local": "node scripts/run-agent-local.mjs"
+    "seed:local": "wrangler d1 execute tereflow --local --file=./data/seed.sql",
+    "seed:remote": "wrangler d1 execute tereflow --remote --file=./data/seed.sql",
+    "agent:local": "node scripts/run-agent-local.mjs",
+    "test:reset": "node -e \"require('fs').rmSync('.wrangler/state/v3/kv',{recursive:true,force:true})\"",
+    "test:e2e": "npm run test:reset && node scripts/e2e-network.mjs && node scripts/e2e-premium.mjs"
   },
   "dependencies": {
     "hono": "^4.6.14",

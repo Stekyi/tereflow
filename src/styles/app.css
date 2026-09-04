@@ -208,7 +208,7 @@ textarea {
 }
 
 .brand-dot::after {
-  content: 'TA';
+  content: 'TF';
   position: absolute;
   inset: 0;
   display: flex;

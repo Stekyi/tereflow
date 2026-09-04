@@ -9,7 +9,7 @@ import { premium } from './routes/premium';
 const app = new Hono<{ Bindings: Env }>();
 
 app.get('/api/health', (c) =>
-  c.json({ ok: true, app: c.env.APP_NAME ?? 'TradeAtlas', ts: new Date().toISOString() }),
+  c.json({ ok: true, app: c.env.APP_NAME ?? 'Tereflow', ts: new Date().toISOString() }),
 );
 
 app.route('/api/admin', admin);

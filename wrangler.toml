@@ -1,4 +1,4 @@
-name = "tradeatlas"
+name = "tereflow"
 main = "worker/index.ts"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
@@ -18,7 +18,7 @@ crons = ["0 21 * * 5"]
 #   wrangler kv namespace create CACHE  -> paste the real id here
 [[d1_databases]]
 binding = "DB"
-database_name = "tradeatlas"
+database_name = "tereflow"
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
 
@@ -27,7 +27,7 @@ binding = "CACHE"
 id = "00000000000000000000000000000000"
 
 [vars]
-APP_NAME = "TradeAtlas"
+APP_NAME = "Tereflow"
 # Comma-separated emails allowed into /admin. Override per environment.
 ADMIN_EMAILS = "danieltekyi@microsoft.com"
 

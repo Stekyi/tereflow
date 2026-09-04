@@ -1,4 +1,4 @@
--- TradeAtlas initial schema
+-- Tereflow initial schema
 -- D1 / SQLite
 
 -- ---------------------------------------------------------------------------

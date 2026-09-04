@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
+import { CHART } from '../lib/theme';
 import { BarRow, Chips, Empty, FollowButton, Skeletons, Stat, useToast } from '../components/ui';
 import {
   fmtPct,
@@ -237,24 +238,24 @@ export default function Country() {
                   <AreaChart data={data.trend} margin={{ top: 4, right: 8, left: -14, bottom: 0 }}>
                     <defs>
                       <linearGradient id="gx" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#3ba9ff" stopOpacity={0.45} />
-                        <stop offset="100%" stopColor="#3ba9ff" stopOpacity={0.02} />
+                        <stop offset="0%" stopColor={CHART.brand} stopOpacity={0.22} />
+                        <stop offset="100%" stopColor={CHART.brand} stopOpacity={0.01} />
                       </linearGradient>
                       <linearGradient id="gm" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#fb7185" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#fb7185" stopOpacity={0.02} />
+                        <stop offset="0%" stopColor={CHART.contrast} stopOpacity={0.16} />
+                        <stop offset="100%" stopColor={CHART.contrast} stopOpacity={0.01} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid stroke="#26375a" strokeDasharray="3 3" vertical={false} />
+                    <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
                     <XAxis
                       dataKey="year"
-                      stroke="#6c80a6"
+                      stroke={CHART.axis}
                       tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
                     />
                     <YAxis
-                      stroke="#6c80a6"
+                      stroke={CHART.axis}
                       tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
@@ -263,12 +264,13 @@ export default function Country() {
                     />
                     <Tooltip
                       contentStyle={{
-                        background: '#16233c',
-                        border: '1px solid #26375a',
-                        borderRadius: 12,
+                        background: CHART.tooltipBg,
+                        border: `1px solid ${CHART.tooltipBorder}`,
+                        borderRadius: 8,
                         fontSize: 13,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                       }}
-                      labelStyle={{ color: '#93a4c4' }}
+                      labelStyle={{ color: CHART.tooltipLabel }}
                       formatter={(v: number, n: string) => [fmtUsd(v), n]}
                     />
                     <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
@@ -276,7 +278,7 @@ export default function Country() {
                       type="monotone"
                       dataKey="export_usd"
                       name="Exports"
-                      stroke="#3ba9ff"
+                      stroke={CHART.brand}
                       strokeWidth={2}
                       fill="url(#gx)"
                     />
@@ -284,7 +286,7 @@ export default function Country() {
                       type="monotone"
                       dataKey="import_usd"
                       name="Imports"
-                      stroke="#fb7185"
+                      stroke={CHART.contrast}
                       strokeWidth={2}
                       fill="url(#gm)"
                     />

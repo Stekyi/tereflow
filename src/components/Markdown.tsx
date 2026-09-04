@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { AUTO_LINK } from '../lib/glossary';
+import { Term } from './Term';
 
 /**
  * Small markdown renderer for playbook bodies.
@@ -119,5 +121,48 @@ function inline(text: string): ReactNode[] {
   }
 
   if (last < text.length) out.push(text.slice(last));
-  return out;
+  return out.flatMap((node, i) =>
+    typeof node === 'string' ? autoLink(node, `al${i}`) : [node],
+  );
+}
+
+/**
+ * Turn known terms of art inside plain prose into glossary links.
+ *
+ * Only the first occurrence in a run is linked. Marking every instance of
+ * "Incoterms" in a playbook would speckle the page and make the marker
+ * meaningless.
+ */
+function autoLink(text: string, keyBase: string): ReactNode[] {
+  let parts: ReactNode[] = [text];
+
+  for (const [pattern, key] of AUTO_LINK) {
+    const next: ReactNode[] = [];
+    let linkedOnce = false;
+
+    for (const part of parts) {
+      if (typeof part !== 'string' || linkedOnce) {
+        next.push(part);
+        continue;
+      }
+      const re = new RegExp(pattern.source, pattern.flags.replace('g', ''));
+      const m = re.exec(part);
+      if (!m) {
+        next.push(part);
+        continue;
+      }
+      linkedOnce = true;
+      if (m.index > 0) next.push(part.slice(0, m.index));
+      next.push(
+        <Term key={`${keyBase}-${key}`} k={key} tone="quiet">
+          {m[0]}
+        </Term>,
+      );
+      const tail = part.slice(m.index + m[0].length);
+      if (tail) next.push(tail);
+    }
+    parts = next;
+  }
+
+  return parts;
 }

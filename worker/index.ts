@@ -20,6 +20,23 @@ app.route('/api', pub);
 
 app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404));
 
+/**
+ * Hashed build assets must 404 when they are missing.
+ *
+ * The SPA fallback otherwise returns index.html for any unknown path, so a tab
+ * left open across a deploy asks for its old chunk, receives HTML, and dies
+ * with "Expected a JavaScript module". A real 404 lets the client detect the
+ * stale build and reload instead.
+ */
+app.get('/assets/*', async (c) => {
+  const res = await c.env.ASSETS.fetch(c.req.raw);
+  const type = res.headers.get('content-type') ?? '';
+  if (type.includes('text/html')) {
+    return c.text('Not found', 404);
+  }
+  return res;
+});
+
 // Everything else is the React SPA.
 app.get('*', (c) => c.env.ASSETS.fetch(c.req.raw));
 

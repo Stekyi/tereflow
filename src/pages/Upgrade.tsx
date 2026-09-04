@@ -81,6 +81,7 @@ export default function Upgrade() {
       {t.node}
 
       <div className="hero">
+        <span className="overline">{entitled ? 'Your membership' : 'Premium'}</span>
         <h2>{entitled ? 'You are on premium' : 'See the move before it is obvious'}</h2>
         <p>
           {entitled

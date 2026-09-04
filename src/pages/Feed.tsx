@@ -113,7 +113,7 @@ export default function Feed() {
             You can see what moved. Premium tells you where it is going and how much time you have
             to get in.
           </p>
-          <Link className="btn primary" to="/upgrade">
+          <Link className="btn gold block" to="/upgrade">
             See premium
           </Link>
         </div>

@@ -53,7 +53,7 @@ export default function PlaybookDetail() {
             The remaining steps cover the documentation, the certifications and the payment terms
             that decide whether a first shipment actually clears.
           </p>
-          <Link className="btn primary" to="/upgrade">
+          <Link className="btn gold" to="/upgrade">
             See premium
           </Link>
         </div>

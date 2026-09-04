@@ -13,6 +13,7 @@ import {
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
 import { CHART } from '../lib/theme';
+import { Term } from '../components/Term';
 import { BarRow, Chips, Empty, FollowButton, Skeletons, Stat, useToast } from '../components/ui';
 import {
   fmtPct,
@@ -159,7 +160,7 @@ export default function Country() {
 
       {tab === 'summary' && (
         <>
-          <div className="grid two" style={{ marginBottom: 12 }}>
+          <div className="grid two" style={{ marginBottom: 14 }}>
             <Stat
               label="Exports"
               value={fmtUsd(o.export_usd)}
@@ -173,22 +174,34 @@ export default function Country() {
               deltaTone={o.import_yoy_pct != null ? (o.import_yoy_pct >= 0 ? 'up' : 'down') : null}
             />
             <Stat
-              label="Trade balance"
+              label={<Term k="trade_balance">Trade balance</Term>}
               value={fmtUsd(o.balance_usd)}
-              delta={o.balance_usd >= 0 ? 'Surplus' : 'Deficit'}
+              delta={
+                o.balance_usd >= 0 ? (
+                  <Term k="surplus">Surplus</Term>
+                ) : (
+                  <Term k="deficit">Deficit</Term>
+                )
+              }
               deltaTone={o.balance_usd >= 0 ? 'up' : 'down'}
             />
             <Stat
-              label="Trading partners"
+              label={<Term k="partner">Trading partners</Term>}
               value={String(o.partner_count)}
-              delta={`${o.product_count} product groups`}
+              delta={
+                <>
+                  {o.product_count} <Term k="hs_code">product groups</Term>
+                </>
+              }
             />
           </div>
 
           {o.export_concentration != null && (
             <div className="card tight">
               <div className="row between">
-                <span className="small muted">Export concentration</span>
+                <span className="small muted">
+                  <Term k="hhi">Export concentration</Term>
+                </span>
                 <span
                   className={`badge ${
                     o.export_concentration > 0.25
@@ -207,10 +220,10 @@ export default function Country() {
               </div>
               <div
                 style={{
-                  height: 7,
+                  height: 6,
                   background: 'var(--bg-2)',
                   borderRadius: 999,
-                  marginTop: 9,
+                  marginTop: 10,
                   overflow: 'hidden',
                 }}
               >
@@ -219,11 +232,11 @@ export default function Country() {
                     height: '100%',
                     width: `${Math.min(100, o.export_concentration * 200)}%`,
                     background:
-                      o.export_concentration > 0.25 ? 'var(--warn)' : 'var(--brand)',
+                      o.export_concentration > 0.25 ? 'var(--gold)' : 'var(--brand)',
                   }}
                 />
               </div>
-              <p className="tiny dim" style={{ margin: '8px 0 0' }}>
+              <p className="tiny dim" style={{ margin: '9px 0 0' }}>
                 How much of what this country sells depends on a handful of products. Higher means
                 one price shock moves the whole economy.
               </p>
@@ -298,11 +311,13 @@ export default function Country() {
 
           {data.services.length > 0 && (
             <div className="card">
-              <p className="card-title">Services</p>
+              <p className="card-title">
+                <Term k="services_trade">Services</Term>
+              </p>
               {data.services.map((s) => (
                 <div className="row between" key={s.code} style={{ marginBottom: 7 }}>
                   <span className="small">{s.name}</span>
-                  <span className="small" style={{ fontWeight: 700 }}>
+                  <span className="small num" style={{ fontWeight: 700 }}>
                     {fmtUsd(s.value_usd)}{' '}
                     {s.yoy_pct != null && (
                       <span className={s.yoy_pct >= 0 ? 'up' : 'down'}>{fmtPct(s.yoy_pct)}</span>
@@ -314,8 +329,11 @@ export default function Country() {
           )}
 
           {o.coverage_note && (
-            <p className="tiny dim" style={{ marginTop: 14 }}>
-              ⓘ {o.coverage_note}
+            <p className="tiny dim" style={{ marginTop: 16 }}>
+              <Term k="coverage" tone="quiet">
+                Data coverage
+              </Term>
+              : {o.coverage_note}
             </p>
           )}
         </>
@@ -371,23 +389,25 @@ export default function Country() {
                   <div className="row between" style={{ marginBottom: 6 }}>
                     <strong style={{ fontSize: 15 }}>{s.product_name}</strong>
                     <span className={`badge ${s.momentum > 0.6 ? 'strong' : 'watch'}`}>
-                      {(s.momentum * 100).toFixed(0)}% momentum
+                      <Term k="momentum" tone="quiet">
+                        {(s.momentum * 100).toFixed(0)}% momentum
+                      </Term>
                     </span>
                   </div>
                   <p className="small muted" style={{ margin: 0 }}>
                     {s.rationale}
                   </p>
-                  <div className="row" style={{ marginTop: 10, gap: 16 }}>
+                  <div className="row" style={{ marginTop: 12, gap: 16 }}>
                     <span className="tiny dim">
-                      Rank now <strong style={{ color: 'var(--text)' }}>{s.current_rank ?? '—'}</strong>
+                      Rank now <strong style={{ color: 'var(--ink)' }}>{s.current_rank ?? '—'}</strong>
                     </span>
                     <span className="tiny dim">
                       Projected in {s.horizon_years}y{' '}
-                      <strong style={{ color: 'var(--brand-2)' }}>{s.projected_rank ?? '—'}</strong>
+                      <strong style={{ color: 'var(--gold)' }}>{s.projected_rank ?? '—'}</strong>
                     </span>
                     <span className="tiny dim">
                       Confidence{' '}
-                      <strong style={{ color: 'var(--text)' }}>
+                      <strong style={{ color: 'var(--ink)' }}>
                         {s.confidence != null ? `${(s.confidence * 100).toFixed(0)}%` : '—'}
                       </strong>
                     </span>
@@ -407,7 +427,7 @@ export default function Country() {
                 still outside the headline rankings.
               </p>
               {user ? (
-                <Link className="btn primary" to="/me">
+                <Link className="btn gold" to="/me">
                   Turn on premium preview
                 </Link>
               ) : (
@@ -538,7 +558,9 @@ function Ranked({
                 <>
                   {' · '}
                   <span className={i.cagr_3y >= 0 ? 'up' : 'down'}>
-                    {fmtPct(i.cagr_3y, 0)}/yr
+                    <Term k="cagr" tone="quiet">
+                      {fmtPct(i.cagr_3y, 0)}/yr
+                    </Term>
                   </span>
                 </>
               )}

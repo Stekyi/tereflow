@@ -78,9 +78,9 @@ export function Stat({
   delta,
   deltaTone,
 }: {
-  label: string;
+  label: ReactNode;
   value: string;
-  delta?: string | null;
+  delta?: ReactNode;
   deltaTone?: 'up' | 'down' | null;
 }) {
   return (

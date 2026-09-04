@@ -24,6 +24,7 @@ export default function Home() {
   return (
     <>
       <div className="hero">
+        <span className="overline">Global trade intelligence</span>
         <h2>Know a market before you enter it</h2>
         <p>
           What a country sells, what it buys, who it trades with, and where the next opening is.

@@ -6,12 +6,12 @@
  * markup. Keep these in step with :root in styles/app.css.
  */
 export const CHART = {
-  brand: '#0a66c2',
-  brandSoft: 'rgba(10, 102, 194, 0.22)',
-  contrast: '#b24020',
-  grid: '#e0dfdc',
-  axis: 'rgba(0, 0, 0, 0.55)',
+  brand: '#0b3d67',
+  brandSoft: 'rgba(11, 61, 103, 0.2)',
+  contrast: '#a8802c',
+  grid: '#e8e2d6',
+  axis: '#8a94a2',
   tooltipBg: '#ffffff',
-  tooltipBorder: '#d9d6d1',
-  tooltipLabel: 'rgba(0, 0, 0, 0.6)',
+  tooltipBorder: '#ddd6c8',
+  tooltipLabel: '#556273',
 } as const;

@@ -42,6 +42,7 @@ export default function Auth() {
       {t.node}
 
       <div className="hero">
+        <span className="overline">{mode === 'register' ? 'Free to join' : 'Members'}</span>
         <h2>{mode === 'register' ? 'Join the network' : 'Welcome back'}</h2>
         <p>
           {mode === 'register'

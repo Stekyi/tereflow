@@ -1,32 +1,52 @@
 :root {
-  /* White page, white cards, one strong LinkedIn blue. Cards are separated by
-     a hairline border rather than a background shift, since both are white. */
-  --bg: #ffffff;
-  --bg-2: #f3f6f8;
+  /* Ivory paper rather than stark white. Warmth is most of what separates a
+     premium surface from a utilitarian one. */
+  --bg: #fbfaf7;
+  --bg-2: #f4f1ea;
   --surface: #ffffff;
-  --surface-2: #eaf1f8;
-  --line: #c9d2dc;
-  --line-soft: #dfe6ec;
-  --text: rgba(0, 0, 0, 0.9);
-  --muted: rgba(0, 0, 0, 0.6);
-  --dim: rgba(0, 0, 0, 0.45);
-  --brand: #0a66c2;
-  --brand-hover: #004182;
-  --brand-2: #378fe9;
-  --up: #01754f;
-  --down: #b24020;
-  --warn: #915907;
-  --gold: #e7a33e;
+  --surface-2: #f7f4ed;
+  --line: #ddd6c8;
+  --line-soft: #e8e2d6;
+
+  /* Ink, not black. A blue undertone keeps long text from feeling harsh. */
+  --ink: #0e1c2b;
+  --text: #16283b;
+  --muted: #556273;
+  --dim: #8a94a2;
+
+  /* Deep navy carries authority where a bright blue reads as a utility. */
+  --brand: #0b3d67;
+  --brand-hover: #06263f;
+  --brand-2: #2f6f9f;
+
+  /* The metallic accent. Used sparingly: premium, ratings, emphasis. */
+  --gold: #a8802c;
+  --gold-soft: #f3ead6;
+  --gold-line: #dcc79a;
+
+  --up: #17604a;
+  --up-soft: #e6f0eb;
+  --down: #8f3222;
+  --down-soft: #f7e9e5;
+  --warn: #8a6116;
+  --warn-soft: #f7efdd;
 
   --r-sm: 6px;
-  --r: 8px;
-  --r-lg: 12px;
+  --r: 10px;
+  --r-lg: 16px;
 
-  --pad: 16px;
-  --tabbar-h: 62px;
+  --pad: 18px;
+  --tabbar-h: 64px;
 
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow: 0 10px 30px rgba(14, 28, 43, 0.12);
+  --card-shadow: 0 1px 2px rgba(14, 28, 43, 0.05), 0 6px 18px rgba(14, 28, 43, 0.04);
+  --lift: 0 4px 10px rgba(14, 28, 43, 0.08), 0 14px 34px rgba(14, 28, 43, 0.07);
+
+  /* A serif for display gives instant editorial weight, the way a broadsheet
+     masthead does. Resolves to Iowan on Apple, Palatino on Windows, Georgia
+     everywhere else, so no webfont request and no layout shift. */
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua',
+    Georgia, serif;
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -43,8 +63,39 @@ body {
   color: var(--text);
   font-family: var(--font);
   font-size: 16px;
-  line-height: 1.5;
+  line-height: 1.55;
   overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Display type: serif, tight, ink. This is the single biggest lever on
+   perceived quality, and it costs nothing. */
+h1,
+h2,
+h3,
+.display {
+  font-family: var(--font-display);
+  color: var(--ink);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Letterspaced small caps for labels. A restraint signal: the label recedes
+   and the number it introduces carries the weight. */
+.overline {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+/* Figures line up in columns when they are tabular. */
+.stat .value,
+.bar-content strong,
+.num {
+  font-variant-numeric: tabular-nums;
 }
 
 body {
@@ -105,16 +156,18 @@ textarea {
   gap: 12px;
   padding: 12px var(--pad);
   padding-top: calc(12px + env(safe-area-inset-top));
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(12px);
+  background: rgba(251, 250, 247, 0.9);
+  backdrop-filter: saturate(180%) blur(14px);
   border-bottom: 1px solid var(--line-soft);
 }
 
 .topbar h1 {
-  font-size: 17px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
   margin: 0;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
+  color: var(--ink);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -132,15 +185,28 @@ textarea {
 }
 
 .brand-dot {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-sm);
-  background: var(--brand);
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: linear-gradient(160deg, #12456f, var(--ink));
   flex: none;
   position: relative;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 2px 6px rgba(14, 28, 43, 0.25);
 }
 
-/* The mark reads as a solid blue tile, the way LinkedIn's does. */
+/* A hairline gold rule across the mark. The only place the metallic appears
+   in the chrome, which is what keeps it feeling like an accent. */
+.brand-dot::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 7px;
+  height: 1px;
+  background: var(--gold);
+  opacity: 0.85;
+}
+
 .brand-dot::after {
   content: 'TA';
   position: absolute;
@@ -148,10 +214,12 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding-bottom: 4px;
+  font-family: var(--font-display);
   color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .back-btn {
@@ -184,8 +252,8 @@ main {
   right: 0;
   z-index: 50;
   display: flex;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(16px);
+  background: rgba(251, 250, 247, 0.94);
+  backdrop-filter: saturate(180%) blur(16px);
   border-top: 1px solid var(--line-soft);
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -196,32 +264,32 @@ main {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
   height: var(--tabbar-h);
-  color: var(--muted);
-  font-size: 11px;
+  color: var(--dim);
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   transition: color 0.15s;
   position: relative;
 }
 
-/* LinkedIn marks the active tab in near-black with a rule under it, not colour. */
+/* Gold marks the active tab. It is the one navigational use of the metallic,
+   so it reads as a position indicator rather than decoration. */
 .tabbar a.active {
-  color: var(--text);
-  font-weight: 700;
+  color: var(--ink);
 }
 
 .tabbar a.active::after {
   content: '';
   position: absolute;
-  bottom: 6px;
+  top: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 28px;
+  width: 26px;
   height: 2px;
-  border-radius: 2px;
-  background: var(--text);
+  background: var(--gold);
 }
 
 .tabbar svg {
@@ -333,21 +401,25 @@ main {
   border: 1px solid var(--line-soft);
   border-radius: var(--r);
   box-shadow: var(--card-shadow);
-  padding: 16px;
-  margin-bottom: 12px;
+  padding: 18px;
+  margin-bottom: 14px;
 }
 
 .card.tight {
-  padding: 12px 14px;
+  padding: 14px 16px;
 }
 
+/* Section labels sit in letterspaced gold small caps above a hairline. The
+   rule does the separating, so the card needs no heavier furniture. */
 .card-title {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  margin: 0 0 12px;
+  letter-spacing: 0.14em;
+  color: var(--gold);
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .section-head {
@@ -355,20 +427,24 @@ main {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin: 22px 0 10px;
+  margin: 30px 0 12px;
 }
 
 .section-head h2 {
-  font-size: 19px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
   margin: 0;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
+  color: var(--ink);
 }
 
 .section-head .hint {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--brand);
   font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .muted {
@@ -425,70 +501,125 @@ main {
   border: 1px solid var(--line-soft);
   border-radius: var(--r);
   box-shadow: var(--card-shadow);
-  padding: 14px;
+  padding: 16px;
+  position: relative;
+}
+
+/* A gold hairline down the left edge of every figure. Drawn inside the padding
+   box so the card needs no overflow clipping, which would otherwise cut off
+   any glossary panel opened from a label. */
+.stat::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--gold);
+  opacity: 0.6;
 }
 
 .stat .label {
-  font-size: 11px;
+  font-size: 10.5px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   color: var(--muted);
   font-weight: 700;
 }
 
 .stat .value {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  margin-top: 4px;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin-top: 6px;
+  line-height: 1.1;
 }
 
 .stat .delta {
   font-size: 12px;
-  margin-top: 2px;
+  margin-top: 4px;
   font-weight: 600;
 }
 
 /* ---------- buttons ---------- */
 
-/* LinkedIn buttons are pills: filled blue for the primary action, blue outline
-   for the secondary. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 8px;
   border: 1px solid var(--brand);
   background: transparent;
   color: var(--brand);
   border-radius: 999px;
-  padding: 10px 18px;
-  font-size: 15px;
+  padding: 11px 22px;
+  font-size: 14.5px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  transition: background 0.15s, box-shadow 0.15s, opacity 0.15s;
+  transition: background 0.18s, box-shadow 0.18s, transform 0.18s, opacity 0.18s;
 }
 
 .btn:hover:not(:disabled) {
-  background: rgba(10, 102, 194, 0.08);
+  background: rgba(11, 61, 103, 0.06);
   box-shadow: inset 0 0 0 1px var(--brand);
 }
 
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
+/* The primary action is ink with a gold underline that grows on hover. It is
+   the one moment of theatre in the interface, and it is a single element. */
 .btn.primary {
-  background: var(--brand);
-  border-color: var(--brand);
+  background: var(--ink);
+  border-color: var(--ink);
   color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn.primary::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 0;
+  height: 2px;
+  background: var(--gold);
+  transform: translateX(-50%);
+  transition: width 0.28s ease;
 }
 
 .btn.primary:hover:not(:disabled) {
   background: var(--brand-hover);
   border-color: var(--brand-hover);
-  box-shadow: none;
+  box-shadow: 0 6px 18px rgba(14, 28, 43, 0.22);
+}
+
+.btn.primary:hover:not(:disabled)::after {
+  width: 62%;
+}
+
+/* Gold button for the premium moment only. */
+.btn.gold {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #fff;
+}
+
+.btn.gold:hover:not(:disabled) {
+  background: #8f6b22;
+  border-color: #8f6b22;
+  box-shadow: 0 6px 18px rgba(168, 128, 44, 0.28);
 }
 
 .btn.danger {
@@ -498,25 +629,24 @@ main {
 }
 
 .btn.danger:hover:not(:disabled) {
-  background: rgba(178, 64, 32, 0.08);
+  background: var(--down-soft);
   box-shadow: inset 0 0 0 1px var(--down);
 }
 
-/* Neutral action: grey outline, used where blue would over-emphasise. */
 .btn.ghost {
   background: transparent;
-  border-color: rgba(0, 0, 0, 0.3);
+  border-color: var(--line);
   color: var(--muted);
 }
 
 .btn.ghost:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.05);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
-  color: var(--text);
+  background: var(--bg-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
 }
 
 .btn.sm {
-  padding: 6px 14px;
+  padding: 7px 16px;
   font-size: 13px;
 }
 
@@ -644,27 +774,27 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 12px;
+  padding: 7px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--line);
   background: var(--surface);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.16s, color 0.16s, border-color 0.16s;
 }
 
 .chip:hover {
-  background: rgba(0, 0, 0, 0.05);
+  border-color: var(--ink);
+  color: var(--ink);
 }
 
-/* Selected filter pills go solid dark green-blue on LinkedIn; blue reads
-   better here because blue is already the single accent. */
 .chip.active {
-  background: var(--brand);
-  border-color: var(--brand);
+  background: var(--ink);
+  border-color: var(--ink);
   color: #fff;
 }
 
@@ -676,37 +806,41 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 3px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
 }
 
 .badge.on {
-  background: rgba(1, 117, 79, 0.12);
+  background: var(--up-soft);
   color: var(--up);
 }
 .badge.off {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--bg-2);
   color: var(--muted);
 }
 .badge.strong {
-  background: rgba(1, 117, 79, 0.12);
+  background: var(--up-soft);
   color: var(--up);
 }
 .badge.moderate {
-  background: rgba(10, 102, 194, 0.1);
+  background: rgba(11, 61, 103, 0.08);
   color: var(--brand);
 }
 .badge.watch {
-  background: rgba(145, 89, 7, 0.12);
+  background: var(--warn-soft);
   color: var(--warn);
 }
+
+/* Premium is the only badge with a border, which is what makes it read as a
+   seal rather than a tag. */
 .badge.premium {
-  background: rgba(231, 163, 62, 0.18);
-  color: #7a4b00;
+  background: var(--gold-soft);
+  color: var(--gold);
+  border: 1px solid var(--gold-line);
 }
 
 .scroll-x {
@@ -728,19 +862,21 @@ textarea {
 .list-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 13px 14px;
+  gap: 13px;
+  padding: 15px 16px;
   background: var(--surface);
   border: 1px solid var(--line-soft);
   box-shadow: var(--card-shadow);
   border-radius: var(--r);
-  margin-bottom: 8px;
+  margin-bottom: 9px;
   color: inherit;
-  transition: background 0.15s;
+  transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s;
 }
 
 .list-item:hover {
-  background: var(--bg-2);
+  border-color: var(--line);
+  box-shadow: var(--lift);
+  transform: translateY(-1px);
 }
 
 .list-item .grow {
@@ -751,8 +887,10 @@ textarea {
 /* A name is always its own line, whatever container it sits in. */
 .name {
   display: block;
-  font-weight: 650;
-  font-size: 15px;
+  font-weight: 600;
+  font-size: 15.5px;
+  color: var(--ink);
+  letter-spacing: -0.005em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -760,8 +898,8 @@ textarea {
 
 .list-item .name {
   display: block;
-  font-weight: 650;
-  font-size: 15px;
+  font-weight: 600;
+  font-size: 15.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -802,8 +940,20 @@ textarea {
 .bar-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: linear-gradient(90deg, rgba(10, 102, 194, 0.22), rgba(10, 102, 194, 0.05));
+  background: linear-gradient(90deg, rgba(11, 61, 103, 0.16), rgba(11, 61, 103, 0.03));
   border-radius: var(--r-sm);
+}
+
+/* The top-ranked row in any list is marked in gold. One highlight per list is
+   a hierarchy; highlighting everything is noise. */
+.bar-row:first-child .bar-fill {
+  background: linear-gradient(90deg, rgba(168, 128, 44, 0.24), rgba(168, 128, 44, 0.04));
+}
+
+.bar-row:first-child .rank-badge {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--gold-line);
 }
 
 .bar-content {
@@ -816,44 +966,49 @@ textarea {
 /* ---------- recommendations ---------- */
 
 .rec {
-  border-left: 3px solid var(--brand);
   background: var(--surface);
   border: 1px solid var(--line-soft);
   border-left: 3px solid var(--brand);
   box-shadow: var(--card-shadow);
   border-radius: var(--r);
-  padding: 14px 16px;
-  margin-bottom: 10px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
 }
 
 .rec.risk {
   border-left-color: var(--warn);
 }
 .rec.timing {
-  border-left-color: var(--brand-2);
+  border-left-color: var(--gold);
 }
 .rec.gap {
   border-left-color: var(--up);
 }
+.rec.partner {
+  border-left-color: var(--brand-2);
+}
 
 .rec h3 {
-  font-size: 15px;
-  font-weight: 700;
-  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0 0 8px;
   letter-spacing: -0.01em;
+  color: var(--ink);
+  line-height: 1.3;
 }
 
 .rec p {
   margin: 0;
   font-size: 14px;
   color: var(--muted);
-  line-height: 1.55;
+  line-height: 1.62;
 }
 
 .rec .evidence {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--line);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
   font-size: 12px;
   color: var(--dim);
 }
@@ -862,26 +1017,160 @@ textarea {
   margin-bottom: 3px;
 }
 
+/* ---------- glossary terms ---------- */
+
+/* A term of art that explains itself. Marked with a gold dotted rule so it
+   reads as "there is more here" without competing with real links, which are
+   navy and solid. */
+.term-wrap {
+  position: relative;
+  display: inline;
+}
+
+.term {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: help;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--gold);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: background 0.15s;
+}
+
+.term:hover,
+.term[aria-expanded='true'] {
+  background: var(--gold-soft);
+  color: var(--ink);
+}
+
+.term-gold {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.term-quiet {
+  text-decoration-color: var(--line);
+}
+
+.term-pop {
+  position: fixed;
+  z-index: 70;
+  display: block;
+  width: min(300px, calc(100vw - 24px));
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--gold);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  padding: 14px 15px;
+  text-align: left;
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: 13px;
+  /* Terms appear inside letterspaced small-caps labels, so the panel has to
+     reset the inherited casing or the definition shouts. */
+  text-transform: none;
+  letter-spacing: normal;
+  line-height: 1.55;
+  color: var(--muted);
+  cursor: auto;
+  animation: term-in 0.16s ease-out;
+}
+
+@keyframes term-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Positioned from measured geometry by the component. */
+
+.term-pop-title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+.term-pop-body {
+  display: block;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+  text-transform: none;
+}
+
+.term-pop-block {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+  text-transform: none;
+}
+
+.term-pop-label {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 3px;
+}
+
+.term-pop-src {
+  display: inline-block;
+  margin-top: 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand);
+}
+
 /* ---------- premium lock ---------- */
 
+/* The paywall is a gold-sealed panel on ivory, not a grey wall. It should feel
+   like something worth opening. */
 .locked {
   position: relative;
-  border: 1px dashed var(--gold);
+  border: 1px solid var(--gold-line);
+  border-top: 3px solid var(--gold);
   border-radius: var(--r);
-  padding: 22px 18px;
+  padding: 26px 20px;
   text-align: center;
-  background: rgba(231, 163, 62, 0.06);
+  background: linear-gradient(180deg, var(--gold-soft), var(--surface) 70%);
+  box-shadow: var(--card-shadow);
 }
 
 .locked h3 {
-  margin: 10px 0 6px;
-  font-size: 16px;
+  margin: 12px 0 8px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
 }
 
 .locked p {
-  margin: 0 0 14px;
+  margin: 0 auto 16px;
   font-size: 14px;
   color: var(--muted);
+  max-width: 46ch;
+  line-height: 1.6;
 }
 
 /* ---------- admin table ---------- */
@@ -989,44 +1278,78 @@ textarea {
   }
 }
 
-/* A tinted blue panel so the hero reads as a header without leaving the
-   white-and-blue palette. */
+/* The hero is the one dark surface: ink with a gold rule and a faint radial
+   warmth. Dark used once, deliberately, reads as expensive. Used everywhere it
+   reads as a theme. */
 .hero {
-  background: var(--surface-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r);
-  padding: 22px 20px;
-  margin-bottom: 16px;
+  position: relative;
+  background: linear-gradient(155deg, #14324e 0%, var(--ink) 62%);
+  border: 1px solid var(--ink);
+  border-radius: var(--r-lg);
+  padding: 28px 24px 26px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  box-shadow: var(--lift);
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 90% at 88% 0%, rgba(168, 128, 44, 0.28), transparent 62%);
+  pointer-events: none;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  left: 24px;
+  top: 0;
+  width: 46px;
+  height: 3px;
+  background: var(--gold);
 }
 
 .hero h2 {
-  margin: 0 0 8px;
-  font-size: 24px;
-  letter-spacing: -0.03em;
-  line-height: 1.25;
-  color: var(--text);
+  position: relative;
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #fff;
 }
 
 .hero p {
+  position: relative;
   margin: 0;
-  color: var(--muted);
-  font-size: 14px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+.hero .overline {
+  position: relative;
+  display: block;
+  margin-bottom: 10px;
+  color: var(--gold-line);
 }
 
 .flag {
-  width: 30px;
-  height: 22px;
+  width: 34px;
+  height: 25px;
   border-radius: 3px;
   background: var(--bg-2);
-  border: 1px solid var(--line-soft);
+  border: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 10px;
   font-weight: 800;
+  letter-spacing: 0.06em;
   color: var(--muted);
   flex: none;
-  letter-spacing: 0.02em;
 }
 
 .src-link {

@@ -7,12 +7,14 @@ import {
   currentUser,
   destroySession,
   hashPassword,
+  isEntitled,
   passwordProblem,
   isSecureRequest,
   sessionCookie,
   validEmail,
   verifyPassword,
 } from '../lib/session';
+import { clientKey, rateLimit, tooMany } from '../lib/ratelimit';
 
 export const auth = new Hono<{ Bindings: Env }>();
 
@@ -28,6 +30,9 @@ interface RegisterBody {
  * registration; the business card is a separate, optional step afterwards.
  */
 auth.post('/register', async (c) => {
+  const limited = await rateLimit(c.env, 'register', clientKey(c.req.raw));
+  if (!limited.ok) return tooMany(limited);
+
   const body = (await c.req.json().catch(() => null)) as RegisterBody | null;
   if (!body) return bad('Invalid request');
 
@@ -63,6 +68,7 @@ auth.post('/register', async (c) => {
         full_name: name,
         role: 'member',
         tier: 'free',
+        tier_expires_at: null,
         country_iso3: body.country_iso3?.toUpperCase() ?? null,
       },
     },
@@ -79,8 +85,18 @@ auth.post('/login', async (c) => {
   if (!body) return bad('Invalid request');
 
   const email = (body.email ?? '').trim().toLowerCase();
+
+  // Two limits with different jobs. The account limit is the one that stops
+  // credential stuffing; the IP limit is a loose backstop that will not lock
+  // out everyone sharing a connection.
+  const byAccount = await rateLimit(c.env, 'loginAccount', `email:${email}`);
+  if (!byAccount.ok) return tooMany(byAccount);
+  const byIp = await rateLimit(c.env, 'loginIp', clientKey(c.req.raw));
+  if (!byIp.ok) return tooMany(byIp);
+
   const row = await c.env.DB.prepare(
-    `SELECT id, email, full_name, role, tier, country_iso3, password_hash, password_salt
+    `SELECT id, email, full_name, role, tier, tier_expires_at, country_iso3,
+            password_hash, password_salt
        FROM users WHERE email = ?`,
   )
     .bind(email)
@@ -90,6 +106,7 @@ auth.post('/login', async (c) => {
       full_name: string;
       role: 'member' | 'admin';
       tier: 'free' | 'premium';
+      tier_expires_at: string | null;
       country_iso3: string | null;
       password_hash: string;
       password_salt: string;
@@ -123,6 +140,7 @@ auth.post('/login', async (c) => {
         full_name: row.full_name,
         role: row.role,
         tier: row.tier,
+        tier_expires_at: row.tier_expires_at,
         country_iso3: row.country_iso3,
       },
     },
@@ -136,7 +154,7 @@ auth.post('/logout', async (c) => {
   return json({ ok: true }, 200, { 'set-cookie': clearCookie(isSecureRequest(c.req.raw)) });
 });
 
-/** Who am I, plus whether I have a card yet and how many unread messages. */
+/** Who am I, plus card state, unread messages and unread feed items. */
 auth.get('/me', async (c) => {
   const user = await currentUser(c.req.raw, c.env);
   if (!user) return json({ user: null });
@@ -158,20 +176,46 @@ auth.get('/me', async (c) => {
     .bind(user.id, user.id, user.id)
     .first<{ n: number }>();
 
+  const feed = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM feed_items WHERE user_id = ? AND read_at IS NULL',
+  )
+    .bind(user.id)
+    .first<{ n: number }>();
+
+  const subs = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM subscriptions WHERE user_id = ?',
+  )
+    .bind(user.id)
+    .first<{ n: number }>();
+
   return json({
     user,
+    entitled: isEntitled(user),
     has_card: Boolean(card),
     card_published: card?.is_published === 1,
     unread: unread?.n ?? 0,
+    feed_unread: feed?.n ?? 0,
+    subscriptions: subs?.n ?? 0,
   });
 });
 
-/** Premium toggle stands in for billing until Phase 3. */
+/**
+ * Development-only tier switch. Refused once a real payment provider is
+ * configured, so it cannot become a back door in production.
+ */
 auth.post('/tier', async (c) => {
   const user = await currentUser(c.req.raw, c.env);
   if (!user) return bad('Sign in first', 401);
+  if (c.env.STRIPE_SECRET_KEY) {
+    return bad('Use /api/premium/billing/checkout, a payment provider is configured', 403);
+  }
   const body = (await c.req.json().catch(() => null)) as { tier: 'free' | 'premium' } | null;
   if (!body || !['free', 'premium'].includes(body.tier)) return bad('tier must be free or premium');
-  await c.env.DB.prepare('UPDATE users SET tier = ? WHERE id = ?').bind(body.tier, user.id).run();
-  return json({ tier: body.tier });
+
+  const expires =
+    body.tier === 'premium' ? new Date(Date.now() + 30 * 86_400_000).toISOString() : null;
+  await c.env.DB.prepare('UPDATE users SET tier = ?, tier_expires_at = ? WHERE id = ?')
+    .bind(body.tier, expires, user.id)
+    .run();
+  return json({ tier: body.tier, tier_expires_at: expires });
 });

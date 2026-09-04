@@ -11,7 +11,18 @@ export interface SessionUser {
   full_name: string;
   role: 'member' | 'admin';
   tier: 'free' | 'premium';
+  tier_expires_at: string | null;
   country_iso3: string | null;
+}
+
+/**
+ * Entitlement is the tier AND an unexpired period. Reading `tier` alone would
+ * keep someone premium forever after a cancelled subscription lapses.
+ */
+export function isEntitled(user: SessionUser | null): boolean {
+  if (!user || user.tier !== 'premium') return false;
+  if (!user.tier_expires_at) return true; // no expiry set = comped or lifetime
+  return new Date(user.tier_expires_at).getTime() > Date.now();
 }
 
 // --- password hashing -------------------------------------------------------
@@ -116,7 +127,8 @@ export async function currentUser(req: Request, env: Env): Promise<SessionUser |
   if (!sid) return null;
 
   const row = await env.DB.prepare(
-    `SELECT u.id, u.email, u.full_name, u.role, u.tier, u.country_iso3, s.expires_at
+    `SELECT u.id, u.email, u.full_name, u.role, u.tier, u.tier_expires_at,
+            u.country_iso3, s.expires_at
        FROM sessions s
        JOIN users u ON u.id = s.user_id
       WHERE s.id = ?`,
@@ -136,6 +148,7 @@ export async function currentUser(req: Request, env: Env): Promise<SessionUser |
     full_name: row.full_name,
     role: row.role,
     tier: row.tier,
+    tier_expires_at: row.tier_expires_at,
     country_iso3: row.country_iso3,
   };
 }

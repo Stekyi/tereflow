@@ -2,15 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
-import { Skeletons, Toggle, useToast } from '../components/ui';
+import { Skeletons, useToast } from '../components/ui';
 import type { BusinessCard } from '../../shared/types';
 
 export default function Me() {
-  const { user, hasCard, loading, refresh, signOut } = useSession();
+  const { user, entitled, hasCard, subscriptions, feedUnread, loading, signOut } = useSession();
   const navigate = useNavigate();
   const t = useToast();
   const [card, setCard] = useState<BusinessCard | null>(null);
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -19,19 +18,6 @@ export default function Me() {
       .then((r) => setCard(r.card))
       .catch(() => undefined);
   }, [user, hasCard]);
-
-  async function toggleTier(next: boolean) {
-    setBusy(true);
-    try {
-      await api.auth.setTier(next ? 'premium' : 'free');
-      await refresh();
-      t.ok(next ? 'Premium preview on' : 'Back to free');
-    } catch (e) {
-      t.err((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   if (loading) return <Skeletons n={4} />;
 
@@ -113,21 +99,49 @@ export default function Me() {
               Premium <span className="badge premium">★</span>
             </div>
             <div className="tiny dim" style={{ maxWidth: 380 }}>
-              Early signals, entry playbooks and a personal market feed. Preview toggle stands in for
-              billing until Phase 3.
+              {entitled
+                ? user.tier_expires_at
+                  ? `Active until ${new Date(user.tier_expires_at).toLocaleDateString()}`
+                  : 'Active'
+                : 'Early signals, entry playbooks and a personal market feed.'}
             </div>
           </div>
-          <Toggle
-            checked={user.tier === 'premium'}
-            onChange={toggleTier}
-            disabled={busy}
-          />
+          <Link className="btn sm primary" to="/upgrade">
+            {entitled ? 'Manage' : 'See plans'}
+          </Link>
         </div>
       </div>
 
       <div className="section-head">
         <h2>More</h2>
       </div>
+
+      <Link className="list-item" to="/feed">
+        <span className="grow">
+          <span className="name">
+            Your feed
+            {feedUnread > 0 && (
+              <span className="badge on" style={{ marginLeft: 8 }}>
+                {feedUnread} new
+              </span>
+            )}
+          </span>
+          <span className="tiny dim">
+            {subscriptions > 0
+              ? `Following ${subscriptions} ${subscriptions === 1 ? 'thing' : 'things'}`
+              : 'Follow a product or market to fill this'}
+          </span>
+        </span>
+        <span className="dim">›</span>
+      </Link>
+
+      <Link className="list-item" to="/playbooks">
+        <span className="grow">
+          <span className="name">How to start</span>
+          <span className="tiny dim">Entry playbooks with their sources</span>
+        </span>
+        <span className="dim">›</span>
+      </Link>
 
       <Link className="list-item" to="/registry">
         <span className="grow">

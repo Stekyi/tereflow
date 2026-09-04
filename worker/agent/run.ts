@@ -3,6 +3,7 @@ import { uid } from '../lib/db';
 import { fetchComtrade } from './adapters/comtrade';
 import { fetchWorldBank } from './adapters/worldbank';
 import { analyse } from './analyse';
+import { fanOutFeed } from './feed';
 import type { FactRow } from './types';
 
 /**
@@ -27,6 +28,7 @@ export interface RunResult {
   facts_written: number;
   processed: string[];
   errors: { slug: string; error: string }[];
+  feed: { subscribers: number; subscriptions: number; items_written: number };
 }
 
 export async function runAnalysis(
@@ -69,6 +71,7 @@ export async function runAnalysis(
     facts_written: 0,
     processed: [],
     errors: [],
+    feed: { subscribers: 0, subscriptions: 0, items_written: 0 },
   };
 
   for (const entity of entities) {
@@ -95,6 +98,17 @@ export async function runAnalysis(
       : result.entities_ok === 0
         ? 'failed'
         : 'partial';
+
+  // Push the refreshed analysis into subscribers' feeds. Isolated so a fan-out
+  // problem cannot lose an otherwise good ingest run.
+  try {
+    result.feed = await fanOutFeed(env, runId);
+  } catch (err) {
+    result.errors.push({
+      slug: '(feed)',
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   await env.DB.prepare(
     `UPDATE analysis_runs

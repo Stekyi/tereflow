@@ -9,8 +9,7 @@ export default function Home() {
   const [stats, setStats] = useState<HomeStats | null>(null);
   const [active, setActive] = useState<Entity[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user, refresh } = useSession();
-  const [busy, setBusy] = useState(false);
+  const { user, entitled, feedUnread } = useSession();
 
   useEffect(() => {
     Promise.all([api.stats(), api.entities({ kind: 'country' })])
@@ -22,17 +21,6 @@ export default function Home() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function toggleTier() {
-    if (!user) return;
-    setBusy(true);
-    try {
-      await api.auth.setTier(user.tier === 'premium' ? 'free' : 'premium');
-      await refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <>
       <div className="hero">
@@ -42,6 +30,22 @@ export default function Home() {
           Rebuilt from official statistics every Friday.
         </p>
       </div>
+
+      {user && feedUnread > 0 && (
+        <Link className="card tight" to="/feed" style={{ display: 'block', borderColor: 'var(--brand)' }}>
+          <div className="row between">
+            <span>
+              <span style={{ fontWeight: 650, fontSize: 15 }}>
+                {feedUnread} new in your feed
+              </span>
+              <span className="tiny dim" style={{ display: 'block' }}>
+                From the markets and products you follow
+              </span>
+            </span>
+            <span className="dim">›</span>
+          </div>
+        </Link>
+      )}
 
       {loading ? (
         <Skeletons n={3} />
@@ -86,7 +90,12 @@ export default function Home() {
           )}
 
           <div className="section-head">
-            <h2>Premium</h2>
+            <h2>{entitled ? 'Premium' : 'Go further'}</h2>
+            {user && (
+              <Link className="hint" to="/feed">
+                Your feed ›
+              </Link>
+            )}
           </div>
 
           <div className="card">
@@ -96,27 +105,24 @@ export default function Home() {
             />
             <PremiumLine
               title="How to start"
-              body="Entry playbooks per sector and market, drawn from trade experts rather than generic advice."
+              body="Entry playbooks per sector and market, sourced from the institutions that write the rules."
             />
             <PremiumLine
               title="Your watchlist"
-              body="Follow a product or a market and get the push-and-pull analysis in your feed each week."
+              body="Follow a product or a market and get the push-and-pull read in your feed each week."
             />
-            <button className="btn block" onClick={toggleTier} style={{ marginTop: 12 }} disabled={busy}>
-              {user
-                ? user.tier === 'premium'
-                  ? 'Premium preview on — turn off'
-                  : 'Preview premium features'
-                : 'Join free to preview premium'}
-            </button>
-            {!user && (
-              <Link className="btn ghost block" to="/join" style={{ marginTop: 8 }}>
-                Create free account
+            {entitled ? (
+              <Link className="btn primary block" to="/feed" style={{ marginTop: 12 }}>
+                Open your feed
+              </Link>
+            ) : (
+              <Link className="btn primary block" to="/upgrade" style={{ marginTop: 12 }}>
+                {user ? 'See premium' : 'Join free, then upgrade'}
               </Link>
             )}
-            <p className="tiny dim" style={{ margin: '8px 0 0', textAlign: 'center' }}>
-              Preview toggle stands in for billing until Phase 3.
-            </p>
+            <Link className="btn ghost block" to="/playbooks" style={{ marginTop: 8 }}>
+              Browse the playbook library
+            </Link>
           </div>
 
           <div className="section-head">

@@ -643,6 +643,16 @@ textarea {
   min-width: 0;
 }
 
+/* A name is always its own line, whatever container it sits in. */
+.name {
+  display: block;
+  font-weight: 650;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .list-item .name {
   display: block;
   font-weight: 650;
@@ -654,7 +664,8 @@ textarea {
 
 /* meta line under the name always sits on its own row */
 .list-item .grow > span:not(.name),
-.list-item .grow > .tiny {
+.list-item .grow > .tiny,
+.admin-row .tiny {
   display: block;
 }
 
@@ -931,6 +942,62 @@ textarea {
   border-radius: 999px;
   flex: none;
 }
+.md {
+  font-size: 15px;
+  line-height: 1.62;
+}
+
+.md-h2 {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 20px 0 8px;
+  color: var(--text);
+}
+
+.md-h2:first-child {
+  margin-top: 0;
+}
+
+.md-h3 {
+  font-size: 14.5px;
+  font-weight: 700;
+  margin: 16px 0 6px;
+  color: var(--muted);
+}
+
+.md-p {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+.md-list {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  color: var(--muted);
+}
+
+.md-list li {
+  margin-bottom: 5px;
+}
+
+.md-code {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-size: 13px;
+}
+
+.md a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.selected-plan {
+  background: rgba(59, 169, 255, 0.08);
+}
+
 .dot.ok {
   background: var(--up);
 }

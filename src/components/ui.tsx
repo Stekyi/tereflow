@@ -100,6 +100,7 @@ export function BarRow({
   share,
   max,
   meta,
+  action,
 }: {
   rank: number;
   name: string;
@@ -107,6 +108,7 @@ export function BarRow({
   share: number;
   max: number;
   meta?: ReactNode;
+  action?: ReactNode;
 }) {
   const pct = max > 0 ? Math.max(2, (share / max) * 100) : 0;
   return (
@@ -130,8 +132,42 @@ export function BarRow({
           {meta && <span className="tiny dim">{meta}</span>}
         </span>
         <span style={{ fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap' }}>{value}</span>
+        {action}
       </div>
     </div>
+  );
+}
+
+/**
+ * Follow toggle. Following is free on purpose — a watchlist is what makes the
+ * premium feed worth paying for, so there is no sense gating the act itself.
+ */
+export function FollowButton({
+  kind,
+  value,
+  label,
+  following,
+  onChange,
+}: {
+  kind: 'product' | 'sector' | 'country' | 'hs_code';
+  value: string;
+  label: string;
+  following: boolean;
+  onChange: (following: boolean, kind: string, value: string, label: string) => void;
+}) {
+  return (
+    <button
+      className={`chip ${following ? 'active' : ''}`}
+      style={{ flex: 'none' }}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onChange(!following, kind, value, label);
+      }}
+      title={following ? 'Unfollow' : 'Follow for weekly analysis'}
+    >
+      {following ? '★' : '☆'}
+    </button>
   );
 }
 

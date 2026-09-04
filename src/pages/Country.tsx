@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
-import { BarRow, Chips, Empty, Skeletons, Stat } from '../components/ui';
+import { BarRow, Chips, Empty, FollowButton, Skeletons, Stat, useToast } from '../components/ui';
 import {
   fmtPct,
   fmtUsd,
@@ -36,8 +36,58 @@ export default function Country() {
   const [tab, setTab] = useState<Tab>('summary');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { user } = useSession();
+  const { user, refresh } = useSession();
   const tier = user?.tier ?? 'free';
+  const t = useToast();
+  const [subs, setSubs] = useState<Map<string, string>>(new Map());
+
+  // Key a subscription by kind+value so follow state survives a re-render.
+  const subKey = (kind: string, value: string) => `${kind}:${value.toLowerCase()}`;
+
+  useEffect(() => {
+    if (!user) return setSubs(new Map());
+    api.premium
+      .subscriptions()
+      .then((r) => setSubs(new Map(r.subscriptions.map((s) => [subKey(s.kind, s.value), s.id]))))
+      .catch(() => undefined);
+  }, [user]);
+
+  async function toggleFollow(
+    next: boolean,
+    kind: string,
+    value: string,
+    label: string,
+  ) {
+    if (!user) {
+      t.err('Join free to follow markets and products');
+      return;
+    }
+    const key = subKey(kind, value);
+    try {
+      if (next) {
+        await api.premium.follow({
+          kind: kind as 'product' | 'sector' | 'country' | 'hs_code',
+          value,
+          label,
+        });
+        const r = await api.premium.subscriptions();
+        setSubs(new Map(r.subscriptions.map((s) => [subKey(s.kind, s.value), s.id])));
+        t.ok(`Following ${label}`);
+      } else {
+        const id = subs.get(key);
+        if (id) await api.premium.unfollow(id);
+        setSubs((prev) => {
+          const copy = new Map(prev);
+          copy.delete(key);
+          return copy;
+        });
+        t.ok(`Unfollowed ${label}`);
+      }
+      await refresh();
+    } catch (e) {
+      t.err((e as Error).message);
+    }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -82,7 +132,17 @@ export default function Country() {
         name={data.entity.name}
         iso3={data.entity.iso3}
         sub={`${data.entity.continent ?? ''} · figures for ${o.year}`}
+        action={
+          <FollowButton
+            kind="country"
+            value={data.entity.slug}
+            label={data.entity.name}
+            following={subs.has(subKey('country', data.entity.slug))}
+            onChange={toggleFollow}
+          />
+        }
       />
+      {t.node}
 
       <Chips
         options={[
@@ -261,8 +321,19 @@ export default function Country() {
 
       {tab === 'products' && (
         <>
-          <Ranked title="What it sells most" items={data.top_exports} />
-          <Ranked title="What it buys most" items={data.top_imports} />
+          <p className="tiny dim" style={{ marginTop: 0 }}>
+            Tap ☆ on a product to follow it. Its weekly analysis then lands in your feed.
+          </p>
+          <Ranked
+            title="What it sells most"
+            items={data.top_exports}
+            follow={{ subs, toggle: toggleFollow, subKey }}
+          />
+          <Ranked
+            title="What it buys most"
+            items={data.top_imports}
+            follow={{ subs, toggle: toggleFollow, subKey }}
+          />
         </>
       )}
 
@@ -392,23 +463,48 @@ export default function Country() {
   );
 }
 
-function Header({ name, iso3, sub }: { name: string; iso3: string | null; sub: string }) {
+function Header({
+  name,
+  iso3,
+  sub,
+  action,
+}: {
+  name: string;
+  iso3: string | null;
+  sub: string;
+  action?: React.ReactNode;
+}) {
   return (
     <div className="row" style={{ marginBottom: 16, gap: 12 }}>
       <span className="flag" style={{ width: 44, height: 32, fontSize: 12 }}>
         {iso3 ?? '??'}
       </span>
-      <div>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 22, fontWeight: 750, letterSpacing: '-0.03em', lineHeight: 1.15 }}>
           {name}
         </div>
         <div className="tiny dim">{sub}</div>
       </div>
+      {action}
     </div>
   );
 }
 
-function Ranked({ title, items }: { title: string; items: RankedItem[] }) {
+interface FollowWiring {
+  subs: Map<string, string>;
+  toggle: (next: boolean, kind: string, value: string, label: string) => void;
+  subKey: (kind: string, value: string) => string;
+}
+
+function Ranked({
+  title,
+  items,
+  follow,
+}: {
+  title: string;
+  items: RankedItem[];
+  follow?: FollowWiring;
+}) {
   if (!items.length) return null;
   const max = Math.max(...items.map((i) => i.share_pct), 1);
   return (
@@ -422,6 +518,17 @@ function Ranked({ title, items }: { title: string; items: RankedItem[] }) {
           value={fmtUsd(i.value_usd)}
           share={i.share_pct}
           max={max}
+          action={
+            follow && i.code ? (
+              <FollowButton
+                kind="hs_code"
+                value={i.code}
+                label={i.name}
+                following={follow.subs.has(follow.subKey('hs_code', i.code))}
+                onChange={follow.toggle}
+              />
+            ) : undefined
+          }
           meta={
             <>
               {i.share_pct.toFixed(1)}% share

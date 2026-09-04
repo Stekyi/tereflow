@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { attachSources, bad, getEntityBySlug, json } from '../lib/db';
-import { currentUser } from '../lib/session';
+import { currentUser, isEntitled } from '../lib/session';
 import type {
   CountryDashboard,
   Entity,
@@ -98,9 +98,10 @@ pub.get('/dashboard/:slug', async (c) => {
     );
   }
 
-  // The gate is the signed-in user's tier. A client header cannot buy premium.
+  // The gate is the signed-in user's entitlement. A client header cannot buy
+  // premium, and a lapsed subscription stops working on its expiry date.
   const viewer = await currentUser(c.req.raw, c.env);
-  const isPremium = viewer?.tier === 'premium';
+  const isPremium = isEntitled(viewer);
 
   const [overview, topExports, topImports, services, partnersExport, partnersImport, trend, recs] =
     await Promise.all([

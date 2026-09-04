@@ -15,6 +15,8 @@ export interface Env {
   COMTRADE_API_KEY?: string;
   CENSUS_API_KEY?: string;
   SESSION_SECRET?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
 }
 
 export function uid(prefix = ''): string {

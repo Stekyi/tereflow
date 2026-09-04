@@ -193,6 +193,7 @@ export interface SessionUser {
   full_name: string;
   role: 'member' | 'admin';
   tier: 'free' | 'premium';
+  tier_expires_at: string | null;
   country_iso3: string | null;
 }
 
@@ -285,6 +286,80 @@ export const SECTOR_OPTIONS = [
   'Professional services',
   'Technology & software',
 ] as const;
+
+// --- premium ----------------------------------------------------------------
+
+export type SubscriptionKind = 'product' | 'sector' | 'country' | 'hs_code';
+
+export interface Subscription {
+  id: string;
+  kind: SubscriptionKind;
+  value: string;
+  label: string | null;
+  created_at: string;
+}
+
+export interface FeedItem {
+  id: string;
+  kind: 'signal' | 'market_balance' | 'trend' | 'playbook' | string;
+  title: string;
+  body: string | null;
+  payload: unknown;
+  entity_slug: string | null;
+  entity_name: string | null;
+  premium_only: boolean;
+  locked: boolean;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface PlaybookSummary {
+  id: string;
+  slug: string;
+  title: string;
+  sector: string | null;
+  hs_code: string | null;
+  country_iso3: string | null;
+  summary: string | null;
+  author_name: string | null;
+  premium_only: 0 | 1;
+  reading_minutes: number;
+  published_at: string | null;
+  locked: boolean;
+}
+
+export interface PlaybookSource {
+  title: string;
+  url: string;
+  publisher: string;
+}
+
+export interface Playbook {
+  slug: string;
+  title: string;
+  summary: string | null;
+  sector: string | null;
+  country_iso3: string | null;
+  author_name: string | null;
+  author_credential: string | null;
+  reading_minutes: number;
+  body_md: string;
+  sources: PlaybookSource[];
+  premium_only: boolean;
+  locked: boolean;
+}
+
+export interface Plan {
+  id: string;
+  label: string;
+  amount_minor: number;
+  currency: string;
+  days: number;
+}
+
+export function fmtMoney(minor: number, currency: string): string {
+  return new Intl.NumberFormat('en', { style: 'currency', currency }).format(minor / 100);
+}
 
 export function fmtUsd(v: number | null | undefined): string {
   if (v == null || !isFinite(v)) return '—';

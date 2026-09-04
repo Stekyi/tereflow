@@ -407,7 +407,7 @@ function detectSignals(
       horizon_years: 4,
       confidence: clamp01(0.4 + 0.4 * consistency + 0.2 * clamp01(share * 30)),
       rationale:
-        `${sector(r.hs_code)} — growing ${growth.toFixed(0)}% a year since ${base}, ` +
+        `${sector(r.hs_code)}: growing ${growth.toFixed(0)}% a year since ${base}, ` +
         `now ${(share * 100).toFixed(2)}% of ${flow}s at rank ${rank ?? '?'}. ` +
         (consistency > 0.6
           ? 'Growth has been steady rather than a single spike.'
@@ -492,7 +492,7 @@ function recommend(
       out.push({
         headline: `${name} has a broad export base`,
         detail:
-          `No single product dominates — the largest is ${lead.name.toLowerCase()} at ` +
+          `No single product dominates. The largest is ${lead.name.toLowerCase()} at ` +
           `${lead.share_pct.toFixed(0)}%. Diversified exporters are more resilient and ` +
           `usually have the customs, logistics and finance capacity to handle varied goods.`,
         angle: 'entry',
@@ -511,7 +511,7 @@ function recommend(
       headline: `Growing demand for ${risingImports.map((p) => p.name.toLowerCase()).join(', ')}`,
       detail:
         `These are the fastest-growing things ${name} buys from abroad. Rising imports mean ` +
-        `domestic demand is outpacing domestic supply — that gap is either a place to sell ` +
+        `domestic demand is outpacing domestic supply. That gap is either a place to sell ` +
         `into, or a place to produce locally and displace the import.`,
       angle: 'gap',
       strength: risingImports[0].cagr_3y! > 20 ? 'strong' : 'moderate',

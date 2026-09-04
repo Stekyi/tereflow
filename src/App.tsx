@@ -16,6 +16,10 @@ const CardEditor = lazy(() => import('./pages/CardEditor'));
 const Messages = lazy(() => import('./pages/Messages'));
 const Thread = lazy(() => import('./pages/Thread'));
 const Me = lazy(() => import('./pages/Me'));
+const Feed = lazy(() => import('./pages/Feed'));
+const Playbooks = lazy(() => import('./pages/Playbooks'));
+const PlaybookDetail = lazy(() => import('./pages/PlaybookDetail'));
+const Upgrade = lazy(() => import('./pages/Upgrade'));
 
 const TITLES: Record<string, string> = {
   '/': 'TradeAtlas',
@@ -24,6 +28,9 @@ const TITLES: Record<string, string> = {
   '/messages': 'Messages',
   '/me': 'Me',
   '/me/card': 'My business card',
+  '/feed': 'Your feed',
+  '/playbooks': 'How to start',
+  '/upgrade': 'Premium',
   '/registry': 'Data registry',
   '/admin': 'Admin',
   '/admin/new': 'New record',
@@ -35,7 +42,7 @@ const ROOTS = new Set(['/', '/explore', '/network', '/messages', '/me']);
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { unread } = useSession();
+  const { unread, feedUnread } = useSession();
 
   const isRoot = ROOTS.has(location.pathname);
   const title = TITLES[location.pathname] ?? 'TradeAtlas';
@@ -70,6 +77,10 @@ export default function App() {
             <Route path="/messages/:id" element={<Thread />} />
             <Route path="/me" element={<Me />} />
             <Route path="/me/card" element={<CardEditor />} />
+            <Route path="/feed" element={<Feed />} />
+            <Route path="/playbooks" element={<Playbooks />} />
+            <Route path="/playbooks/:slug" element={<PlaybookDetail />} />
+            <Route path="/upgrade" element={<Upgrade />} />
 
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/new" element={<AdminForm />} />
@@ -91,7 +102,12 @@ export default function App() {
       </main>
 
       <nav className="tabbar">
-        <Tab to="/" label="Home" d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z" />
+        <Tab
+          to="/"
+          label="Home"
+          d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"
+          badge={feedUnread}
+        />
         <Tab
           to="/explore"
           label="Markets"

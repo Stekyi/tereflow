@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { bad, json, uid } from '../lib/db';
 import { currentUser } from '../lib/session';
+import { rateLimit, tooMany } from '../lib/ratelimit';
 import { INTENTS, type BusinessCard, type BusinessCardInput, type Intent } from '../../shared/types';
 
 export const network = new Hono<{ Bindings: Env }>();
@@ -256,6 +257,9 @@ network.post('/conversations', async (c) => {
   const user = await currentUser(c.req.raw, c.env);
   if (!user) return bad('Sign in first', 401);
 
+  const limited = await rateLimit(c.env, 'message', user.id);
+  if (!limited.ok) return tooMany(limited);
+
   const body = (await c.req.json().catch(() => null)) as {
     to_user_id: string;
     subject?: string;
@@ -366,6 +370,10 @@ network.get('/conversations/:id/messages', async (c) => {
 network.post('/conversations/:id/messages', async (c) => {
   const user = await currentUser(c.req.raw, c.env);
   if (!user) return bad('Sign in first', 401);
+
+  const limited = await rateLimit(c.env, 'message', user.id);
+  if (!limited.ok) return tooMany(limited);
+
   const cid = c.req.param('id');
 
   const convo = await c.env.DB.prepare(

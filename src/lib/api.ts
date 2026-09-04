@@ -6,9 +6,15 @@ import type {
   Entity,
   EntityInput,
   EntityWithSources,
+  FeedItem,
   Message,
+  Plan,
+  Playbook,
+  PlaybookSummary,
   Rating,
   SessionUser,
+  Subscription,
+  SubscriptionKind,
 } from '../../shared/types';
 
 const ADMIN_TOKEN_KEY = 'ta_admin_token';
@@ -143,9 +149,12 @@ export const api = {
     me: () =>
       req<{
         user: SessionUser | null;
+        entitled?: boolean;
         has_card?: boolean;
         card_published?: boolean;
         unread?: number;
+        feed_unread?: number;
+        subscriptions?: number;
       }>('/api/auth/me'),
     register: (input: {
       email: string;
@@ -205,5 +214,55 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(input),
       }),
+  },
+
+  premium: {
+    subscriptions: () => req<{ subscriptions: Subscription[] }>('/api/premium/subscriptions'),
+    follow: (input: { kind: SubscriptionKind; value: string; label?: string }) =>
+      req<{ ok: true }>('/api/premium/subscriptions', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    unfollow: (id: string) =>
+      req<{ deleted: true }>(`/api/premium/subscriptions/${id}`, { method: 'DELETE' }),
+
+    feed: () =>
+      req<{ items: FeedItem[]; unread: number; entitled: boolean; locked_count: number }>(
+        '/api/premium/feed',
+      ),
+    markRead: (id?: string) =>
+      req<{ ok: true }>('/api/premium/feed/read', {
+        method: 'POST',
+        body: JSON.stringify(id ? { id } : {}),
+      }),
+
+    playbooks: (params: Record<string, string | undefined> = {}) => {
+      const qs = new URLSearchParams();
+      for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v);
+      const s = qs.toString();
+      return req<{ playbooks: PlaybookSummary[]; entitled: boolean }>(
+        `/api/premium/playbooks${s ? `?${s}` : ''}`,
+      );
+    },
+    playbook: (slug: string) =>
+      req<{ playbook: Playbook; entitled: boolean }>(`/api/premium/playbooks/${slug}`),
+
+    plans: () => req<{ plans: Plan[]; provider: string }>('/api/premium/billing/plans'),
+    checkout: (plan: string) =>
+      req<{
+        provider: string;
+        checkout_url?: string;
+        activated?: boolean;
+        period_end?: string;
+        note?: string;
+      }>('/api/premium/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
+    cancel: () => req<{ tier: string }>('/api/premium/billing/cancel', { method: 'POST' }),
+    history: () =>
+      req<{
+        events: Record<string, unknown>[];
+        tier: string;
+        tier_expires_at: string | null;
+        entitled: boolean;
+      }>('/api/premium/billing/history'),
   },
 };

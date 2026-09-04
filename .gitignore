@@ -8,5 +8,3 @@ dist/
 .DS_Store
 data/seed.sql
 
-# generated seeds are rebuilt with npm run seed:build
-data/playbooks.sql

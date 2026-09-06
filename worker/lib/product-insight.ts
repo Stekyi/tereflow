@@ -11,8 +11,16 @@ import type {
   ProductSubscriber,
 } from '../../shared/types';
 
-interface AnalyticsRow {
-  hs_code: string;
+/** The stored basis for a score: the pipeline's own inputs, plus whose it is. */
+interface SignalRow {
+  cagr_3y: number | null;
+  momentum: number | null;
+  confidence: number | null;
+  value_usd: number | null;
+  name: string;
+}
+
+interface AnalyticsRow {  hs_code: string;
   entity_id: string;
   flow: 'export' | 'import';
   year: number;
@@ -68,6 +76,12 @@ export async function buildProductInsight(
   env: Env,
   hs: string,
   focusSlug: string | null,
+  /**
+   * The direction the reader came in on. Somebody who tapped China's copper
+   * imports wants China's import figures, not the token exports that happen to
+   * exist for the same country and product.
+   */
+  focusFlow: 'export' | 'import' | null = null,
 ): Promise<ProductInsight> {
   const settings = await loadSettings(env);
   const chapter = hs.slice(0, 2);
@@ -110,10 +124,12 @@ export async function buildProductInsight(
       : (prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2
     : null;
 
-  // Headline figures follow the country in focus when there is one, and
-  // otherwise the largest seller, which is the most representative single row.
-  const focus = focusSlug ? all.find((r) => r.slug === focusSlug && r.flow === 'export')
-    ?? all.find((r) => r.slug === focusSlug)
+  // Headline figures follow the country in focus when there is one, in the
+  // direction the reader arrived on. Without a focus it is the largest seller,
+  // which is the most representative single row.
+  const focus = focusSlug
+    ? all.find((r) => r.slug === focusSlug && r.flow === (focusFlow ?? 'export'))
+      ?? all.find((r) => r.slug === focusSlug)
     : null;
   const headline = focus ?? sellersRaw[0] ?? all[0] ?? null;
 
@@ -190,12 +206,44 @@ export async function buildProductInsight(
        JOIN entities e ON e.id = a.entity_id AND e.is_active = 1`,
   ).first<{ n: number }>();
 
-  const score = opportunityScore({
-    cagr_3y: headline?.cagr_pct ?? null,
-    momentum: null,
-    confidence: null,
-    value_usd: headline?.value_usd ?? null,
-  });
+  /*
+   * Take the score the pipeline already computed rather than recomputing here.
+   *
+   * The stored signal carries momentum and confidence; product_analytics does
+   * not. Scoring from analytics alone silently forfeits those weights, which
+   * made the same product read 82 in the product list and 34 in this modal.
+   * Two different numbers for one thing is worse than either number.
+   *
+   * With a country in focus the score is that country's. Without one, the best
+   * score any country holds for this product is the useful answer, since the
+   * question being asked is whether the product is worth looking at at all.
+   * Whose it is gets named either way.
+   *
+   * Where nothing was ranked the score is null rather than computed from what
+   * is to hand. A product that was never ranked should say so, not report a
+   * low number that reads as a verdict.
+   */
+  const signal = focus
+    ? await env.DB.prepare(
+        `SELECT s.cagr_3y, s.momentum, s.confidence, s.value_usd, e.name
+           FROM opportunity_signals s
+           JOIN entities e ON e.id = s.entity_id
+          WHERE s.hs_code = ? AND s.entity_id = ? AND s.flow = ?
+          ORDER BY s.computed_at DESC LIMIT 1`,
+      )
+        .bind(hs, focus.entity_id, focus.flow)
+        .first<SignalRow>()
+    : await env.DB.prepare(
+        `SELECT s.cagr_3y, s.momentum, s.confidence, s.value_usd, e.name
+           FROM opportunity_signals s
+           JOIN entities e ON e.id = s.entity_id AND e.is_active = 1
+          WHERE s.hs_code = ?
+          ORDER BY s.momentum DESC, s.value_usd DESC LIMIT 1`,
+      )
+        .bind(hs)
+        .first<SignalRow>();
+
+  const score = signal ? opportunityScore(signal) : null;
 
   return {
     hs_code: hs,
@@ -207,6 +255,7 @@ export async function buildProductInsight(
     category: classify(hs, globalClassifications, new Set()),
 
     score,
+    score_from_name: signal?.name ?? null,
     growth_pct: headline?.cagr_pct ?? null,
     value_usd: headline?.value_usd ?? 0,
     year: headline?.year ?? null,
@@ -222,6 +271,7 @@ export async function buildProductInsight(
 
     focus_slug: focus?.slug ?? null,
     focus_name: focus?.name ?? null,
+    focus_flow: headline?.flow ?? 'export',
 
     sellers,
     buyers,
@@ -246,6 +296,39 @@ export async function buildProductInsight(
 }
 
 /**
+ * A LIKE pattern safe to build from a source-supplied product description.
+ *
+ * Three problems with using the name directly. A description carrying a
+ * percent sign becomes a wildcard and matches every card in the table. D1
+ * refuses any pattern over fifty characters with "LIKE or GLOB pattern too
+ * complex", which is far shorter than SQLite's own default and took out
+ * roughly half the product modal until it was measured. And a forty character
+ * phrase would not match a real card anyway: nobody writes "plastics;
+ * household articles and hygienic or toilet articles" in a headline.
+ *
+ * So this takes the leading words, which is both what a person would search
+ * for and comfortably inside the limit. Null when nothing useful is left, and
+ * the caller then matches on the HS code alone rather than on a fragment.
+ */
+const LIKE_MAX = 40;
+
+function likeTerm(productName: string): string | null {
+  const head = shortProductName(productName).split(/[,;]/)[0].trim().toLowerCase();
+  // Strip the LIKE metacharacters rather than escaping them: these are search
+  // words, and a product name has no business carrying a wildcard.
+  const words = head.replace(/[%_\\]/g, ' ').split(/\s+/).filter(Boolean);
+
+  let term = '';
+  for (const w of words.slice(0, 3)) {
+    const next = term ? `${term} ${w}` : w;
+    if (next.length > LIKE_MAX) break;
+    term = next;
+  }
+
+  return term.length >= 3 ? `%${term}%` : null;
+}
+
+/**
  * Published cards that follow this product, so somebody looking at it can see
  * who else is. Matched on the exact HS code a card lists, on a subscription to
  * the code, and on the product name appearing in the card's own text.
@@ -258,7 +341,7 @@ async function loadSubscribers(
   hs: string,
   productName: string,
 ): Promise<ProductSubscriber[]> {
-  const term = `%${shortProductName(productName).split(',')[0].trim().toLowerCase()}%`;
+  const term = likeTerm(productName);
 
   const { results } = await env.DB.prepare(
     `SELECT DISTINCT b.id AS card_id, b.display_name, b.company, b.headline,
@@ -269,8 +352,8 @@ async function loadSubscribers(
       WHERE b.is_published = 1
         AND (s.id IS NOT NULL
              OR b.hs_codes LIKE ?
-             OR lower(b.headline) LIKE ?
-             OR lower(b.bio) LIKE ?)
+             OR (?4 IS NOT NULL AND lower(b.headline) LIKE ?4)
+             OR (?4 IS NOT NULL AND lower(b.bio) LIKE ?4))
       ORDER BY b.rating_count DESC, b.rating_avg DESC
       LIMIT 20`,
   )

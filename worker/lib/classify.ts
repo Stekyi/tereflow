@@ -7,6 +7,9 @@ import { HS2_LABEL } from '../agent/codes';
  * catches e.g. Ghanaian cocoa or Kenyan tea without hand-listing every
  * country). No separate "must also be top-3" condition is needed: at 25%+,
  * at most three chapters could ever qualify at once by construction.
+ *
+ * The default here is the fallback; callers with a database in hand pass the
+ * stored DOMINANT_SHARE_THRESHOLD instead.
  */
 const DOMINANT_SHARE_THRESHOLD = 0.25;
 
@@ -83,11 +86,14 @@ export function resolveForEntity(
  * truncated top-N list, or a chapter split across products just outside the
  * displayed top could be undercounted.
  */
-export function dominantCodes(exportChapterShares: Record<string, number> | undefined): Set<string> {
+export function dominantCodes(
+  exportChapterShares: Record<string, number> | undefined,
+  threshold: number = DOMINANT_SHARE_THRESHOLD,
+): Set<string> {
   if (!exportChapterShares) return new Set();
   return new Set(
     Object.entries(exportChapterShares)
-      .filter(([, share]) => share >= DOMINANT_SHARE_THRESHOLD)
+      .filter(([, share]) => share >= threshold)
       .map(([chapter]) => chapter),
   );
 }

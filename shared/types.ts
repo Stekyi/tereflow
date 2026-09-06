@@ -438,8 +438,18 @@ export interface ProductInsight {
   chapter_label: string;
   category: ExportCategory;
 
-  /** 0-100, the same score used on the cards. */
-  score: number;
+  /**
+   * 0-100, the same score used on the cards, read from the stored signal so
+   * the two agree. Null when this product was never ranked for the headline
+   * country, which is not the same as scoring badly.
+   */
+  score: number | null;
+  /**
+   * The country the score belongs to. Without a country in focus this is the
+   * best-placed market for the product, which is rarely the largest seller,
+   * so showing the number without the name would misattribute it.
+   */
+  score_from_name: string | null;
   /** Percent per year for the country in focus, or the largest seller. */
   growth_pct: number | null;
   value_usd: number;
@@ -459,6 +469,11 @@ export interface ProductInsight {
   /** Set when the modal was opened scoped to one country. */
   focus_slug: string | null;
   focus_name: string | null;
+  /**
+   * The direction the headline figures describe. An import row's value is that
+   * country's buying, and labelling it "export value" would be a plain lie.
+   */
+  focus_flow: 'export' | 'import';
 
   sellers: ProductCountryRow[];
   buyers: ProductCountryRow[];

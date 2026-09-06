@@ -1,22 +1,34 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  LabelList,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
+import { CHART } from '../lib/theme';
 import { Empty, FollowButton } from './ui';
 import { isNewTrade, scoreBand, SCORE_BAND_LABEL, SCORE_BASIS } from '../../shared/opportunity';
 import { hasLongerDescription } from '../../shared/product-name';
 import {
   fmtPct,
   fmtUsd,
+  PRICE_PREMIUM_LABEL,
   type ProductCard,
-  type ProductCountry,
-  type ProductDetail,
+  type ProductCountryRow,
+  type ProductInsight,
 } from '../../shared/types';
 
 /**
  * One product as a tappable row. The card design lives here so Home, the
- * Home, the product list and anywhere else that lists products all read the
- * same way.
+ * product list and anywhere else that lists products all read the same way.
  * Tapping is the caller's job (it opens the modal), so this stays a plain
  * button and never navigates on its own.
  */
@@ -25,14 +37,19 @@ export function ProductCardRow({
   onOpen,
 }: {
   product: ProductCard;
-  onOpen: (hsCode: string) => void;
+  /**
+   * The row names one country, so the modal opens on that country's figures.
+   * Tapping Nigeria's cocoa and reading Cote d'Ivoire's numbers is the kind
+   * of small mismatch that costs a reader their trust in the whole page.
+   */
+  onOpen: (hsCode: string, countrySlug: string, flow: 'export' | 'import') => void;
 }) {
   const band = scoreBand(product.score);
   return (
     <button
       type="button"
       className="product-row"
-      onClick={() => onOpen(product.hs_code)}
+      onClick={() => onOpen(product.hs_code, product.slug, product.flow)}
       aria-label={`${product.name}, ${product.country}, score ${product.score} of 100`}
     >
       <span className="flag">{product.iso3 ?? '??'}</span>
@@ -76,112 +93,319 @@ export function ProductCardRow({
   );
 }
 
-/** Ranked country list inside the modal, using the shared bar-row pattern. */
-function RankList({ title, rows }: { title: string; rows: ProductCountry[] }) {
-  if (!rows.length) return null;
-  const max = Math.max(...rows.map((r) => r.value_usd), 1);
+/* ---------- number formatting ---------- */
+
+const NF0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+const NF1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
+const NF2 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+
+function withDigits(n: number): string {
+  const abs = Math.abs(n);
+  if (abs >= 100) return NF0.format(n);
+  if (abs >= 10) return NF1.format(n);
+  return NF2.format(n);
+}
+
+/**
+ * Unit values run from a few thousand dollars a tonne for food to tens of
+ * millions for gold. Printing gold as "$101,714,124/t" reads like a bug, so
+ * the unit steps up to per kilo and then per gram once the number gets big.
+ * Null means no weight was reported, which is not the same as a price of zero.
+ */
+function fmtUnitValue(usdPerTonne: number | null): string {
+  if (usdPerTonne == null) return 'Not reported';
+  let value = usdPerTonne;
+  let unit = 't';
+  if (value >= 1_000_000) {
+    value = value / 1000;
+    unit = 'kg';
+  }
+  if (value >= 1_000_000) {
+    value = value / 1000;
+    unit = 'g';
+  }
+  return `$${withDigits(value)}/${unit}`;
+}
+
+/**
+ * Weight in kilograms as reported. Tonnes for anything of size, but a handful
+ * of kilos must not round down to "0 t" and read as nothing traded, so small
+ * quantities stay in kilograms.
+ */
+function fmtVolume(qtyKg: number | null): string {
+  if (qtyKg == null) return 'Not reported';
+  const tonnes = qtyKg / 1000;
+  if (tonnes < 1) return `${NF0.format(qtyKg)} kg`;
+  if (tonnes < 10) return `${NF1.format(tonnes)} t`;
+  return `${NF0.format(Math.round(tonnes))} t`;
+}
+
+/**
+ * Growth that came off a negligible base is not a rate, so it is named rather
+ * than shown as a percentage that would imply a trend. Null stays blank.
+ */
+function growthText(cagr: number | null): { text: string; tone: string } {
+  if (cagr == null) return { text: 'Not reported', tone: '' };
+  if (isNewTrade(cagr)) return { text: 'Newly established', tone: 'up' };
+  return { text: `${fmtPct(cagr, 1)}/yr`, tone: cagr >= 0 ? 'up' : 'down' };
+}
+
+/* ---------- target markets chart ---------- */
+
+// Recharts needs concrete colours, so demand-growth bars cycle through a set
+// of distinct tones rather than one flat colour.
+const CHART_PALETTE = [
+  '#0b3d67',
+  '#a8802c',
+  '#17604a',
+  '#2f7db0',
+  '#b5532a',
+  '#6a4c93',
+  '#3e8e7e',
+  '#c0492f',
+];
+
+interface MarketDatum {
+  name: string;
+  growth: number;
+  label: string;
+}
+
+function MarketTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: MarketDatum }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
   return (
-    <div className="card">
-      <p className="card-title">{title}</p>
-      {rows.map((r) => (
-        <div className="bar-row" key={r.slug}>
-          <div className="bar-fill" style={{ width: `${Math.max(3, (r.value_usd / max) * 100)}%` }} />
-          <div className="bar-content">
-            <span className="rank-badge">{r.rank}</span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', fontWeight: 620, fontSize: 14 }}>{r.name}</span>
-              <span className="tiny dim">
-                {r.year > 0 ? r.year : 'Year not reported'}
-                {r.growth_pct != null &&
-                  (isNewTrade(r.growth_pct) ? (
-                    <> {'\u00b7'} <span className="up">newly established</span></>
-                  ) : (
-                    <>
-                      {' \u00b7 '}
-                      <span className={r.growth_pct >= 0 ? 'up' : 'down'}>
-                        {fmtPct(r.growth_pct, 0)}/yr
-                      </span>
-                    </>
-                  ))}
-              </span>
-            </span>
-            <span className="num" style={{ fontWeight: 700, fontSize: 14 }}>
-              {fmtUsd(r.value_usd)}
-            </span>
-          </div>
-        </div>
-      ))}
+    <div
+      style={{
+        background: CHART.tooltipBg,
+        border: `1px solid ${CHART.tooltipBorder}`,
+        borderRadius: 8,
+        fontSize: 13,
+        padding: '8px 10px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        maxWidth: 220,
+      }}
+    >
+      <div style={{ color: CHART.tooltipLabel, marginBottom: 2 }}>{d.name}</div>
+      <div style={{ fontWeight: 700 }}>{d.label} a year</div>
+      <div className="tiny" style={{ color: CHART.tooltipLabel, marginTop: 2 }}>
+        Import demand growth
+      </div>
     </div>
   );
 }
 
-/**
- * The global product view. Opens on any product tap and never navigates to a
- * country page. Related products swap the modal in place, with a small history
- * so the reader can step back.
- */
+function TargetMarketsChart({ rows }: { rows: MarketDatum[] }) {
+  const height = Math.max(140, rows.length * 40 + 24);
+  return (
+    <div style={{ height, margin: '0 -8px' }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          layout="vertical"
+          data={rows}
+          margin={{ top: 4, right: 48, left: 4, bottom: 0 }}
+        >
+          <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" horizontal={false} />
+          <XAxis
+            type="number"
+            stroke={CHART.axis}
+            tick={{ fontSize: 10 }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v: number) => `${Math.round(v)}%`}
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            stroke={CHART.axis}
+            tickLine={false}
+            axisLine={false}
+            width={108}
+            interval={0}
+            tick={{ fontSize: 10, fill: CHART.axis }}
+          />
+          <Tooltip cursor={{ fill: CHART.brandSoft }} content={<MarketTooltip />} />
+          <Bar dataKey="growth" radius={[0, 3, 3, 0]}>
+            {rows.map((_, idx) => (
+              <Cell key={idx} fill={CHART_PALETTE[idx % CHART_PALETTE.length]} />
+            ))}
+            <LabelList dataKey="label" position="right" fill={CHART.tooltipLabel} fontSize={10} />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/* ---------- tiles and tables ---------- */
+
+function Tile({
+  k,
+  v,
+  s,
+  tone,
+  text,
+  title,
+}: {
+  k: string;
+  v: string;
+  s?: string | null;
+  tone?: string;
+  text?: boolean;
+  title?: string;
+}) {
+  return (
+    <div className={`insight-tile${text ? ' text' : ''}`}>
+      <span className="k">{k}</span>
+      <span className={`v${tone ? ` ${tone}` : ''}`} title={title}>
+        {v}
+      </span>
+      {s && <span className="s">{s}</span>}
+    </div>
+  );
+}
+
+function CountryTable({ title, rows }: { title: string; rows: ProductCountryRow[] }) {
+  if (rows.length === 0) return null;
+  return (
+    <>
+      <p className="overline" style={{ margin: '14px 0 6px' }}>
+        {title}
+      </p>
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Country</th>
+              <th className="align-right">Value</th>
+              <th className="align-right">Volume</th>
+              <th className="align-right">Unit value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 10).map((r) => (
+              <tr key={r.slug}>
+                <td>{r.name}</td>
+                <td className="align-right">{fmtUsd(r.value_usd)}</td>
+                <td className="align-right">{fmtVolume(r.qty_kg)}</td>
+                <td className="align-right">{fmtUnitValue(r.unit_value_usd_t)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+/* ---------- modal ---------- */
+
 export default function ProductModal({
   hsCode,
+  countrySlug = null,
+  flow = null,
   onClose,
 }: {
   hsCode: string;
+  /** Country to open on, when the reader tapped a row belonging to one. */
+  countrySlug?: string | null;
+  /** Direction the reader arrived on, so the headline matches the row tapped. */
+  flow?: 'export' | 'import' | null;
   onClose: () => void;
 }) {
   const { user } = useSession();
   const [hs, setHs] = useState(hsCode);
   const [history, setHistory] = useState<string[]>([]);
-  const [detail, setDetail] = useState<ProductDetail | null>(null);
+  const [focusSlug, setFocusSlug] = useState<string | null>(countrySlug);
+  const [focusFlow, setFocusFlow] = useState<'export' | 'import' | null>(flow);
+  /**
+   * Which side the country list shows. It follows the row the reader arrived
+   * on, so somebody who tapped an import row picks from buyers rather than
+   * being offered sellers whose figures would not match the tiles above.
+   */
+  const [asideFlow, setAsideFlow] = useState<'export' | 'import'>(flow ?? 'export');
+  const [insight, setInsight] = useState<ProductInsight | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [following, setFollowing] = useState<Set<string>>(new Set());
+  const [following, setFollowing] = useState(false);
+  const [followId, setFollowId] = useState<string | null>(null);
+
+  // A different product is a fresh worldwide view. The country that was in
+  // focus belonged to the product being left, so carrying it over would scope
+  // the new one to a market that may not even trade it. Clearing the insight
+  // too keeps the old product's numbers from flashing during the fetch.
+  //
+  // Keyed on the previous HS code rather than a "have I run before" flag:
+  // StrictMode runs effects twice on mount in development, and a flag would
+  // treat that second run as a product change and drop the country the reader
+  // arrived with.
+  const prevHs = useRef(hs);
+  useEffect(() => {
+    if (prevHs.current === hs) return;
+    prevHs.current = hs;
+    setFocusSlug(null);
+    setFocusFlow(null);
+    setAsideFlow('export');
+    setInsight(null);
+  }, [hs]);
 
   useEffect(() => {
-    let live = true;
+    let alive = true;
     setLoading(true);
     setError(null);
     api
-      .product(hs)
-      .then((d) => {
-        if (live) setDetail(d);
+      .insight(hs, focusSlug ?? undefined, focusFlow ?? undefined)
+      .then((data) => {
+        if (!alive) return;
+        setInsight(data);
       })
-      .catch((e: Error) => {
-        if (live) setError(e.message);
+      .catch((err) => {
+        if (!alive) return;
+        setError(err instanceof Error ? err.message : 'Could not load this product');
       })
       .finally(() => {
-        if (live) setLoading(false);
+        if (alive) setLoading(false);
       });
     return () => {
-      live = false;
+      alive = false;
     };
-  }, [hs]);
+  }, [hs, focusSlug, focusFlow]);
 
-  // Load what the reader already follows so the star reads correctly on open.
   useEffect(() => {
-    if (!user) return;
-    let live = true;
+    if (!user) {
+      setFollowing(false);
+      setFollowId(null);
+      return;
+    }
+    let alive = true;
     api.premium
       .subscriptions()
-      .then((r) => {
-        if (!live) return;
-        setFollowing(
-          new Set(r.subscriptions.filter((s) => s.kind === 'hs_code').map((s) => s.value)),
-        );
+      .then(({ subscriptions }) => {
+        if (!alive) return;
+        const sub = subscriptions.find((s) => s.kind === 'hs_code' && s.value === hs);
+        setFollowing(!!sub);
+        setFollowId(sub?.id ?? null);
       })
-      .catch(() => undefined);
+      .catch(() => {});
     return () => {
-      live = false;
+      alive = false;
     };
-  }, [user]);
+  }, [user, hs]);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  // Lock the page behind the modal so only the modal scrolls.
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -191,53 +415,69 @@ export default function ProductModal({
   }, []);
 
   const openRelated = useCallback(
-    (nextHs: string) => {
+    (code: string) => {
       setHistory((h) => [...h, hs]);
-      setHs(nextHs);
+      setHs(code);
     },
     [hs],
   );
 
   const goBack = useCallback(() => {
     setHistory((h) => {
-      if (!h.length) return h;
-      const prev = h[h.length - 1];
-      setHs(prev);
-      return h.slice(0, -1);
+      const next = [...h];
+      const prev = next.pop();
+      if (prev) setHs(prev);
+      return next;
     });
   }, []);
 
   const toggleFollow = useCallback(
-    async (next: boolean, _kind: string, value: string, label: string) => {
-      // Optimistic; the star should feel instant.
-      setFollowing((set) => {
-        const copy = new Set(set);
-        if (next) copy.add(value);
-        else copy.delete(value);
-        return copy;
-      });
+    async (next: boolean) => {
+      if (!insight) return;
+      const prevFollowing = following;
+      const prevId = followId;
+      setFollowing(next);
       try {
         if (next) {
-          await api.premium.follow({ kind: 'hs_code', value, label });
-        } else {
-          const subs = await api.premium.subscriptions();
-          const match = subs.subscriptions.find((s) => s.kind === 'hs_code' && s.value === value);
-          if (match) await api.premium.unfollow(match.id);
+          await api.premium.follow({ kind: 'hs_code', value: insight.hs_code, label: insight.name });
+          const { subscriptions } = await api.premium.subscriptions();
+          const sub = subscriptions.find((s) => s.kind === 'hs_code' && s.value === insight.hs_code);
+          setFollowId(sub?.id ?? null);
+        } else if (prevId) {
+          await api.premium.unfollow(prevId);
+          setFollowId(null);
         }
       } catch {
-        // Roll back if the write failed so the star stays honest.
-        setFollowing((set) => {
-          const copy = new Set(set);
-          if (next) copy.delete(value);
-          else copy.add(value);
-          return copy;
-        });
+        setFollowing(prevFollowing);
+        setFollowId(prevId);
       }
     },
-    [],
+    [insight, following, followId],
   );
 
-  const nonProductPartners = detail?.partners.some((p) => !p.product_specific) ?? false;
+  const marketRows = useMemo<MarketDatum[]>(() => {
+    if (!insight) return [];
+    return insight.target_markets
+      .filter((m) => m.cagr_pct != null && !isNewTrade(m.cagr_pct))
+      .sort((a, b) => (b.cagr_pct as number) - (a.cagr_pct as number))
+      .slice(0, 8)
+      .map((m) => ({
+        name: m.name,
+        growth: m.cagr_pct as number,
+        label: fmtPct(m.cagr_pct as number, 0),
+      }));
+  }, [insight]);
+
+  const newlyMarkets = useMemo(() => {
+    if (!insight) return [];
+    return insight.target_markets.filter((m) => m.cagr_pct != null && isNewTrade(m.cagr_pct));
+  }, [insight]);
+
+  const band = insight?.score != null ? scoreBand(insight.score) : 'watch';
+  const asideRows = asideFlow === 'import' ? (insight?.buyers ?? []) : (insight?.sellers ?? []);
+  const growth = insight ? growthText(insight.growth_pct) : { text: '', tone: '' };
+  const growthWhose = insight?.focus_name ?? insight?.sellers[0]?.name ?? null;
+  const showBorrowedPrice = !!insight?.price_from_name && !insight?.focus_slug;
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
@@ -252,28 +492,17 @@ export default function ProductModal({
           <div style={{ minWidth: 0 }}>
             <p className="overline" style={{ margin: 0 }}>
               {history.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={goBack}
-                  style={{
-                    padding: 0,
-                    border: 'none',
-                    background: 'none',
-                    color: 'var(--brand)',
-                    cursor: 'pointer',
-                    font: 'inherit',
-                    letterSpacing: 'inherit',
-                    textTransform: 'inherit',
-                  }}
-                >
+                <button type="button" className="link-btn" onClick={goBack}>
                   {'\u2039'} Back
                 </button>
+              ) : insight?.focus_name ? (
+                `Product in ${insight.focus_name}`
               ) : (
                 'Product worldwide'
               )}
             </p>
             <h2 id="global-product-title" style={{ margin: '3px 0 0', fontSize: 24 }}>
-              {detail?.name ?? 'Loading product'}
+              {insight?.name ?? 'Loading product'}
             </h2>
           </div>
           <button className="icon-btn" type="button" onClick={onClose} aria-label="Close">
@@ -283,107 +512,296 @@ export default function ProductModal({
 
         {loading ? (
           <div className="skeleton" style={{ height: 120, marginTop: 18 }} />
-        ) : error || !detail ? (
+        ) : error || !insight ? (
           <Empty title="Could not load this product" hint={error ?? undefined} />
         ) : (
           <>
             <div className="row" style={{ gap: 8, flexWrap: 'wrap', margin: '12px 0 4px' }}>
-              <span className={`badge ${detail.category === 'traditional' ? 'watch' : 'on'}`}>
-                {detail.category === 'traditional' ? 'Traditional' : 'Non-traditional'}
+              <span className={`badge ${insight.category === 'traditional' ? 'watch' : 'on'}`}>
+                {insight.category === 'traditional' ? 'Traditional' : 'Non-traditional'}
               </span>
-              <span className="partner-chip">HS {detail.hs_code}</span>
+              <span className="partner-chip">HS {insight.hs_code}</span>
               {user && (
                 <FollowButton
                   kind="hs_code"
-                  value={detail.hs_code}
-                  label={detail.name}
-                  following={following.has(detail.hs_code)}
+                  value={insight.hs_code}
+                  label={insight.name}
+                  following={following}
                   onChange={toggleFollow}
                 />
               )}
             </div>
 
             <p className="small muted" style={{ margin: '4px 0 0' }}>
-              {detail.sector}
-              {detail.chapter_label && detail.chapter_label !== detail.name && (
-                <> {'\u00b7'} {detail.chapter_label}</>
+              {insight.sector}
+              {insight.chapter_label && insight.chapter_label !== insight.name && (
+                <> {'\u00b7'} {insight.chapter_label}</>
               )}
             </p>
 
-            {detail.name_full &&
-              detail.name_full !== detail.name &&
-              hasLongerDescription(detail.name_full) && (
+            {insight.name_full &&
+              insight.name_full !== insight.name &&
+              hasLongerDescription(insight.name_full) && (
                 <p className="tiny dim" style={{ margin: '6px 0 0' }}>
-                  Full description: {detail.name_full}
+                  Full description: {insight.name_full}
                 </p>
               )}
 
-            <div className="product-summary">
-              <div>
-                <span className="tiny dim">Sold by countries on record</span>
-                <strong>{fmtUsd(detail.total_export_usd)}</strong>
-              </div>
-              <div>
-                <span className="tiny dim">Bought by countries on record</span>
-                <strong>{fmtUsd(detail.total_import_usd)}</strong>
-              </div>
-            </div>
-
-            <p className="tiny dim" style={{ margin: '10px 0 0' }}>
-              These totals cover the countries Tereflow has analysed, not every country in the
-              world, so they read lower than global trade in this product.
-              {detail.partial_coverage &&
-                ' Some of those countries have not reported a comparable earlier year, so their growth is left blank rather than estimated.'}
-            </p>
-
-            <div style={{ height: 14 }} />
-            <RankList title="Sells the most" rows={detail.exporters} />
-            <RankList title="Buys the most" rows={detail.importers} />
-
-            {detail.partners.length > 0 && (
-              <div className="card">
-                <p className="card-title">Trading partners</p>
-                <div className="opportunity-partners" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none' }}>
-                  {detail.partners.slice(0, 12).map((p) => (
-                    <span className="partner-chip" key={p.iso3 ?? p.name}>
-                      {p.name}
-                    </span>
-                  ))}
-                </div>
-                {nonProductPartners && (
-                  <p className="tiny dim" style={{ margin: '10px 0 0' }}>
-                    Partner detail here is reported per trade flow, not per product, on the current
-                    sources. These are the countries this trade moves between overall, not proof
-                    that this specific product goes to each one.
-                  </p>
-                )}
+            {insight.focus_slug && insight.focus_name && (
+              <div className="focus-banner">
+                <span>
+                  Scoped to <strong>{insight.focus_name}</strong> for this product.
+                </span>
+                <button type="button" className="link-btn" onClick={() => { setFocusSlug(null); setFocusFlow(null); }}>
+                  Back to worldwide
+                </button>
               </div>
             )}
 
-            {detail.related.length > 0 && (
-              <div className="card">
-                <p className="card-title">Related products</p>
-                <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                  {detail.related.map((r) => (
+            <div className="insight-body">
+              <div className="insight-main">
+                <div className="insight-tiles">
+                  <Tile
+                    k="Opportunity score"
+                    v={insight.score != null ? `${insight.score}/100` : 'Not scored'}
+                    s={
+                      insight.score == null
+                        ? 'This line was not ranked in any market on record'
+                        : insight.score_from_name && !insight.focus_slug
+                          ? `${SCORE_BAND_LABEL[band]} for ${insight.score_from_name}`
+                          : SCORE_BAND_LABEL[band]
+                    }
+                    title={
+                      insight.score != null
+                        ? SCORE_BASIS
+                        : 'A score is only given where the pipeline ranked this product for a country. No score is not a low score.'
+                    }
+                  />
+                  <Tile
+                    k="YoY growth"
+                    v={growth.text}
+                    s={growthWhose ? `For ${growthWhose}` : undefined}
+                    tone={growth.tone}
+                  />
+                  <Tile
+                    k="Unit value"
+                    v={fmtUnitValue(insight.unit_value_usd_t)}
+                    s={
+                      showBorrowedPrice
+                        ? `Price from ${insight.price_from_name}`
+                        : insight.world_median_usd_t != null
+                          ? `World median ${fmtUnitValue(insight.world_median_usd_t)}`
+                          : undefined
+                    }
+                  />
+                  <Tile
+                    k={insight.focus_flow === 'import' ? 'Import value' : 'Export value'}
+                    v={fmtUsd(insight.value_usd)}
+                    s={
+                      insight.focus_name
+                        ? insight.year != null
+                          ? `${insight.focus_name}, ${insight.year}`
+                          : insight.focus_name
+                        : insight.year != null
+                          ? `${insight.year}`
+                          : undefined
+                    }
+                  />
+                  <Tile
+                    k="Price premium"
+                    v={PRICE_PREMIUM_LABEL[insight.price_premium]}
+                    s={
+                      insight.price_ratio != null
+                        ? `${NF2.format(insight.price_ratio)}x the world median`
+                        : undefined
+                    }
+                    text
+                  />
+                </div>
+
+                {showBorrowedPrice && (
+                  <p className="tiny dim" style={{ margin: '10px 0 0' }}>
+                    The headline seller reported no weight for this product, so the unit value
+                    shown is {insight.price_from_name}'s. It stands in for the price here rather
+                    than being left blank, but it belongs to {insight.price_from_name}.
+                  </p>
+                )}
+
+                <div className="product-summary">
+                  <div>
+                    <span className="tiny dim">Exports on record</span>
+                    <strong>{fmtUsd(insight.totals.export_usd)}</strong>
+                  </div>
+                  <div>
+                    <span className="tiny dim">Imports on record</span>
+                    <strong>{fmtUsd(insight.totals.import_usd)}</strong>
+                  </div>
+                  <div>
+                    <span className="tiny dim">Reporting countries</span>
+                    <strong>
+                      {insight.totals.reporting_countries} of {insight.totals.countries_with_data}
+                    </strong>
+                  </div>
+                </div>
+
+                {insight.totals.countries_with_data > 0 && (
+                  <p className="tiny dim" style={{ margin: '10px 0 0' }}>
+                    {insight.totals.reporting_countries} of{' '}
+                    {insight.totals.countries_with_data} countries carrying data in this product
+                    reported a figure, so this is a sample of the trade, not the whole world
+                    market.
+                  </p>
+                )}
+
+                <div className="card" style={{ marginTop: 16 }}>
+                  <p className="card-title">Where demand is growing fastest</p>
+                  {insight.target_markets.length === 0 ? (
+                    <Empty
+                      title="No importer growth on record"
+                      hint="None of the reporting importers had a comparable earlier year for this product, so their demand growth is left blank rather than estimated."
+                    />
+                  ) : (
+                    <>
+                      {marketRows.length > 0 ? (
+                        <TargetMarketsChart rows={marketRows} />
+                      ) : (
+                        <p className="tiny dim" style={{ margin: 0 }}>
+                          Every importer with growth on record came off a negligible base, so
+                          there is no rate to chart.
+                        </p>
+                      )}
+                      {newlyMarkets.length > 0 && (
+                        <p className="tiny dim" style={{ margin: '10px 0 0' }}>
+                          Newly established demand:{' '}
+                          {newlyMarkets.map((m) => m.name).join(', ')}. These came off almost no
+                          prior trade, so they are named rather than shown as a growth rate.
+                        </p>
+                      )}
+                      <p className="tiny dim" style={{ margin: '8px 4px 0' }}>
+                        Importers ranked by how fast their demand is growing, not by size.
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                <div className="card">
+                  <p className="card-title">Who trades this, by country</p>
+                  {!insight.partner_detail_available && (
+                    <p className="tiny dim" style={{ margin: '0 0 4px' }}>
+                      These are each country's own totals for this product on the current sources,
+                      not proof of who ships to whom. Country to country flows are not available
+                      on this data tier.
+                    </p>
+                  )}
+                  <CountryTable title="Sold by" rows={insight.sellers} />
+                  <CountryTable title="Bought by" rows={insight.buyers} />
+                </div>
+
+                <div className="card">
+                  <p className="card-title">Who else follows this</p>
+                  {insight.subscriber_count === 0 ? (
+                    <p className="tiny dim" style={{ margin: 0 }}>
+                      Nobody is following this product yet. Follow it above to be the first, and
+                      others looking at the same line will be able to find you here.
+                    </p>
+                  ) : (
+                    <ul className="subscriber-list">
+                      {insight.subscribers.map((sub, idx) => (
+                        <li key={sub.card_id ?? `${sub.display_name}-${idx}`} className="list-item">
+                          <div style={{ minWidth: 0 }}>
+                            <span className="name">{sub.display_name}</span>
+                            {sub.company && <span className="tiny dim"> {'\u00b7'} {sub.company}</span>}
+                            {sub.headline && (
+                              <span className="tiny dim" style={{ display: 'block', marginTop: 2 }}>
+                                {sub.headline}
+                              </span>
+                            )}
+                            {sub.intents.length > 0 && (
+                              <span className="row" style={{ gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                                {sub.intents.map((intent) => (
+                                  <span className="partner-chip" key={intent}>
+                                    {intent}
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                          </div>
+                          {sub.card_id && (
+                            <Link className="chip" to={`/network/${sub.card_id}`}>
+                              View card
+                            </Link>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                {insight.related.length > 0 && (
+                  <div className="card">
+                    <p className="card-title">Related products</p>
+                    <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                      {insight.related.map((r) => (
+                        <button
+                          type="button"
+                          key={r.hs_code}
+                          className="chip"
+                          onClick={() => openRelated(r.hs_code)}
+                        >
+                          {r.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <Link
+                  className="btn primary block"
+                  to={`/network?q=${encodeURIComponent(insight.name)}`}
+                >
+                  Find partners for this product
+                </Link>
+              </div>
+
+              <aside className="insight-aside">
+                <p className="overline" style={{ margin: '0 0 8px' }}>
+                  {asideFlow === 'import' ? 'Focus a buyer' : 'Focus a seller'}
+                </p>
+                <div className="country-list">
+                  <button
+                    type="button"
+                    className={`country-row${!focusSlug ? ' active' : ''}`}
+                    onClick={() => { setFocusSlug(null); setFocusFlow(null); }}
+                  >
+                    <span className="grow name">Worldwide</span>
+                    <span className="tiny dim">All reporters</span>
+                  </button>
+                  {asideRows.slice(0, 12).map((s) => (
                     <button
                       type="button"
-                      key={r.hs_code}
-                      className="chip"
-                      onClick={() => openRelated(r.hs_code)}
+                      key={s.slug}
+                      className={`country-row${focusSlug === s.slug ? ' active' : ''}`}
+                      onClick={() => { setFocusSlug(s.slug); setFocusFlow(asideFlow); }}
                     >
-                      {r.name}
+                      <span className="rank-badge">{s.rank}</span>
+                      <span className="grow name">{s.name}</span>
+                      <span className="tiny dim">{fmtUsd(s.value_usd)}</span>
                     </button>
                   ))}
                 </div>
-              </div>
-            )}
-
-            <Link
-              className="btn primary block"
-              to={`/network?q=${encodeURIComponent(detail.name)}`}
-            >
-              Find partners for this product
-            </Link>
+                <p className="tiny dim" style={{ margin: '8px 0 0' }}>
+                  Pick a country to rescope every figure above to what it reports for this product.
+                </p>
+                <button
+                  type="button"
+                  className="link-btn"
+                  style={{ marginTop: 8 }}
+                  onClick={() => setAsideFlow(asideFlow === 'import' ? 'export' : 'import')}
+                >
+                  {asideFlow === 'import' ? 'Show who sells it instead' : 'Show who buys it instead'}
+                </button>
+              </aside>
+            </div>
           </>
         )}
       </section>

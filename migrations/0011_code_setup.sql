@@ -22,9 +22,13 @@ CREATE TABLE IF NOT EXISTS code_setup (
   description   TEXT NOT NULL,
   value         TEXT NOT NULL,
   default_value TEXT NOT NULL,
-  -- 'number' | 'text' | 'percent' | 'usd'. Drives the portal's input and the
-  -- parse on read, so a number setting cannot be saved as prose.
-  kind          TEXT NOT NULL DEFAULT 'number' CHECK (kind IN ('number','text','percent','usd')),
+  -- 'number' | 'count' | 'text' | 'percent' | 'usd'. Drives the portal's input
+  -- and the parse on read, so a number setting cannot be saved as prose.
+  --
+  -- Keep this list in step with the validator in worker/routes/portal.ts. The
+  -- seed below uses INSERT OR IGNORE for idempotency, which means a row using
+  -- a kind missing from here is dropped silently rather than refused.
+  kind          TEXT NOT NULL DEFAULT 'number' CHECK (kind IN ('number','count','text','percent','usd')),
   -- Groups rows in the portal. Purely presentational.
   category      TEXT NOT NULL DEFAULT 'general',
   updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
@@ -98,6 +102,10 @@ INSERT OR IGNORE INTO code_setup (code, name, description, value, default_value,
   ('DOMINANT_SHARE_THRESHOLD', 'Dominant commodity share',
    'A chapter carrying at least this share of a country exports counts as its own headline commodity and is treated as traditional.',
    '0.25', '0.25', 'number', 'pipeline'),
+
+  ('RANKED_TOP_N', 'Ranked list length',
+   'How many products and partners a country dashboard ranks. Separate from the product modal list, which is its own setting.',
+   '12', '12', 'count', 'limits'),
 
   ('PRICE_PREMIUM_HIGH', 'Price premium: high',
    'A country earning at least this multiple of the world median price for a product is selling at a high premium. 1.15 is fifteen percent above.',

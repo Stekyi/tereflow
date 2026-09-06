@@ -17,6 +17,13 @@ export default function Home() {
   const [products, setProducts] = useState<ProductCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalHs, setModalHs] = useState<string | null>(null);
+  const [modalCountry, setModalCountry] = useState<string | null>(null);
+  const [modalFlow, setModalFlow] = useState<'export' | 'import' | null>(null);
+  const openProduct = (hs: string, slug: string, f: 'export' | 'import') => {
+    setModalHs(hs);
+    setModalCountry(slug);
+    setModalFlow(f);
+  };
 
   // Debounced so a search doesn't fire a request on every keystroke.
   useEffect(() => {
@@ -53,6 +60,19 @@ export default function Home() {
     [],
   );
 
+  // The heading has to say what the reader is looking at. A search is its own
+  // thing; otherwise it is the ranked list, scoped to whatever filters are set,
+  // and it says "worldwide" plainly when nothing is set rather than leaving the
+  // reader to assume the filters are hiding something.
+  const listHeading = useMemo(() => {
+    const query = q.trim();
+    if (query) return `Results for "${query}"`;
+    if (flow === 'all' && continent === 'all') return 'Top opportunities worldwide this week';
+    const flowWord = flow === 'all' ? '' : `${flow} `;
+    const region = continent === 'all' ? '' : ` in ${continent}`;
+    return `Top ${flowWord}opportunities${region} this week`;
+  }, [q, flow, continent]);
+
   return (
     <>
       <div className="hero with-scene">
@@ -77,6 +97,13 @@ export default function Home() {
       <Chips options={continentOptions} value={continent} onChange={setContinent} />
       <div style={{ height: 14 }} />
 
+      <div className="section-head">
+        <h2 style={{ fontSize: 16 }}>{listHeading}</h2>
+      </div>
+      <p className="tiny dim" style={{ margin: '2px 0 12px' }}>
+        Ranked by opportunity score across the markets Tereflow has analysed.
+      </p>
+
       {loading ? (
         <Skeletons n={5} />
       ) : products.length === 0 ? (
@@ -86,7 +113,7 @@ export default function Home() {
         />
       ) : (
         products.map((p) => (
-          <ProductCardRow key={`${p.flow}-${p.hs_code}-${p.iso3}`} product={p} onOpen={setModalHs} />
+          <ProductCardRow key={`${p.flow}-${p.hs_code}-${p.iso3}`} product={p} onOpen={openProduct} />
         ))
       )}
 
@@ -151,7 +178,14 @@ export default function Home() {
         <span className="dim">{'\u203a'}</span>
       </Link>
 
-      {modalHs && <ProductModal hsCode={modalHs} onClose={() => setModalHs(null)} />}
+      {modalHs && (
+        <ProductModal
+          hsCode={modalHs}
+          countrySlug={modalCountry}
+          flow={modalFlow}
+          onClose={() => setModalHs(null)}
+        />
+      )}
     </>
   );
 }

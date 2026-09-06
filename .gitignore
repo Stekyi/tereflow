@@ -13,3 +13,5 @@ local/dist/
 local/logs/
 local/run-pipeline.cmd
 
+# scratch output from test and pipeline runs
+.tmp-*

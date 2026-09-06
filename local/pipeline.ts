@@ -39,7 +39,38 @@
 import { fetchComtrade, probeComtrade, RateLimited } from '../worker/agent/adapters/comtrade';
 import { fetchWorldBank } from '../worker/agent/adapters/worldbank';
 import { analyse } from '../worker/agent/analyse';
+import { CODE_TO_KEY, DEFAULTS, type Settings } from '../worker/lib/settings';
 import type { FactRow } from '../worker/agent/types';
+
+/**
+ * Fetch the tunable thresholds the app is currently running to.
+ *
+ * A failure here is not fatal. Falling back to what the code shipped with
+ * produces a correct run using the original numbers, which is better than
+ * refusing to analyse because a settings table could not be read. It is
+ * announced rather than swallowed, because a run that quietly ignored an
+ * edited threshold would be confusing to debug later.
+ */
+async function loadRunSettings(api: Api, dryRun: boolean): Promise<Settings> {
+  try {
+    const { settings: rows } = await api.settings();
+    const out: Settings = { ...DEFAULTS };
+    let applied = 0;
+    for (const r of rows) {
+      const key: keyof Settings | undefined = CODE_TO_KEY[r.code];
+      if (!key) continue;
+      const n = Number(r.value);
+      if (!Number.isFinite(n)) continue;
+      out[key] = n;
+      applied++;
+    }
+    if (!dryRun) console.log(`  settings: ${applied} thresholds loaded from code_setup`);
+    return out;
+  } catch (e) {
+    console.log(`  settings: could not read code_setup (${(e as Error).message}), using defaults`);
+    return { ...DEFAULTS };
+  }
+}
 
 interface Config {
   apiUrl: string;
@@ -200,7 +231,21 @@ class Api {
    * because a country's price only means something next to everybody else's.
    */
   priceRatios() {
-    return this.call<{ priced: number }>('/api/admin/ingest/price-ratios', { method: 'POST' });
+    return this.call<{ priced: number; implausible_weights_dropped: number }>(
+      '/api/admin/ingest/price-ratios',
+      { method: 'POST' },
+    );
+  }
+  /**
+   * The thresholds the analysis should work to.
+   *
+   * Fetched rather than imported so a change made in the portal takes effect
+   * on the next run without redeploying anything the pipeline runs from.
+   */
+  settings() {
+    return this.call<{ settings: { code: string; value: string }[] }>(
+      '/api/admin/portal/config',
+    );
   }
   fail(slug: string, error: string) {
     return this.call<{ ok: true }>('/api/admin/ingest/fail', {
@@ -275,6 +320,10 @@ async function main() {
   let rateLimited: RateLimited | null = null;
   const errors: { slug: string; error: string }[] = [];
 
+  // Read the thresholds once for the whole pass so every country in a run is
+  // analysed to the same rules, even if somebody edits a setting mid-run.
+  const settings = await loadRunSettings(api, cfg.dryRun);
+
   for (const [i, entity] of targets.entries()) {
     const label = `[${i + 1}/${targets.length}] ${entity.name}`;
     process.stdout.write(`${label} ... `);
@@ -314,6 +363,7 @@ async function main() {
           // computed wherever the noise floors allow, and those floors are the
           // real guard.
           [],
+          settings,
         );
 
         if (cfg.dryRun) {
@@ -385,6 +435,7 @@ async function main() {
         entity.iso3!,
         years,
         cfg.callPaceMs,
+        settings,
       );
 
       const rows: FactRow[] = [...comtrade.rows, ...worldbank.rows];
@@ -402,6 +453,7 @@ async function main() {
         worldbank.context,
         sourceRefs,
         comtrade.truncated_years ?? [],
+        settings,
       );
 
       const coverage =

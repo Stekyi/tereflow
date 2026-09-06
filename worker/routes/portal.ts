@@ -392,3 +392,102 @@ portal.get('/setup', async (c) => {
     ],
   });
 });
+
+/**
+ * The tunable numbers, grouped for editing.
+ *
+ * These were constants scattered across the analysis code. Moving them into a
+ * table means the person who has to defend a figure can change what produced
+ * it without a deploy, and can see what it was before they touched it.
+ */
+portal.get('/config', async (c) => {
+  const rows = await all<{
+    code: string;
+    name: string;
+    description: string | null;
+    value: string;
+    default_value: string;
+    kind: string;
+    category: string;
+    updated_at: string | null;
+  }>(
+    c.env.DB,
+    `SELECT code, name, description, value, default_value, kind, category, updated_at
+       FROM code_setup
+      ORDER BY category, name`,
+  );
+
+  const categories = [...new Set(rows.map((r) => r.category))];
+  return json({
+    settings: rows.map((r) => ({ ...r, changed: r.value !== r.default_value })),
+    categories,
+    note:
+      'Changing a threshold changes what the analysis produces, not what is displayed on top of it. '
+      + 'Run `npm run pipeline -- --reanalyse` afterwards to recompute from stored facts without refetching.',
+  });
+});
+
+/**
+ * Write one setting.
+ *
+ * Values are validated against the kind before they land, because a threshold
+ * that fails to parse would silently fall back to its default and the portal
+ * would keep showing the number somebody thought they had set.
+ */
+portal.put('/config/:code', async (c) => {
+  const code = c.req.param('code');
+  const body = await c.req
+    .json<{ value?: unknown }>()
+    .catch(() => ({}) as { value?: unknown });
+  const raw = body.value;
+
+  if (typeof raw !== 'string' && typeof raw !== 'number') {
+    return json({ error: 'value must be a string or a number' }, 400);
+  }
+  const value = String(raw).trim();
+
+  const existing = await row<{ kind: string; default_value: string }>(
+    c.env.DB,
+    'SELECT kind, default_value FROM code_setup WHERE code = ?',
+    code,
+  );
+  if (!existing) return json({ error: 'no such setting' }, 404);
+
+  if (existing.kind !== 'text') {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return json({ error: `${code} must be a number` }, 400);
+    if (existing.kind === 'percent' && n < 0) {
+      return json({ error: 'a percent threshold cannot be negative' }, 400);
+    }
+    if ((existing.kind === 'usd' || existing.kind === 'count') && n < 0) {
+      return json({ error: `${code} cannot be negative` }, 400);
+    }
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE code_setup SET value = ?, updated_at = datetime('now') WHERE code = ?`,
+  )
+    .bind(value, code)
+    .run();
+
+  return json({ code, value, reverted: value === existing.default_value });
+});
+
+/** Put one setting back to what the code shipped with. */
+portal.post('/config/:code/reset', async (c) => {
+  const code = c.req.param('code');
+  const existing = await row<{ default_value: string }>(
+    c.env.DB,
+    'SELECT default_value FROM code_setup WHERE code = ?',
+    code,
+  );
+  if (!existing) return json({ error: 'no such setting' }, 404);
+
+  await c.env.DB.prepare(
+    `UPDATE code_setup SET value = default_value, updated_at = datetime('now') WHERE code = ?`,
+  )
+    .bind(code)
+    .run();
+
+  return json({ code, value: existing.default_value });
+});

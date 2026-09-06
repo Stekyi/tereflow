@@ -2039,3 +2039,153 @@ textarea {
     white-space: nowrap;
   }
 }
+
+
+/* ---------- product insight modal (Home + Country) ---------- */
+
+/* Plain inline text button for back links and focus reset, so they read as
+   links without pulling in the block button styles. */
+.link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--brand);
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.focus-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  font-size: 13px;
+}
+
+/* Content and the country picker stack on a phone and sit side by side once
+   there is room. The aside is after the content in the DOM, so on narrow it
+   falls below rather than pushing the numbers down. */
+.insight-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 14px;
+}
+.insight-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.insight-aside {
+  min-width: 0;
+}
+@media (min-width: 720px) {
+  .insight-body {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  .insight-aside {
+    flex: 0 0 236px;
+    width: 236px;
+    position: sticky;
+    top: 0;
+  }
+}
+
+.insight-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+}
+.insight-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+}
+.insight-tile .k {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.insight-tile .v {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.insight-tile.text .v {
+  font-size: 14px;
+  font-weight: 650;
+}
+.insight-tile .v.up {
+  color: var(--up);
+}
+.insight-tile .v.down {
+  color: var(--down);
+}
+.insight-tile .s {
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.country-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.country-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.country-row:hover {
+  background: var(--surface-2);
+}
+.country-row.active {
+  background: var(--surface-2);
+  border-color: var(--brand);
+}
+.country-row .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.subscriber-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}

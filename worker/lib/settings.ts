@@ -30,6 +30,7 @@ export interface Settings {
   signalsPerCountry: number;
   signalsPerFlow: number;
   marketTopN: number;
+  rankedTopN: number;
   topOpportunities: number;
   chapterCoverageTarget: number;
   maxDetailChapters: number;
@@ -64,6 +65,7 @@ export const DEFAULTS: Settings = {
   signalsPerCountry: 40,
   signalsPerFlow: 25,
   marketTopN: 10,
+  rankedTopN: 12,
   topOpportunities: 5,
   chapterCoverageTarget: 0.92,
   maxDetailChapters: 22,
@@ -74,7 +76,7 @@ export const DEFAULTS: Settings = {
   pricingMaxDeviation: 10,
 };
 
-const CODE_TO_KEY: Record<string, keyof Settings> = {
+export const CODE_TO_KEY: Record<string, keyof Settings> = {
   SCORE_BAND_STRONG: 'scoreBandStrong',
   SCORE_BAND_MODERATE: 'scoreBandModerate',
   SCORE_WEIGHT_GROWTH: 'scoreWeightGrowth',
@@ -91,6 +93,7 @@ const CODE_TO_KEY: Record<string, keyof Settings> = {
   SIGNALS_PER_COUNTRY: 'signalsPerCountry',
   SIGNALS_PER_FLOW: 'signalsPerFlow',
   MARKET_TOP_N: 'marketTopN',
+  RANKED_TOP_N: 'rankedTopN',
   TOP_OPPORTUNITIES: 'topOpportunities',
   CHAPTER_COVERAGE_TARGET: 'chapterCoverageTarget',
   MAX_DETAIL_CHAPTERS: 'maxDetailChapters',

@@ -288,10 +288,14 @@ admin.get('/classifications', async (c) => {
   const resolved = await loadClassifications(c.env.DB, entityId);
   const overview =
     entityId === '*' ? null : await loadResult<Overview>(c.env.DB, entityId, 'overview');
+  const settings = await loadSettings(c.env);
 
   return json({
     entity_id: entityId,
-    rows: resolveAll(resolved, dominantCodes(overview?.export_chapter_shares)),
+    rows: resolveAll(
+      resolved,
+      dominantCodes(overview?.export_chapter_shares, settings.dominantShareThreshold),
+    ),
   });
 });
 

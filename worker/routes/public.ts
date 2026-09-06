@@ -6,6 +6,7 @@ import { hs2Label, hs2Sector, hs6Label } from '../agent/codes';
 import { shortProductName } from '../../shared/product-name';
 import { opportunityScore } from '../../shared/opportunity';
 import { buildProductInsight } from '../lib/product-insight';
+import { loadSettings } from '../lib/settings';
 import {
   classify,
   dominantCodes,
@@ -157,7 +158,8 @@ pub.get('/dashboard/:slug', async (c) => {
   // cocoa/gold-style bulk commodities differently from what an SME could
   // actually enter. Partner rows have no HS code and are left untagged.
   const classifications = await loadClassifications(c.env.DB, entity.id);
-  const dominant = dominantCodes(overview?.export_chapter_shares);
+  const settings = await loadSettings(c.env);
+  const dominant = dominantCodes(overview?.export_chapter_shares, settings.dominantShareThreshold);
   const tagProducts = (items: RankedItem[]) =>
     items.map((r) => ({ ...r, category: classify(r.code, classifications, dominant) }));
 
@@ -461,8 +463,20 @@ pub.get('/insight/:hs', async (c) => {
     return bad('hs must be a 2-digit chapter or 6-digit product code', 400);
   }
   const country = c.req.query('country')?.trim() || null;
-  const insight = await buildProductInsight(c.env, hs, country);
-  return json(insight, 200, { 'cache-control': 'public, max-age=300', vary: 'Cookie' });
+  const flowParam = c.req.query('flow')?.trim();
+  const flow = flowParam === 'export' || flowParam === 'import' ? flowParam : null;
+
+  try {
+    const insight = await buildProductInsight(c.env, hs, country, flow);
+    return json(insight, 200, { 'cache-control': 'public, max-age=300', vary: 'Cookie' });
+  } catch (err) {
+    // A bare 500 on one product and not another is impossible to diagnose from
+    // the outside. Log which product, and say so in the response, because the
+    // modal can then tell the reader this product failed rather than showing
+    // an empty shell.
+    console.error(`insight failed for HS ${hs}`, err);
+    return bad(`could not build the read for HS ${hs}: ${(err as Error).message}`, 500);
+  }
 });
 
 /**

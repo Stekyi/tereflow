@@ -6,6 +6,7 @@ import type {
 } from '../../shared/types';
 import type { FactRow } from './types';
 import type { WorldBankContext } from './adapters/worldbank';
+import { DEFAULTS, type Settings } from '../lib/settings';
 import { hs2Sector } from './codes';
 
 export interface AnalysisBundle {
@@ -71,26 +72,41 @@ export interface SignalDraft {
 }
 
 /**
- * Noise floors for what counts as a signal.
+ * Turn the stored settings into the shape the analysis reads.
  *
- * These are granularity-dependent. At HS2 there are ~97 chapters, so 0.2% of
- * a country's trade is a small chapter. At HS6 the same trade is split across
- * thousands of lines, and 0.2% would be a top-20 product: Ghana's mango and
- * guava exports are 0.19% of its total, and shea is smaller still, so an HS2
- * floor silently deletes exactly the openings an SME is looking for.
+ * Noise floors are granularity-dependent. At HS2 there are ~97 chapters, so
+ * 0.2% of a country's trade is a small chapter. At HS6 the same trade is split
+ * across thousands of lines, and 0.2% would be a top-20 product: Ghana's mango
+ * and guava exports are 0.19% of its total, and shea is smaller still, so an
+ * HS2 floor silently deletes exactly the openings an SME is looking for.
  *
  * The absolute floor is what stops the lower share floor pulling in rounding
  * noise: a line has to be a real, financeable trade before it is shown.
+ *
+ * Kept as one function so there is a single place that decides how a row in
+ * code_setup maps onto a threshold, rather than the mapping being spread over
+ * every use site.
  */
-const NOISE_FLOOR = {
-  hs2: { share: 0.002, valueUsd: 5_000_000 },
-  hs6: { share: 0.0002, valueUsd: 2_000_000 },
-} as const;
+function floorsFrom(s: Settings) {
+  return {
+    hs2: { share: s.noiseFloorHs2Share, valueUsd: s.noiseFloorHs2Usd },
+    hs6: { share: s.noiseFloorHs6Share, valueUsd: s.noiseFloorHs6Usd },
+  };
+}
 
-/** Minimum compound annual growth, in percent, before a line is interesting. */
-const MIN_GROWTH_PCT = 8;
-
-const TOP_N = 12;
+/**
+ * The thresholds the current run is working to.
+ *
+ * These are read by helper functions all over this module, so they are bound
+ * once when analyse() is entered rather than passed down through fifteen
+ * signatures. That is only safe because analyse() is synchronous from top to
+ * bottom: nothing here awaits, so no second call can interleave and change
+ * the numbers underneath the first.
+ *
+ * If you ever make a function in this file async, thread these through
+ * properly instead.
+ */
+let active: Settings = DEFAULTS;
 
 /**
  * How many product openings are kept per country, and per flow before they are
@@ -105,9 +121,9 @@ const TOP_N = 12;
  *
  * Classification then hides traditional lines by default, which removes a
  * large share of these again, so the visible list is smaller than it looks.
+ *
+ * Now settings, as SIGNALS_PER_COUNTRY and SIGNALS_PER_FLOW in code_setup.
  */
-const SIGNALS_PER_COUNTRY = 40;
-const SIGNALS_PER_FLOW = 25;
 
 export function analyse(
   entityName: string,
@@ -116,7 +132,11 @@ export function analyse(
   sourceRefs: string[],
   /** Years whose specific-product detail the source capped. See AdapterResult. */
   truncatedYears: number[] = [],
+  /** Thresholds from code_setup. Falls back to what the code shipped with. */
+  settings: Settings = DEFAULTS,
 ): AnalysisBundle {
+  active = settings;
+
   // A year only counts for headline figures if BOTH flows reported a world
   // total. Otherwise the trade balance is comparing a number against nothing.
   const worldTotalYears = (flow: 'export' | 'import') =>
@@ -181,7 +201,7 @@ export function analyse(
     // Chapter (2-digit) shares of exports, e.g. { "71": 0.63, "18": 0.14 }.
     // Feeds the traditional/non-traditional dominant-commodity heuristic
     // (see worker/lib/classify.ts) -- kept here because it needs the full
-    // distribution, not just the top TOP_N products that get stored/shown.
+    // distribution, not just the top products that get stored and shown.
     export_chapter_shares: exportChapterShares,
     partner_count: new Set(
       rows.filter((r) => r.year === latest && r.partner_iso3).map((r) => r.partner_iso3),
@@ -200,7 +220,7 @@ export function analyse(
     ...detectSignals(rows, 'import', productYears, topImports, truncated),
   ]
     .sort((a, b) => b.momentum - a.momentum)
-    .slice(0, SIGNALS_PER_COUNTRY);
+    .slice(0, active.signalsPerCountry);
 
   const recommendations = recommend(
     entityName,
@@ -250,7 +270,8 @@ function buildProductAnalytics(
 
     const reported = totalFor(rows, latest, flow);
     const total = reported > 0 ? reported : current.reduce((s, r) => s + r.value_usd, 0);
-    const floor = level === SPECIFIC_LEN ? NOISE_FLOOR.hs6 : NOISE_FLOOR.hs2;
+    const floors = floorsFrom(active);
+  const floor = level === SPECIFIC_LEN ? floors.hs6 : floors.hs2;
     const comparable =
       level !== SPECIFIC_LEN ||
       (!truncatedYears.has(latest) && threeBack != null && !truncatedYears.has(threeBack));
@@ -381,11 +402,12 @@ function rankProducts(
   const comparable =
     level !== SPECIFIC_LEN || (!truncatedYears.has(latest) && threeBack != null && !truncatedYears.has(threeBack));
 
-  const floor = level === SPECIFIC_LEN ? NOISE_FLOOR.hs6 : NOISE_FLOOR.hs2;
+  const floors = floorsFrom(active);
+  const floor = level === SPECIFIC_LEN ? floors.hs6 : floors.hs2;
 
   return current
     .sort((a, b) => b.value_usd - a.value_usd)
-    .slice(0, TOP_N)
+    .slice(0, active.rankedTopN)
     .map((r, i) => {
       const past = threeBack != null ? valueOf(rows, threeBack, flow, r.hs_code) : undefined;
       const last = prevYear != null ? valueOf(rows, prevYear, flow, r.hs_code) : undefined;
@@ -415,7 +437,7 @@ function rankProducts(
 function hasRealBase(from: number | undefined, floorUsd: number): boolean {
   // A twentieth of the display floor: low enough that a genuinely small but
   // real starting position still yields a rate, high enough to exclude noise.
-  return from != null && from >= floorUsd / 20;
+  return from != null && from >= floorUsd / active.growthBaseDivisor;
 }
 
 function growthFrom(
@@ -431,7 +453,7 @@ function growthFrom(
 /**
  * Every reported product rolled up to its 2-digit HS chapter, as a share
  * (0..1) of that year's total, over the whole distribution -- not just the
- * top TOP_N shown to the user, or it silently understates concentration for
+ * top products shown to the user, or it silently understates concentration for
  * economies with a long tail of similarly-sized products past rank 12.
  *
  * Chapter-level, not per-line-item: products are now stored at the specific
@@ -478,7 +500,7 @@ function rankPartners(
 
   return current
     .sort((a, b) => b.value_usd - a.value_usd)
-    .slice(0, TOP_N)
+    .slice(0, active.rankedTopN)
     .map((r, i) => {
       const past = threeBack != null ? partnerValue(rows, threeBack, flow, r.partner_iso3) : undefined;
       const last = prevYear != null ? partnerValue(rows, prevYear, flow, r.partner_iso3) : undefined;
@@ -698,7 +720,8 @@ function detectSignals(
   const rankOf = new Map(ranked.map((r, i) => [r.hs_code, i + 1]));
 
   // Floors follow the level actually being scored, not a build-time guess.
-  const floor = workingLevel === SPECIFIC_LEN ? NOISE_FLOOR.hs6 : NOISE_FLOOR.hs2;
+  const floors = floorsFrom(active);
+  const floor = workingLevel === SPECIFIC_LEN ? floors.hs6 : floors.hs2;
 
   const drafts: SignalDraft[] = [];
 
@@ -714,7 +737,7 @@ function detectSignals(
     const share = r.value_usd / workingTotal;
     // Must be a real trade in its own right, and growing.
     if (share < floor.share || r.value_usd < floor.valueUsd) continue;
-    if (growth < MIN_GROWTH_PCT) continue;
+    if (growth < active.minGrowthPct) continue;
     // Already a headline product — not an early signal.
     if (topCodes.has(r.hs_code)) continue;
 
@@ -772,7 +795,7 @@ function detectSignals(
     });
   }
 
-  return drafts.sort((a, b) => b.momentum - a.momentum).slice(0, SIGNALS_PER_FLOW);
+  return drafts.sort((a, b) => b.momentum - a.momentum).slice(0, active.signalsPerFlow);
 }
 
 function sumYear(rows: FactRow[], year: number, flow: 'export' | 'import'): number {

@@ -3,6 +3,7 @@ import type { AdapterResult, FactRow } from '../types';
 import { ISO3_TO_M49, M49_TO_ISO3, hs2Label, hs2Sector, hs6Label } from '../codes';
 import { HS6_LABEL } from '../hs6-codes.generated';
 import { ISO3_NAME } from '../country-names';
+import { DEFAULTS, type Settings } from '../../lib/settings';
 
 const PREVIEW = 'https://comtradeapi.un.org/public/v1/preview/C/A/HS';
 const FULL = 'https://comtradeapi.un.org/data/v1/get/C/A/HS';
@@ -58,6 +59,8 @@ export async function fetchComtrade(
   iso3: string,
   years: number[],
   perCallDelayMs = 0,
+  /** Chapter coverage settings from code_setup. Falls back to the shipped values. */
+  settings: Pick<Settings, 'chapterCoverageTarget' | 'maxDetailChapters'> = DEFAULTS,
 ): Promise<AdapterResult> {
   const reporter = ISO3_TO_M49[iso3?.toUpperCase()];
   if (!reporter) {
@@ -237,7 +240,7 @@ export async function fetchComtrade(
   const detailYears = hasKey
     ? productYears
     : productYears.filter((y) => y === latest || y === Math.min(...productYears));
-  const chapters = chaptersToDetail(chapterValue);
+  const chapters = chaptersToDetail(chapterValue, settings);
   for (const chapter of chapters) {
     const codes = hs6CodesInChapter(chapter);
     if (!codes.length) continue;
@@ -315,21 +318,23 @@ export async function fetchComtrade(
  * Each chapter is one API call per year per flow, so the ceiling is what keeps
  * a diversified economy from turning into hundreds of calls. Concentrated
  * economies reach the target in a handful of chapters and stop early.
+ *
+ * Both live in code_setup as CHAPTER_COVERAGE_TARGET and MAX_DETAIL_CHAPTERS.
  */
-const CHAPTER_COVERAGE_TARGET = 0.92;
-const MAX_DETAIL_CHAPTERS = 22;
-
-function chaptersToDetail(chapterValue: Map<string, number>): string[] {
+function chaptersToDetail(
+  chapterValue: Map<string, number>,
+  settings: Pick<Settings, 'chapterCoverageTarget' | 'maxDetailChapters'>,
+): string[] {
   const total = [...chapterValue.values()].reduce((s, v) => s + v, 0);
   if (total <= 0) return [];
   const ranked = [...chapterValue.entries()].sort((a, b) => b[1] - a[1]);
   const picked: string[] = [];
   let running = 0;
   for (const [chapter, value] of ranked) {
-    if (picked.length >= MAX_DETAIL_CHAPTERS) break;
+    if (picked.length >= settings.maxDetailChapters) break;
     picked.push(chapter);
     running += value;
-    if (running / total >= CHAPTER_COVERAGE_TARGET) break;
+    if (running / total >= settings.chapterCoverageTarget) break;
   }
   return picked;
 }

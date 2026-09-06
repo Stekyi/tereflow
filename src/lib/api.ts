@@ -19,6 +19,7 @@ import type {
   ProductBreakdown,
   ProductCard,
   ProductDetail,
+  ProductInsight,
   Playbook,
   PlaybookSummary,
   Rating,
@@ -228,6 +229,25 @@ export interface PortalSetup {
   notes: string[];
 }
 
+export interface PortalSetting {
+  code: string;
+  name: string;
+  description: string | null;
+  value: string;
+  default_value: string;
+  kind: string;
+  category: string;
+  updated_at: string | null;
+  /** True when somebody has moved this off what the code shipped with. */
+  changed: boolean;
+}
+
+export interface PortalConfig {
+  settings: PortalSetting[];
+  categories: string[];
+  note: string;
+}
+
 export type SourceHealth = 'ok' | 'gated' | 'dead' | 'unknown';
 
 export const api = {
@@ -297,6 +317,22 @@ export const api = {
 
   /** One product, everywhere it is traded. Backs the product modal. */
   product: (hs: string) => req<ProductDetail>(`/api/products/${encodeURIComponent(hs)}`),
+
+  /**
+   * The precomputed read of one product: prices, ranked buyers and sellers,
+   * where demand is growing, and who else is following it.
+   *
+   * `country` scopes the headline figures to one market without changing the
+   * lists, which is what lets the same modal serve a global tap and a tap from
+   * inside a country page.
+   */
+  insight: (hs: string, country?: string, flow?: 'export' | 'import') => {
+    const qs = new URLSearchParams();
+    if (country) qs.set('country', country);
+    if (flow) qs.set('flow', flow);
+    const s = qs.toString();
+    return req<ProductInsight>(`/api/insight/${encodeURIComponent(hs)}${s ? `?${s}` : ''}`);
+  },
 
   /** Countries index: summary figures only, no product lists. */
   countries: (params: { continent?: string; q?: string } = {}) => {
@@ -451,6 +487,17 @@ export const api = {
       ),
     content: () => req<{ playbooks: PortalPlaybook[] }>('/api/admin/portal/content'),
     setup: () => req<PortalSetup>('/api/admin/portal/setup'),
+    config: () => req<PortalConfig>('/api/admin/portal/config'),
+    setConfig: (code: string, value: string) =>
+      req<{ code: string; value: string; reverted: boolean }>(
+        `/api/admin/portal/config/${encodeURIComponent(code)}`,
+        { method: 'PUT', body: JSON.stringify({ value }) },
+      ),
+    resetConfig: (code: string) =>
+      req<{ code: string; value: string }>(
+        `/api/admin/portal/config/${encodeURIComponent(code)}/reset`,
+        { method: 'POST' },
+      ),
   },
 
   auth: {

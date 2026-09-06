@@ -2392,3 +2392,82 @@ textarea {
     font-size: 21px;
   }
 }
+
+/* --- budget ------------------------------------------------------------- */
+
+/* Collapsed until wanted. Somebody who has not thought about a budget should
+   not be asked for one before they have seen anything worth budgeting for. */
+.budget-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 14px;
+  margin: 10px 0 4px;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.budget-summary:hover {
+  border-color: var(--brand);
+  border-style: solid;
+}
+
+.budget-summary strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.budget-editor {
+  padding: 14px;
+  margin: 10px 0 4px;
+  background: var(--surface);
+  border: 1px solid var(--brand);
+  border-radius: var(--r-md);
+}
+
+.budget-currency {
+  flex: none;
+  padding: 7px 9px;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.budget-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.budget-input:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+/* Its own line under the meta, because it answers a different question from
+   the rest of the row and reads as an aside when it is run in with them. */
+.budget-line {
+  display: block;
+  margin-top: 3px;
+}
+
+.budget-card {
+  border-color: var(--brand);
+}

@@ -49,8 +49,8 @@ export interface Settings {
  * without code_setup is therefore identical to behaviour before it existed.
  */
 export const DEFAULTS: Settings = {
-  scoreBandStrong: 65,
-  scoreBandModerate: 45,
+  scoreBandStrong: 74,
+  scoreBandModerate: 62,
   scoreWeightGrowth: 34,
   scoreWeightMomentum: 26,
   scoreWeightConfidence: 22,

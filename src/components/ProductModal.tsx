@@ -13,6 +13,8 @@ import {
 } from 'recharts';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
+import { useBudget } from '../lib/budget';
+import { budgetFit, fmtQuantity } from '../../shared/budget';
 import { CHART } from '../lib/theme';
 import { Empty, FollowButton } from './ui';
 import { isNewTrade, scoreBand, SCORE_BAND_LABEL, SCORE_BASIS } from '../../shared/opportunity';
@@ -34,9 +36,12 @@ import {
  */
 export function ProductCardRow({
   product,
+  budget = 0,
   onOpen,
 }: {
   product: ProductCard;
+  /** Working budget in US dollars. Zero hides the quantity line entirely. */
+  budget?: number;
   /**
    * The row names one country, so the modal opens on that country's figures.
    * Tapping Nigeria's cocoa and reading Cote d'Ivoire's numbers is the kind
@@ -44,7 +49,9 @@ export function ProductCardRow({
    */
   onOpen: (hsCode: string, countrySlug: string, flow: 'export' | 'import') => void;
 }) {
-  const band = scoreBand(product.score);
+  const band = product.band;
+  const fit = budget > 0 ? budgetFit(budget, product.unit_value_usd_t) : null;
+  const qty = fit ? fmtQuantity(fit) : null;
   return (
     <button
       type="button"
@@ -78,6 +85,24 @@ export function ProductCardRow({
             {product.best_market_product_specific
               ? `Biggest market for this product: ${product.best_market}`
               : `Biggest ${product.flow === 'export' ? 'buyer' : 'supplier'} overall: ${product.best_market}`}
+          </span>
+        )}
+        {/* Three outcomes, and no price is its own answer rather than a no. */}
+        {fit && (
+          <span className="tiny budget-line">
+            {fit.fits ? (
+              <>
+                <span className="up">Your budget buys about {qty}</span>
+                <span className="dim"> at ${Math.round(fit.usd_per_tonne ?? 0).toLocaleString()}/t</span>
+              </>
+            ) : fit.tonnes != null ? (
+              <span className="dim">
+                Your budget buys {qty}, under a tonne at $
+                {Math.round(fit.usd_per_tonne ?? 0).toLocaleString()}/t
+              </span>
+            ) : (
+              <span className="dim">No weight reported, so no price to work from</span>
+            )}
           </span>
         )}
       </span>
@@ -320,6 +345,7 @@ export default function ProductModal({
   onClose: () => void;
 }) {
   const { user } = useSession();
+  const [budget] = useBudget();
   const [hs, setHs] = useState(hsCode);
   const [history, setHistory] = useState<string[]>([]);
   const [focusSlug, setFocusSlug] = useState<string | null>(countrySlug);
@@ -475,6 +501,9 @@ export default function ProductModal({
 
   const band = insight?.score != null ? scoreBand(insight.score) : 'watch';
   const asideRows = asideFlow === 'import' ? (insight?.buyers ?? []) : (insight?.sellers ?? []);
+  // Against the unit value actually in view, so the number moves when the
+  // reader rescopes to another country rather than staying on the first one.
+  const modalFit = budgetFit(budget, insight?.unit_value_usd_t ?? null);
   const growth = insight ? growthText(insight.growth_pct) : { text: '', tone: '' };
   const growthWhose = insight?.focus_name ?? insight?.sellers[0]?.name ?? null;
   const showBorrowedPrice = !!insight?.price_from_name && !insight?.focus_slug;
@@ -651,6 +680,32 @@ export default function ProductModal({
                     reported a figure, so this is a sample of the trade, not the whole world
                     market.
                   </p>
+                )}
+
+                {budget > 0 && (
+                  <div className="card budget-card" style={{ marginTop: 16 }}>
+                    <p className="card-title">What ${budget.toLocaleString()} buys</p>
+                    {modalFit.tonnes == null ? (
+                      <p className="small" style={{ margin: 0 }}>
+                        No weight was reported for this trade, so there is no price per tonne to
+                        work from. The value is real, the quantity is not on record.
+                      </p>
+                    ) : (
+                      <>
+                        <p style={{ margin: 0, fontSize: 22, fontWeight: 650 }}>
+                          {fmtQuantity(modalFit)}
+                          <span className="dim" style={{ fontSize: 14, fontWeight: 400 }}>
+                            {' '}at {fmtUnitValue(modalFit.usd_per_tonne)}
+                          </span>
+                        </p>
+                        <p className="tiny dim" style={{ margin: '8px 0 0' }}>
+                          {modalFit.fits
+                            ? 'Goods value at the border, from the price this trade actually fetched. Freight, insurance, duty, clearing and financing sit on top.'
+                            : 'That is under a tonne, which is not really a shipment. At this price the product needs a larger budget to be worth moving.'}
+                        </p>
+                      </>
+                    )}
+                  </div>
                 )}
 
                 <div className="card" style={{ marginTop: 16 }}>

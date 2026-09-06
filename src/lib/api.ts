@@ -303,6 +303,8 @@ export const api = {
       country?: string;
       all?: boolean;
       limit?: number;
+      /** Counts within_budget across every match, not just the page shown. */
+      budget?: number;
     } = {},
   ) => {
     const qs = new URLSearchParams();
@@ -312,6 +314,7 @@ export const api = {
     if (params.country) qs.set('country', params.country);
     if (params.all) qs.set('all', '1');
     if (params.limit) qs.set('limit', String(params.limit));
+    if (params.budget) qs.set('budget', String(params.budget));
     const s = qs.toString();
     return req<{ products: ProductCard[]; count: number; summary: ProductSummary }>(
       `/api/products${s ? `?${s}` : ''}`,

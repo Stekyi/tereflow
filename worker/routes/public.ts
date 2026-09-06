@@ -4,9 +4,10 @@ import { attachSources, bad, getEntityBySlug, json } from '../lib/db';
 import { currentUser, isEntitled } from '../lib/session';
 import { hs2Label, hs2Sector, hs6Label } from '../agent/codes';
 import { shortProductName } from '../../shared/product-name';
-import { opportunityScore } from '../../shared/opportunity';
+import { opportunityScore, scoreBand } from '../../shared/opportunity';
+import { budgetFit } from '../../shared/budget';
 import { buildProductInsight } from '../lib/product-insight';
-import { loadSettings } from '../lib/settings';
+import { loadSettings, type Settings } from '../lib/settings';
 import {
   classify,
   dominantCodes,
@@ -382,9 +383,12 @@ pub.get('/products', async (c) => {
     `SELECT s.entity_id, s.hs_code, s.product_name, s.flow, s.year, s.value_usd,
             s.cagr_3y, s.momentum, s.confidence, s.best_market, s.best_market_iso3,
             s.best_market_product_specific,
+            a.unit_value_usd_t, a.price_ratio,
             e.slug, e.name AS country, e.iso3, e.continent
        FROM opportunity_signals s
        JOIN entities e ON e.id = s.entity_id
+       LEFT JOIN product_analytics a
+              ON a.hs_code = s.hs_code AND a.entity_id = s.entity_id AND a.flow = s.flow
       WHERE ${clauses.join(' AND ')}
       ORDER BY s.momentum DESC, s.cagr_3y DESC`,
   )
@@ -396,12 +400,13 @@ pub.get('/products', async (c) => {
     (results ?? []).map((r) => r.entity_id),
   );
 
+  const settings = await loadSettings(c.env);
+  const budget = Number(c.req.query('budget') ?? 0);
+
   const matched = (results ?? [])
-    .map((r) => toProductCard(r, classifications))
+    .map((r) => toProductCard(r, classifications, settings))
     .filter((p) => includeTraditional || p.category !== 'traditional')
     .sort((a, b) => b.score - a.score);
-
-  const settings = await loadSettings(c.env);
 
   /*
    * The figures the home page leads with.
@@ -409,6 +414,12 @@ pub.get('/products', async (c) => {
    * These follow the same filters as the list below them, so a reader who
    * narrows to Africa sees how many openings are in Africa, not a global
    * number sitting above an African list.
+   *
+   * within_budget is counted here rather than in the browser for the same
+   * reason: the other four describe every match, and a fifth that quietly
+   * described only the visible page would be read as the same kind of number.
+   * Null when no budget was given, which the UI shows as absent rather than
+   * as none.
    */
   const summary = {
     total: matched.length,
@@ -418,6 +429,12 @@ pub.get('/products', async (c) => {
     markets: new Set(matched.map((p) => p.slug)).size,
     /** Biggest single line in view, so the scale of the list is visible. */
     largest_usd: matched.length ? Math.max(...matched.map((p) => p.value_usd)) : 0,
+    within_budget:
+      budget > 0
+        ? matched.filter((p) => budgetFit(budget, p.unit_value_usd_t).fits).length
+        : null,
+    /** How many could be judged at all, so a low count is not read as a verdict. */
+    priced: matched.filter((p) => p.unit_value_usd_t != null).length,
   };
 
   return json({ products: matched.slice(0, limit), count: matched.length, summary });
@@ -436,6 +453,8 @@ interface SignalRow {
   best_market: string | null;
   best_market_iso3: string | null;
   best_market_product_specific: number | null;
+  unit_value_usd_t: number | null;
+  price_ratio: number | null;
   slug: string;
   country: string;
   iso3: string;
@@ -445,6 +464,7 @@ interface SignalRow {
 function toProductCard(
   r: SignalRow,
   classifications: Map<string, Map<string, ExportClassification>>,
+  settings: Settings,
 ): ProductCard {
   const full = r.product_name ?? hs6Label(r.hs_code);
   return {
@@ -470,6 +490,17 @@ function toProductCard(
     best_market: r.best_market,
     best_market_iso3: r.best_market_iso3,
     best_market_product_specific: r.best_market_product_specific === 1,
+    unit_value_usd_t: r.unit_value_usd_t,
+    band: scoreBand(
+      opportunityScore({
+        cagr_3y: r.cagr_3y,
+        momentum: r.momentum,
+        confidence: r.confidence,
+        value_usd: r.value_usd,
+      }),
+      settings.scoreBandStrong,
+      settings.scoreBandModerate,
+    ),
     has_signal: true,
     // A signal is only written when the years were comparable, so anything
     // reaching here already passed the truncation check in analyse.ts.

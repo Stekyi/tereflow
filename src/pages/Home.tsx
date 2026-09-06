@@ -4,6 +4,8 @@ import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
 import { Chips, Empty, Skeletons } from '../components/ui';
 import { HeroScene } from '../components/Brand';
+import { BudgetBar } from '../components/BudgetBar';
+import { useBudget } from '../lib/budget';
 import ProductModal, { ProductCardRow } from '../components/ProductModal';
 import { CONTINENTS, type ProductCard, type ProductSummary } from '../../shared/types';
 
@@ -28,6 +30,7 @@ function Kpi({ n, k }: { n: number; k: string }) {
 
 export default function Home() {
   const { user, entitled, feedUnread } = useSession();
+  const [budget, setBudget] = useBudget();
   const [q, setQ] = useState('');
   const [flow, setFlow] = useState<FlowFilter>('all');
   const [continent, setContinent] = useState<string>('all');
@@ -52,6 +55,7 @@ export default function Home() {
           q: q.trim() || undefined,
           flow: flow === 'all' ? undefined : flow,
           continent: continent === 'all' ? undefined : continent,
+          budget: budget || undefined,
           limit: 40,
         })
         .then((r) => {
@@ -65,7 +69,7 @@ export default function Home() {
         .finally(() => setLoading(false));
     }, 200);
     return () => clearTimeout(handle);
-  }, [q, flow, continent]);
+  }, [q, flow, continent, budget]);
 
   const flowOptions = useMemo(
     () => [
@@ -88,8 +92,7 @@ export default function Home() {
   // thing; otherwise it is the ranked list, scoped to whatever filters are set,
   // and it says "worldwide" plainly when nothing is set rather than leaving the
   // reader to assume the filters are hiding something.
-  const listHeading = useMemo(() => {
-    const query = q.trim();
+  const listHeading = useMemo(() => {    const query = q.trim();
     if (query) return `Results for "${query}"`;
     if (flow === 'all' && continent === 'all') return 'Top opportunities worldwide this week';
     const flowWord = flow === 'all' ? '' : `${flow} `;
@@ -127,9 +130,15 @@ export default function Home() {
           <Kpi n={summary.exports} k="To sell" />
           <Kpi n={summary.imports} k="To supply" />
           <Kpi n={summary.strong} k="Strong case" />
-          <Kpi n={summary.markets} k={summary.markets === 1 ? 'Market' : 'Markets'} />
+          {summary.within_budget != null ? (
+            <Kpi n={summary.within_budget} k="Within budget" />
+          ) : (
+            <Kpi n={summary.markets} k={summary.markets === 1 ? 'Market' : 'Markets'} />
+          )}
         </div>
       )}
+
+      <BudgetBar budget={budget} onChange={setBudget} />
 
       <div className="section-head">
         <h2 style={{ fontSize: 16 }}>{listHeading}</h2>
@@ -150,7 +159,12 @@ export default function Home() {
         />
       ) : (
         products.map((p) => (
-          <ProductCardRow key={`${p.flow}-${p.hs_code}-${p.iso3}`} product={p} onOpen={openProduct} />
+          <ProductCardRow
+            key={`${p.flow}-${p.hs_code}-${p.iso3}`}
+            product={p}
+            budget={budget}
+            onOpen={openProduct}
+          />
         ))
       )}
 

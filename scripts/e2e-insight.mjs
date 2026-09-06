@@ -95,6 +95,77 @@ async function main() {
   );
   check('strong is a subset of the total', sum.strong <= sum.total, `${sum.strong}/${sum.total}`);
 
+  /*
+   * A badge and a count computed from the same threshold must agree.
+   *
+   * scoreBand() used to hardcode its cut-offs while the summary counted using
+   * the stored ones, so editing the threshold in the portal moved the count
+   * and left every badge where it was.
+   */
+  const banded = await get('/api/products?limit=120');
+  const rows = banded.body?.products ?? [];
+  check('every product carries a band', rows.every((p) => p.band), rows[0]?.band);
+  check(
+    'bands are ordered by score, with no strong below a moderate',
+    Math.min(...rows.filter((p) => p.band === 'strong').map((p) => p.score), Infinity)
+      >= Math.max(...rows.filter((p) => p.band === 'moderate').map((p) => p.score), -Infinity),
+  );
+  // The list is sorted by score descending, so if the badges were computed
+  // from the same threshold the count uses, exactly the first `strong` rows
+  // carry the strong badge and the next one does not.
+  if (sum.strong < rows.length) {
+    check(
+      'the strong badges and the strong count are the same threshold',
+      rows.slice(0, sum.strong).every((p) => p.band === 'strong')
+        && rows[sum.strong].band !== 'strong',
+      `${sum.strong} counted, row ${sum.strong} is ${rows[sum.strong]?.band}`,
+    );
+  } else {
+    check('the strong badges and the strong count are the same threshold', true, 'page too small');
+  }
+
+  /*
+   * A band that catches almost everything, or almost nothing, is decoration.
+   * This is deliberately wide: it is here to catch a threshold left at a value
+   * that stops separating, not to pin a particular editorial choice.
+   */
+  const strongShare = sum.strong / sum.total;
+  check(
+    'the strong band still separates',
+    strongShare > 0.02 && strongShare < 0.5,
+    `${(strongShare * 100).toFixed(0)} percent labelled strong`,
+  );
+
+  /*
+   * Budget arithmetic is the reader's own money, so it has to be right and it
+   * has to describe the whole set rather than the visible page.
+   */
+  const nb = await get('/api/products?limit=20');
+  check('no budget means no budget figure', nb.body?.summary?.within_budget === null);
+
+  const b25 = await get('/api/products?limit=20&budget=25000');
+  const b1 = await get('/api/products?limit=20&budget=1000');
+  check(
+    'a budget produces a count over every match, not the page',
+    typeof b25.body?.summary?.within_budget === 'number'
+      && b25.body.summary.within_budget > (b25.body.products?.length ?? 0),
+    `${b25.body?.summary?.within_budget} within budget, page of ${b25.body?.products?.length}`,
+  );
+  check(
+    'a bigger budget clears at least as many openings',
+    b25.body.summary.within_budget >= b1.body.summary.within_budget,
+    `${b1.body.summary.within_budget} at 1k, ${b25.body.summary.within_budget} at 25k`,
+  );
+  check(
+    'nothing can be within budget without a price',
+    b25.body.summary.within_budget <= b25.body.summary.priced,
+    `${b25.body.summary.within_budget} within, ${b25.body.summary.priced} priced`,
+  );
+  check(
+    'unit values are positive or absent, never zero',
+    (b25.body.products ?? []).every((p) => p.unit_value_usd_t == null || p.unit_value_usd_t > 0),
+  );
+
   const africa = await get('/api/products?limit=20&continent=Africa&flow=export');
   const af = africa.body?.summary ?? {};
   check(

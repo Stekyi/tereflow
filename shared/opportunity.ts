@@ -80,9 +80,25 @@ export function opportunityScore(input: ScoreInput): number {
 
 export type ScoreBand = 'strong' | 'moderate' | 'watch';
 
-export function scoreBand(score: number): ScoreBand {
-  if (score >= 65) return 'strong';
-  if (score >= 45) return 'moderate';
+/**
+ * Fallback cut-offs.
+ *
+ * The bands that actually apply live in code_setup and are decided on the
+ * server, which sends the band along with each product so a badge can never
+ * disagree with a count computed from the same numbers. These are what the
+ * code shipped with, for anything rendering a bare score with no server band
+ * to hand.
+ */
+export const BAND_STRONG = 74;
+export const BAND_MODERATE = 62;
+
+export function scoreBand(
+  score: number,
+  strong: number = BAND_STRONG,
+  moderate: number = BAND_MODERATE,
+): ScoreBand {
+  if (score >= strong) return 'strong';
+  if (score >= moderate) return 'moderate';
   return 'watch';
 }
 

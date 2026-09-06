@@ -1,3 +1,4 @@
+import type { ScoreBand } from './opportunity';
 export type EntityKind = 'country' | 'intl_org' | 'regional_body';
 export type SourceCategory = 'export' | 'import' | 'commerce';
 export type SourceFmt = 'html' | 'csv' | 'json' | 'api' | 'sdmx' | 'xlsx' | 'pdf';
@@ -279,6 +280,13 @@ export interface ProductSummary {
   /** Distinct countries represented in the list. */
   markets: number;
   largest_usd: number;
+  /**
+   * Openings a stated budget clears. Null when no budget was given, which is
+   * not the same as none of them clearing it.
+   */
+  within_budget: number | null;
+  /** How many carry a price at all, so a low within_budget is readable. */
+  priced: number;
 }
 
 export interface ProductCard {
@@ -313,7 +321,17 @@ export interface ProductCard {
    * the UI must not present it as a per-product finding.
    */
   best_market_product_specific: boolean;
-  /** True when the figures come from a completed opportunity signal rather
+  /**
+   * Dollars per tonne for this country and flow, where a weight was reported.
+   * Null is common and means no weight, never a price of zero.
+   */
+  unit_value_usd_t: number | null;
+  /**
+   * Which band the score falls in, decided on the server against the stored
+   * cut-offs. Sent rather than recomputed so a badge can never disagree with
+   * a count derived from the same thresholds.
+   */
+  band: ScoreBand;  /** True when the figures come from a completed opportunity signal rather
    *  than raw facts, so growth and momentum are available. */
   has_signal: boolean;
   /** Set when this country's product detail was capped by the source. */

@@ -39,10 +39,10 @@ CREATE INDEX IF NOT EXISTS idx_code_setup_category ON code_setup(category, code)
 INSERT OR IGNORE INTO code_setup (code, name, description, value, default_value, kind, category) VALUES
   ('SCORE_BAND_STRONG', 'Strong case cut-off',
    'A product scoring at or above this is labelled a strong case. Raising it makes the label rarer.',
-   '65', '65', 'number', 'scoring'),
+   '74', '74', 'number', 'scoring'),
   ('SCORE_BAND_MODERATE', 'Worth a look cut-off',
    'A product scoring at or above this, but below the strong cut-off, is labelled worth a look. Below it, early days.',
-   '45', '45', 'number', 'scoring'),
+   '62', '62', 'number', 'scoring'),
 
   ('SCORE_WEIGHT_GROWTH', 'Score weight: growth',
    'How much of the 100 points come from how fast the trade is growing. The four weights should add up to 100.',

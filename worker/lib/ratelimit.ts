@@ -58,6 +58,20 @@ export function clientKey(req: Request): string {
   );
 }
 
+/**
+ * Buckets where failing open is not acceptable.
+ *
+ * If KV is unavailable the limiter cannot count, and for most endpoints
+ * letting the request through is the right trade: a feedback form that stops
+ * working during a KV incident is worse than one that is briefly unthrottled.
+ *
+ * Login and registration are different. Failing open there silently removes
+ * brute-force protection for the duration of the incident, and a
+ * misconfigured CACHE binding would remove it permanently without any visible
+ * symptom. These refuse instead.
+ */
+const FAIL_CLOSED = new Set<keyof typeof LIMITS>(['loginAccount', 'loginIp', 'register']);
+
 export async function rateLimit(
   env: Env,
   bucket: keyof typeof LIMITS,
@@ -74,7 +88,9 @@ export async function rateLimit(
     const current = await env.CACHE.get(key);
     count = current ? Number(current) : 0;
   } catch {
-    // If KV is unavailable, fail open rather than locking everyone out.
+    if (FAIL_CLOSED.has(bucket)) {
+      return { ok: false, remaining: 0, retryAfter: 60 };
+    }
     return { ok: true, remaining: limit.max, retryAfter: 0 };
   }
 

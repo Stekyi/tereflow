@@ -92,8 +92,8 @@ export function dominantCodes(exportChapterShares: Record<string, number> | unde
   );
 }
 
-/** hsCode may be a specific HS6 product line or a bare HS2 chapter (Marketplace
- *  searches by chapter) -- classification always resolves at chapter level. */
+/** hsCode may be a specific HS6 product line or a bare HS2 chapter (the product
+ *  search can pass a chapter) -- classification always resolves at chapter level. */
 export function classify(
   hsCode: string | null,
   resolved: Map<string, ExportClassification>,

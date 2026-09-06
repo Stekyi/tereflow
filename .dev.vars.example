@@ -1,0 +1,31 @@
+# Local Worker configuration. Copy to .dev.vars, which is gitignored.
+#
+#   cp .dev.vars.example .dev.vars
+#
+# In production these are set with `wrangler secret put NAME`, not from a file.
+
+# Gates the owner portal and the ingest endpoints the local pipeline pushes to.
+# Sent as `Authorization: Bearer <token>`, never as a cookie: a cookie would be
+# attached to cross-site requests and make every admin write forgeable.
+ADMIN_TOKEN = "local-dev-token"
+
+# Opens POST /api/auth/tier and the stub checkout, both of which grant premium
+# with no payment. Set ONLY in development.
+#
+# This used to be inferred from "is STRIPE_SECRET_KEY missing", which is the
+# wrong question: a deploy that has not wired up billing yet is the normal
+# pre-launch state, and in that state anybody who found the endpoint got
+# premium for free. It is now off unless explicitly set to the string "true".
+ALLOW_DEV_TIER_SWITCH = "true"
+
+# Optional. Free registration at https://comtradeplus.un.org
+#
+# Without it the pipeline is capped at 500 rows per response and has to fetch
+# specific products one HS chapter at a time, which costs roughly 112 requests
+# per country against a keyless limit of about 100 an hour. That is one country
+# per hour. With a key it is about 12 requests per country.
+# COMTRADE_API_KEY = ""
+
+# Optional. Until both are set, checkout returns 503 and no money can be taken.
+# STRIPE_SECRET_KEY = ""
+# STRIPE_WEBHOOK_SECRET = ""

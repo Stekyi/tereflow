@@ -8,19 +8,19 @@ import type { Env } from './db';
  *
  * Phase 2 swaps this for the session cookie + users.role = 'admin'. The call
  * sites do not change.
+ *
+ * Header only, deliberately. A cookie is attached by the browser to any
+ * cross-site request, so accepting the token in one would make every admin
+ * write, including bulk ingest and user edits, forgeable from another origin.
+ * There are no CSRF tokens here. An Authorization header is never attached
+ * automatically, which is what makes this safe without them.
  */
 export function isAdmin(req: Request, env: Env): boolean {
   const token = env.ADMIN_TOKEN;
   if (!token) return false;
 
   const header = req.headers.get('authorization') ?? '';
-  if (header.startsWith('Bearer ') && safeEqual(header.slice(7).trim(), token)) return true;
-
-  const cookie = req.headers.get('cookie') ?? '';
-  const match = /(?:^|;\s*)ta_admin=([^;]+)/.exec(cookie);
-  if (match && safeEqual(decodeURIComponent(match[1]), token)) return true;
-
-  return false;
+  return header.startsWith('Bearer ') && safeEqual(header.slice(7).trim(), token);
 }
 
 /** Constant-time-ish compare so the token is not guessable byte by byte. */

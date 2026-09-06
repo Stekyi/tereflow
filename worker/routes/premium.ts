@@ -323,7 +323,19 @@ premium.post('/billing/checkout', async (c) => {
     return json({ provider: 'stripe', checkout_url: session.url });
   }
 
-  // Stub provider — development only.
+  // Stub provider.
+  //
+  // This grants premium with no payment, so it is gated on an explicit opt-in
+  // rather than on the absence of Stripe. "No payment provider configured" is
+  // the normal state of a deploy that has not wired up billing yet, and in
+  // that state this branch would hand premium to anybody who asked.
+  if (c.env.ALLOW_DEV_TIER_SWITCH !== 'true') {
+    return bad(
+      'Payments are not available yet. No payment provider is configured on this deployment.',
+      503,
+    );
+  }
+
   const periodEnd = new Date(Date.now() + plan.days * 86_400_000).toISOString();
   await recordBilling(c.env, {
     user_id: user.id,

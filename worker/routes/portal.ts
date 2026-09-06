@@ -227,17 +227,20 @@ portal.get('/network', async (c) => {
        (SELECT COUNT(*) FROM ratings)       AS ratings`,
   );
 
-  // subject_id is the rated card; rater_id is the rating user's card, not the
-  // user row, so the reviewer is named through their card.
+  // ratings.rater_id and subject_id reference users(id), not business_cards(id):
+  // a reputation belongs to the person, not to whichever card they currently
+  // publish. Joining these to card ids returns nothing but nulls.
   const recentRatings = await all(
     db,
     `SELECT r.id, r.score, r.comment, r.dealt_in, r.created_at,
-            subject.headline AS rated_headline,
-            subject.display_name AS rated_name,
-            rater.display_name AS rater_name
+            subject.full_name AS rated_name,
+            subject.email AS rated_email,
+            rater.full_name AS rater_name,
+            subject_card.headline AS rated_headline
        FROM ratings r
-       LEFT JOIN business_cards subject ON subject.id = r.subject_id
-       LEFT JOIN business_cards rater ON rater.id = r.rater_id
+       LEFT JOIN users subject ON subject.id = r.subject_id
+       LEFT JOIN users rater ON rater.id = r.rater_id
+       LEFT JOIN business_cards subject_card ON subject_card.user_id = r.subject_id
       ORDER BY r.created_at DESC LIMIT 40`,
   );
 

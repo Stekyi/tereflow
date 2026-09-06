@@ -135,8 +135,9 @@ export function analyse(
   const latestPoint = trend.find((t) => t.year === latest);
   const prevPoint = prev ? trend.find((t) => t.year === prev) : undefined;
 
-  const topExports = rankProducts(rows, 'export', productYear, productYears);
-  const topImports = rankProducts(rows, 'import', productYear, productYears);
+  const truncated = new Set(truncatedYears);
+  const topExports = rankProducts(rows, 'export', productYear, productYears, truncated);
+  const topImports = rankProducts(rows, 'import', productYear, productYears, truncated);
   const partnersExport = rankPartners(rows, 'export', latest, years);
   const partnersImport = rankPartners(rows, 'import', latest, years);
   const services = rankServices(context, latest);
@@ -172,7 +173,6 @@ export function analyse(
     coverage_note: buildCoverageNote(years, latest, productYear),
   };
 
-  const truncated = new Set(truncatedYears);
   const signals = [
     ...detectSignals(rows, 'export', productYears, topExports, truncated),
     ...detectSignals(rows, 'import', productYears, topImports, truncated),
@@ -272,13 +272,36 @@ function rankProducts(
   flow: 'export' | 'import',
   latest: number,
   years: number[],
+  truncatedYears: Set<number>,
 ): RankedItem[] {
-  const { rows: current } = productRows(rows, flow, latest);
-  const total = current.reduce((s, r) => s + r.value_usd, 0);
+  const { rows: current, level } = productRows(rows, flow, latest);
+  if (!current.length) return [];
+
+  // Share is against the country's real trade, not against the rows that
+  // happen to be in hand.
+  //
+  // At HS6 the rows in hand are a capped, partial slice: the source returns at
+  // most a few hundred lines per chapter and only the largest chapters are
+  // fetched at all. Dividing by their sum inflates every share by 1/coverage,
+  // which for the larger economies is roughly double. China's memory-chip line
+  // read 3.77% of exports against a true 1.92%. The world-total row is the
+  // honest denominator and totalFor() already returns it.
+  const reported = totalFor(rows, latest, flow);
+  const rowSum = current.reduce((s, r) => s + r.value_usd, 0);
+  const total = reported > 0 ? reported : rowSum;
   if (total <= 0) return [];
 
   const threeBack = nearestPastYear(years, latest - 3, latest);
   const prevYear = previousYear(years, latest);
+
+  // Growth across a year whose specific-product detail was capped compares two
+  // different arbitrary slices, so it measures which rows came back rather
+  // than any change in trade. detectSignals already refuses to do this; the
+  // headline product list was still doing it.
+  const comparable =
+    level !== SPECIFIC_LEN || (!truncatedYears.has(latest) && threeBack != null && !truncatedYears.has(threeBack));
+
+  const floor = level === SPECIFIC_LEN ? NOISE_FLOOR.hs6 : NOISE_FLOOR.hs2;
 
   return current
     .sort((a, b) => b.value_usd - a.value_usd)
@@ -292,10 +315,37 @@ function rankProducts(
         name: r.product_name ?? r.hs_code ?? 'Unclassified',
         value_usd: r.value_usd,
         share_pct: (r.value_usd / total) * 100,
-        cagr_3y: threeBack != null ? cagr(past, r.value_usd, latest - threeBack) : null,
-        yoy_pct: pctChange(last, r.value_usd),
+        cagr_3y:
+          comparable && threeBack != null
+            ? growthFrom(past, r.value_usd, latest - threeBack, floor.valueUsd)
+            : null,
+        yoy_pct: hasRealBase(last, floor.valueUsd) ? pctChange(last, r.value_usd) : null,
       };
     });
+}
+
+/**
+ * A growth rate is only meaningful if the year it grew from was a real trade.
+ *
+ * Comtrade reports lines worth a few thousand dollars, which are rounding
+ * artifacts rather than markets. China's HS 720712 went from $5,730 to $415m,
+ * which is arithmetically 4067% a year and tells the reader nothing true.
+ * About one signal in five was one of these.
+ */
+function hasRealBase(from: number | undefined, floorUsd: number): boolean {
+  // A twentieth of the display floor: low enough that a genuinely small but
+  // real starting position still yields a rate, high enough to exclude noise.
+  return from != null && from >= floorUsd / 20;
+}
+
+function growthFrom(
+  from: number | undefined,
+  to: number,
+  periods: number,
+  floorUsd: number,
+): number | null {
+  if (!hasRealBase(from, floorUsd)) return null;
+  return cagr(from, to, periods);
 }
 
 /**
@@ -556,7 +606,11 @@ function detectSignals(
     : current;
   if (!working.length) return [];
   const workingLevel = specificTruncated ? CHAPTER_LEN : level;
-  const workingTotal = working.reduce((s, r) => s + r.value_usd, 0);
+  // Same reasoning as rankProducts: divide by the country's reported total,
+  // not by the subset of rows in hand, or every share is inflated by 1/coverage.
+  const reportedTotal = totalFor(rows, latest, flow);
+  const workingSum = working.reduce((s, r) => s + r.value_usd, 0);
+  const workingTotal = reportedTotal > 0 ? reportedTotal : workingSum;
   if (workingTotal <= 0) return [];
 
   const topCodes = new Set(currentTop.slice(0, 5).map((t) => t.code));
@@ -574,7 +628,7 @@ function detectSignals(
     if (r.hs_code === '99' || r.hs_code?.startsWith('99')) continue;
 
     const past = valueOf(rows, base, flow, r.hs_code);
-    const growth = cagr(past, r.value_usd, span);
+    const growth = growthFrom(past, r.value_usd, span, floor.valueUsd);
     if (growth == null) continue;
 
     const share = r.value_usd / workingTotal;

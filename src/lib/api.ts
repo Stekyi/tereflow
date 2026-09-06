@@ -360,7 +360,7 @@ export const api = {
       req<{ deleted: boolean }>(`/api/admin/entities/${slug}`, { method: 'DELETE' }),
     /** Rebuilds subscriber feeds from stored signals. Does not refetch source
      *  data: that runs on the operator's machine via `npm run pipeline`. */
-    runNow: () =>
+    rebuildFeeds: () =>
       req<{
         run_id: string;
         status: string;
@@ -482,6 +482,12 @@ export const api = {
     logout: () => req<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
     setTier: (tier: 'free' | 'premium') =>
       req<{ tier: string }>('/api/auth/tier', { method: 'POST', body: JSON.stringify({ tier }) }),
+    /** Close the account and remove the data. Needs the current password. */
+    close: (password: string) =>
+      req<{ closed: true }>('/api/auth/close', {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      }),
   },
 
   network: {
@@ -491,6 +497,9 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(input),
       }),
+    /** Remove your own card. Unpublishing hides it; this removes the row. */
+    deleteCard: () =>
+      req<{ deleted: true }>('/api/network/cards/me', { method: 'DELETE' }),
     discover: (params: Record<string, string | undefined> = {}) => {
       const qs = new URLSearchParams();
       for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v);

@@ -6,9 +6,7 @@ import FeedbackButton from './components/FeedbackButton';
 import { useSession } from './lib/auth';
 
 const Home = lazy(() => import('./pages/Home'));
-const Explore = lazy(() => import('./pages/Explore'));
 const Countries = lazy(() => import('./pages/Countries'));
-const Marketplace = lazy(() => import('./pages/Marketplace'));
 const Country = lazy(() => import('./pages/Country'));
 const Registry = lazy(() => import('./pages/Registry'));
 const Portal = lazy(() => import('./pages/Portal'));
@@ -27,9 +25,7 @@ const Upgrade = lazy(() => import('./pages/Upgrade'));
 
 const TITLES: Record<string, string> = {
   '/': 'Tereflow',
-  '/explore': 'Explore',
   '/countries': 'Countries',
-  '/marketplace': 'Products',
   '/network': 'Network',
   '/messages': 'Messages',
   '/me': 'Me',
@@ -64,7 +60,7 @@ export default function App() {
           </span>
         ) : (
           <button className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
-            ‹ Back
+            â€¹ Back
           </button>
         )}
         <h1>{title}</h1>
@@ -82,9 +78,7 @@ export default function App() {
         <Suspense fallback={<Skeletons n={5} />}>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/explore" element={<Explore />} />
             <Route path="/countries" element={<Countries />} />
-            <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/country/:slug" element={<Country />} />
             <Route path="/registry" element={<Registry />} />
 
@@ -121,7 +115,7 @@ export default function App() {
         </Suspense>
       </main>
 
-      {/* Four tabs, not six. Marketplace merged into Home, which already
+      {/* Four tabs, not six. Marketplace and Explore both duplicated Home, which already
           browses the same products, and Messages moved to the top bar. */}
       <nav className="tabbar">
         <Tab

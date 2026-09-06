@@ -50,6 +50,14 @@ interface Config {
   dryRun: boolean;
   /** Skip the "is the source unchanged" check and always do the full fetch. */
   force: boolean;
+  /**
+   * Recompute from the facts already stored, without contacting any source.
+   *
+   * For fixing the analysis rather than refreshing the data. Everything the app
+   * shows is derived from trade_facts, so a change to the maths only needs the
+   * maths re-run.
+   */
+  reanalyse: boolean;
   yearsBack: number;
   /** Pause between countries so we stay a good citizen on public APIs. */
   politenessMs: number;
@@ -92,6 +100,7 @@ function readConfig(): Config {
     limit: flag('limit') ? Number(flag('limit')) : undefined,
     dryRun: args.includes('--dry-run'),
     force: args.includes('--force'),
+    reanalyse: args.includes('--reanalyse') || args.includes('--reanalyze'),
     yearsBack: Number(process.env.TEREFLOW_YEARS_BACK ?? 6),
     politenessMs: Number(process.env.TEREFLOW_POLITENESS_MS ?? 1200),
     callPaceMs: Number(process.env.TEREFLOW_CALL_PACE_MS ?? 300),
@@ -159,6 +168,19 @@ class Api {
       method: 'POST',
       body: JSON.stringify({ slug, facts }),
     });
+  }
+  /** Read stored facts back, for --reanalyse. Paged; the caller loops. */
+  async storedFacts(slug: string): Promise<FactRow[]> {
+    const out: FactRow[] = [];
+    const PAGE = 5000;
+    for (let offset = 0; ; offset += PAGE) {
+      const r = await this.call<{ facts: FactRow[]; returned: number; total: number }>(
+        `/api/admin/ingest/facts/${encodeURIComponent(slug)}?limit=${PAGE}&offset=${offset}`,
+      );
+      out.push(...r.facts);
+      if (r.returned < PAGE || out.length >= r.total) break;
+    }
+    return out;
   }
   commit(payload: unknown) {
     return this.call<{ ok: true }>('/api/admin/ingest/commit', {
@@ -245,6 +267,79 @@ async function main() {
     const t0 = Date.now();
 
     try {
+      // Recompute-only path. Reads the facts already stored and runs the
+      // analysis over them, contacting no source at all. This is what makes a
+      // maths fix cheap: the expensive part of a run is the fetch, and the
+      // fetch has not changed.
+      if (cfg.reanalyse) {
+        const rows = await api.storedFacts(entity.slug);
+        if (rows.length === 0) {
+          console.log('no stored facts, nothing to recompute');
+          skipped++;
+          continue;
+        }
+
+        // The World Bank context is small and free, so it is refetched rather
+        // than stored. If it is unavailable the services section is thinner,
+        // which is visible, rather than wrong.
+        const worldbank = await fetchWorldBank(entity.iso3!, years).catch(() => null);
+
+        const bundle = analyse(
+          entity.name,
+          rows,
+          worldbank?.context ?? {
+            gdp_by_year: {},
+            services_export_by_year: {},
+            services_import_by_year: {},
+            gns_export_by_year: {},
+            gns_import_by_year: {},
+          },
+          ['un-comtrade', ...(worldbank?.ok ? [worldbank.source_ref] : [])],
+          // Truncation is a property of the fetch, which is not being redone.
+          // Passing none is the conservative choice: it means growth is
+          // computed wherever the noise floors allow, and those floors are the
+          // real guard.
+          [],
+        );
+
+        if (cfg.dryRun) {
+          const o = bundle.overview;
+          console.log(
+            `recomputed only. ${rows.length} stored rows, ${o.year}: ` +
+              `X $${(o.export_usd / 1e9).toFixed(1)}bn M $${(o.import_usd / 1e9).toFixed(1)}bn`,
+          );
+          ok++;
+          continue;
+        }
+
+        await api.commit({
+          slug: entity.slug,
+          run_id: runId,
+          // No fingerprint and no coverage change: neither the source nor the
+          // facts moved, only the maths applied to them.
+          analysis: {
+            overview: bundle.overview,
+            top_exports: bundle.top_exports,
+            top_imports: bundle.top_imports,
+            services: bundle.services,
+            partners_export: bundle.partners_export,
+            partners_import: bundle.partners_import,
+            yearly_trend: bundle.yearly_trend,
+            recommendations: bundle.recommendations,
+          },
+          signals: bundle.signals,
+        });
+
+        const o = bundle.overview;
+        console.log(
+          `recomputed from ${rows.length} stored rows, ${o.year}: ` +
+            `X $${(o.export_usd / 1e9).toFixed(1)}bn M $${(o.import_usd / 1e9).toFixed(1)}bn ` +
+            `(${((Date.now() - t0) / 1000).toFixed(0)}s)`,
+        );
+        ok++;
+        continue;
+      }
+
       // Cheap first: a latest-year-only Comtrade probe (2-4 calls) plus the
       // already-cheap World Bank fetch, before paying for the full ~18-call
       // Comtrade product/partner breakdown.

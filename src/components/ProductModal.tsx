@@ -15,7 +15,8 @@ import {
 
 /**
  * One product as a tappable row. The card design lives here so Home, the
- * Marketplace and anywhere else that lists products all read the same way.
+ * Home, the product list and anywhere else that lists products all read the
+ * same way.
  * Tapping is the caller's job (it opens the modal), so this stays a plain
  * button and never navigates on its own.
  */
@@ -377,7 +378,10 @@ export default function ProductModal({
               </div>
             )}
 
-            <Link className="btn primary block" to={`/marketplace?hs=${encodeURIComponent(detail.hs_code)}`}>
+            <Link
+              className="btn primary block"
+              to={`/network?q=${encodeURIComponent(detail.name)}`}
+            >
               Find partners for this product
             </Link>
           </>

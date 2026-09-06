@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
 import { Chips, Empty, Skeletons } from '../components/ui';
@@ -13,8 +13,12 @@ import {
 
 export default function Network() {
   const { user, hasCard } = useSession();
+  const [params] = useSearchParams();
   const [cards, setCards] = useState<BusinessCard[]>([]);
-  const [q, setQ] = useState('');
+  // Seeded from the query string so "find partners for this product" in the
+  // product modal lands here with the search already filled in, rather than on
+  // a second product list that duplicates the home page.
+  const [q, setQ] = useState(params.get('q') ?? '');
   const [intent, setIntent] = useState<Intent | ''>('');
   const [sector, setSector] = useState('');
   const [loading, setLoading] = useState(true);

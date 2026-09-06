@@ -17,6 +17,12 @@ export interface Env {
   SESSION_SECRET?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  /**
+   * Opens POST /api/auth/tier, which hands the caller premium with no payment.
+   * Must be the literal string "true". Absent means closed, so a deploy that
+   * has not configured billing yet does not give premium away.
+   */
+  ALLOW_DEV_TIER_SWITCH?: string;
 }
 
 export function uid(prefix = ''): string {

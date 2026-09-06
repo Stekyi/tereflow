@@ -6,10 +6,14 @@ import { Skeletons, useToast } from '../components/ui';
 import type { BusinessCard } from '../../shared/types';
 
 export default function Me() {
-  const { user, entitled, hasCard, subscriptions, feedUnread, loading, signOut } = useSession();
+  const { user, entitled, hasCard, subscriptions, feedUnread, loading, signOut, refresh } =
+    useSession();
   const navigate = useNavigate();
   const t = useToast();
   const [card, setCard] = useState<BusinessCard | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [closePassword, setClosePassword] = useState('');
+  const [closingBusy, setClosingBusy] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -155,8 +159,8 @@ export default function Me() {
           the entry point is always visible and the token screen does the gating. */}
       <Link className="list-item" to="/admin">
         <span className="grow">
-          <span className="name">Admin</span>
-          <span className="tiny dim">Registry, activation and analysis runs</span>
+          <span className="name">Owner portal</span>
+          <span className="tiny dim">Registry, pipeline, users, sources and feedback</span>
         </span>
         <span className="dim">›</span>
       </Link>
@@ -171,6 +175,94 @@ export default function Me() {
       >
         Sign out
       </button>
+
+      <div className="section-head">
+        <h2>Your data</h2>
+      </div>
+
+      {card && (
+        <button
+          className="btn ghost block"
+          type="button"
+          onClick={async () => {
+            if (!confirm('Remove your business card? Your phone, website and city go with it.')) {
+              return;
+            }
+            try {
+              await api.network.deleteCard();
+              setCard(null);
+              await refresh();
+              t.ok('Card removed');
+            } catch (e) {
+              t.err((e as Error).message);
+            }
+          }}
+        >
+          Remove my business card
+        </button>
+      )}
+
+      <button
+        className="btn danger block"
+        type="button"
+        style={{ marginTop: 8 }}
+        onClick={() => setClosing(true)}
+      >
+        Close my account
+      </button>
+
+      {closing && (
+        <div className="card" style={{ marginTop: 10, borderColor: 'var(--down)' }}>
+          <p className="card-title">Close your account</p>
+          <p className="small muted" style={{ marginTop: 0 }}>
+            This removes your account, your card, everything you follow, your feed and any private
+            conversations you were part of. It cannot be undone.
+          </p>
+          <div className="field">
+            <label htmlFor="close-password">Confirm your password</label>
+            <input
+              id="close-password"
+              type="password"
+              value={closePassword}
+              onChange={(e) => setClosePassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <button
+              className="btn ghost sm"
+              type="button"
+              style={{ flex: 1 }}
+              onClick={() => {
+                setClosing(false);
+                setClosePassword('');
+              }}
+            >
+              Keep my account
+            </button>
+            <button
+              className="btn danger sm"
+              type="button"
+              style={{ flex: 1 }}
+              disabled={!closePassword || closingBusy}
+              onClick={async () => {
+                setClosingBusy(true);
+                try {
+                  await api.auth.close(closePassword);
+                  await refresh();
+                  navigate('/');
+                } catch (e) {
+                  t.err((e as Error).message);
+                } finally {
+                  setClosingBusy(false);
+                }
+              }}
+            >
+              {closingBusy ? 'Closing' : 'Close for good'}
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

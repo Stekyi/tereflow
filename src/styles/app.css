@@ -1625,7 +1625,7 @@ textarea {
   background: var(--dim);
 }
 
-/* Marketplace: product/service search typeahead. */
+/* Product search typeahead. */
 .typeahead {
   position: relative;
 }

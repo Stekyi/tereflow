@@ -220,9 +220,9 @@ function Panel({
 
 /* ---- helpers ---- */
 
-const fmtDate = (s: string | null | undefined) => (s ? s.slice(0, 10) : '—');
+const fmtDate = (s: string | null | undefined) => (s ? s.slice(0, 10) : 'â€”');
 const fmtDateTime = (s: string | null | undefined) =>
-  s ? s.slice(0, 16).replace('T', ' ') : '—';
+  s ? s.slice(0, 16).replace('T', ' ') : 'â€”';
 const num = (n: number | null | undefined) => (n == null ? '0' : n.toLocaleString('en'));
 
 function StatusBadge({ status }: { status: string }) {
@@ -301,7 +301,7 @@ function Overview({ onError }: { onError: OnError }) {
             <div className="tiny dim">
               {num(run.entities_ok)} ok, {num(run.entities_failed)} failed, {num(run.entities_skipped)} skipped
               {run.facts_written != null ? `, ${num(run.facts_written)} facts written` : ''}
-              {run.finished_at ? ` · finished ${fmtDateTime(run.finished_at)}` : ' · still running'}
+              {run.finished_at ? ` Â· finished ${fmtDateTime(run.finished_at)}` : ' Â· still running'}
             </div>
           </div>
         ) : (
@@ -405,7 +405,7 @@ function Registry({ t, onError }: { t: Toaster; onError: OnError }) {
   async function rebuildFeeds() {
     setBusy('run');
     try {
-      const r = await api.admin.runNow();
+      const r = await api.admin.rebuildFeeds();
       t.ok(
         r.feedError
           ? `Feed rebuild failed: ${r.feedError}`
@@ -463,7 +463,7 @@ function Registry({ t, onError }: { t: Toaster; onError: OnError }) {
     <>
       <div className="row between" style={{ marginBottom: 12 }}>
         <span className="small dim">
-          {entities.length} records · {activeCount} active
+          {entities.length} records Â· {activeCount} active
         </span>
         <Link className="btn primary sm" to="/admin/new">
           + New record
@@ -531,10 +531,10 @@ function Registry({ t, onError }: { t: Toaster; onError: OnError }) {
                 <div className="name">{e.name}</div>
                 <div className="tiny dim">
                   {KIND_LABEL[e.kind]}
-                  {e.iso3 ? ` · ${e.iso3}` : ''} · {links} links
-                  {broken > 0 && <span className="down"> · {broken} broken</span>}
-                  {e.last_error && <span className="down"> · error</span>}
-                  {e.last_ingest_at && ` · ${e.last_ingest_at.slice(0, 10)}`}
+                  {e.iso3 ? ` Â· ${e.iso3}` : ''} Â· {links} links
+                  {broken > 0 && <span className="down"> Â· {broken} broken</span>}
+                  {e.last_error && <span className="down"> Â· error</span>}
+                  {e.last_ingest_at && ` Â· ${e.last_ingest_at.slice(0, 10)}`}
                 </div>
               </div>
               <div className="row" style={{ gap: 6 }}>
@@ -635,7 +635,7 @@ function Pipeline({ onError }: { onError: OnError }) {
                     <td className="align-right">{num(r.entities_ok)}</td>
                     <td className="align-right">{num(r.entities_failed)}</td>
                     <td className="align-right">{num(r.entities_skipped)}</td>
-                    <td className="align-right">{r.facts_written == null ? '—' : num(r.facts_written)}</td>
+                    <td className="align-right">{r.facts_written == null ? 'â€”' : num(r.facts_written)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -668,7 +668,7 @@ function Pipeline({ onError }: { onError: OnError }) {
                     </span>
                   </td>
                   <td>{fmtDate(c.last_ingest_at)}</td>
-                  <td className="align-right">{c.coverage_score == null ? '—' : c.coverage_score.toFixed(0)}</td>
+                  <td className="align-right">{c.coverage_score == null ? 'â€”' : c.coverage_score.toFixed(0)}</td>
                   <td className="align-right">{num(c.facts)}</td>
                   <td className="align-right">{num(c.signals)}</td>
                   <td className="down tiny">{c.last_error ?? ''}</td>
@@ -774,7 +774,7 @@ function Sources({ t, onError }: { t: Toaster; onError: OnError }) {
                       {s.tls_warning ? <span className="badge watch" style={{ marginLeft: 6 }}>TLS warning</span> : null}
                     </td>
                     <td>{s.fmt}</td>
-                    <td className="align-right">{s.last_status ?? '—'}</td>
+                    <td className="align-right">{s.last_status ?? 'â€”'}</td>
                     <td>{fmtDate(s.last_checked_at)}</td>
                   </tr>
                 );
@@ -896,7 +896,7 @@ function Products({ t, onError }: { t: Toaster; onError: OnError }) {
             <div className="row between">
               <span className="grow">
                 <span className="name">
-                  HS {r.hs_code} · {r.label}
+                  HS {r.hs_code} Â· {r.label}
                 </span>
                 <span className="tiny dim">{SOURCE_LABEL[r.source]}</span>
               </span>
@@ -1064,11 +1064,11 @@ function Users({ onError }: { onError: OnError }) {
               {users.map((u) => (
                 <tr key={u.id}>
                   <td>{u.email}{u.email_verified ? '' : ' (unverified)'}</td>
-                  <td>{u.full_name ?? '—'}</td>
+                  <td>{u.full_name ?? 'â€”'}</td>
                   <td>
                     <span className={`badge ${u.tier === 'premium' ? 'premium' : 'off'}`}>{u.tier}</span>
                   </td>
-                  <td>{u.country_iso3 ?? '—'}</td>
+                  <td>{u.country_iso3 ?? 'â€”'}</td>
                   <td className="align-right">{num(u.cards)}</td>
                   <td className="align-right">{num(u.follows)}</td>
                   <td>{fmtDate(u.created_at)}</td>
@@ -1138,8 +1138,8 @@ function Network({ onError }: { onError: OnError }) {
                 {cards.map((c) => (
                   <tr key={c.id}>
                     <td>{c.display_name}</td>
-                    <td>{c.company ?? '—'}</td>
-                    <td>{c.country_iso3 ?? '—'}</td>
+                    <td>{c.company ?? 'â€”'}</td>
+                    <td>{c.country_iso3 ?? 'â€”'}</td>
                     <td>
                       <span className={`badge ${c.is_published ? 'on' : 'off'}`}>
                         {c.is_published ? 'Published' : 'Draft'}
@@ -1147,9 +1147,9 @@ function Network({ onError }: { onError: OnError }) {
                       {c.is_verified ? <span className="badge strong" style={{ marginLeft: 4 }}>Verified</span> : null}
                     </td>
                     <td className="align-right">
-                      {c.rating_count > 0 ? `${(c.rating_avg ?? 0).toFixed(1)} (${c.rating_count})` : '—'}
+                      {c.rating_count > 0 ? `${(c.rating_avg ?? 0).toFixed(1)} (${c.rating_count})` : 'â€”'}
                     </td>
-                    <td className="tiny dim">{c.owner_email ?? c.owner_name ?? '—'}</td>
+                    <td className="tiny dim">{c.owner_email ?? c.owner_name ?? 'â€”'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1168,15 +1168,15 @@ function Network({ onError }: { onError: OnError }) {
             <div className="list-item" key={r.id} style={{ display: 'block', cursor: 'default' }}>
               <div className="row between">
                 <span className="name">
-                  {'★'.repeat(Math.max(0, Math.min(5, r.score)))}
-                  {'☆'.repeat(Math.max(0, 5 - r.score))}
+                  {'â˜…'.repeat(Math.max(0, Math.min(5, r.score)))}
+                  {'â˜†'.repeat(Math.max(0, 5 - r.score))}
                 </span>
                 <span className="tiny dim">{fmtDate(r.created_at)}</span>
               </div>
               {r.comment && <p className="small" style={{ margin: '6px 0 0' }}>{r.comment}</p>}
               <p className="tiny dim" style={{ margin: '6px 0 0' }}>
                 {r.rater_name ?? 'Someone'} rated {r.rated_name ?? r.rated_headline ?? 'a card'}
-                {r.dealt_in ? ` · dealt in ${r.dealt_in}` : ''}
+                {r.dealt_in ? ` Â· dealt in ${r.dealt_in}` : ''}
               </p>
             </div>
           ))
@@ -1278,12 +1278,12 @@ function Premium({ onError }: { onError: OnError }) {
                   <tr key={b.id}>
                     <td>{fmtDate(b.created_at)}</td>
                     <td>{b.kind}</td>
-                    <td>{b.provider ?? '—'}</td>
-                    <td>{b.plan ?? '—'}</td>
+                    <td>{b.provider ?? 'â€”'}</td>
+                    <td>{b.plan ?? 'â€”'}</td>
                     <td className="align-right">
-                      {b.amount_minor == null ? '—' : `${(b.amount_minor / 100).toFixed(2)} ${b.currency ?? ''}`}
+                      {b.amount_minor == null ? 'â€”' : `${(b.amount_minor / 100).toFixed(2)} ${b.currency ?? ''}`}
                     </td>
-                    <td className="tiny dim">{b.user_email ?? '—'}</td>
+                    <td className="tiny dim">{b.user_email ?? 'â€”'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1332,14 +1332,14 @@ function Content({ onError }: { onError: OnError }) {
             {playbooks.map((p) => (
               <tr key={p.slug}>
                 <td>{p.title}</td>
-                <td>{p.sector ?? '—'}</td>
-                <td>{p.country_iso3 ?? '—'}</td>
+                <td>{p.sector ?? 'â€”'}</td>
+                <td>{p.country_iso3 ?? 'â€”'}</td>
                 <td>
                   <span className={`badge ${p.premium_only ? 'premium' : 'on'}`}>
                     {p.premium_only ? 'Premium' : 'Free'}
                   </span>
                 </td>
-                <td className="align-right">{p.reading_minutes ?? '—'}</td>
+                <td className="align-right">{p.reading_minutes ?? 'â€”'}</td>
                 <td>{fmtDate(p.published_at)}</td>
               </tr>
             ))}
@@ -1434,7 +1434,7 @@ function Feedback({ t, onError }: { t: Toaster; onError: OnError }) {
               ) : (
                 'Not signed in, no reply address'
               )}
-              {r.path ? ` · from ${r.path}` : ''}
+              {r.path ? ` Â· from ${r.path}` : ''}
             </p>
 
             <div className="row" style={{ gap: 6 }}>

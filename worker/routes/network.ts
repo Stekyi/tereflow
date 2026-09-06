@@ -61,6 +61,29 @@ network.get('/cards/me', async (c) => {
   return json({ card: row ? toCard(row) : null });
 });
 
+/**
+ * Remove your own card.
+ *
+ * Unpublishing hides a card but leaves the row, and the row holds a phone
+ * number, a website and a city. Somebody who put those in must be able to take
+ * them out again.
+ *
+ * Ratings are deliberately not touched: they are keyed on users, not cards,
+ * because a reputation belongs to the person and deleting a card should not be
+ * a way to shed it.
+ */
+network.delete('/cards/me', async (c) => {
+  const user = await currentUser(c.req.raw, c.env);
+  if (!user) return bad('Sign in first', 401);
+
+  const result = await c.env.DB.prepare('DELETE FROM business_cards WHERE user_id = ?')
+    .bind(user.id)
+    .run();
+
+  if (!result.meta.changes) return bad('You do not have a card', 404);
+  return json({ deleted: true });
+});
+
 /** Upsert. One card per user, so this is a PUT rather than a POST. */
 network.put('/cards/me', async (c) => {
   const user = await currentUser(c.req.raw, c.env);

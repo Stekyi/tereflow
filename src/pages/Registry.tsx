@@ -54,7 +54,7 @@ export default function Registry() {
     <>
       <p className="small dim" style={{ marginTop: 0 }}>
         Every official publication this platform reads from. {entities.length} bodies, {linkTotal}{' '}
-        links, re-checked every Friday.
+        links, re-checked on every pipeline run.
       </p>
 
       <input

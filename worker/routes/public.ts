@@ -175,10 +175,21 @@ pub.get('/dashboard/:slug', async (c) => {
     computed_at: computed?.at ?? null,
   };
 
-  return json(payload, 200, { 'cache-control': 'private, max-age=300' });
+  // Cached only for anonymous readers. The payload's `opportunities` field
+  // depends on the caller's entitlement, so caching it for a signed-in reader
+  // means somebody who just upgraded keeps seeing the locked version for the
+  // rest of the window, and any cache that ignored `private` would be holding
+  // one reader's entitlement level and serving it to another.
+  return json(
+    payload,
+    200,
+    viewer
+      ? { 'cache-control': 'no-store', vary: 'Cookie' }
+      : { 'cache-control': 'public, max-age=300', vary: 'Cookie' },
+  );
 });
 
-/** Where the numbers came from — shown under every dashboard. */
+/** Where the numbers came from â€” shown under every dashboard. */
 pub.get('/dashboard/:slug/sources', async (c) => {
   const entity = await getEntityBySlug(c.env.DB, c.req.param('slug'));
   if (!entity) return bad('Not found', 404);
@@ -451,15 +462,25 @@ pub.get('/products/:hs', async (c) => {
     return bad('hs must be a 2-digit chapter or 6-digit product code', 400);
   }
   const isSpecific = hs.length === 6;
-  const pattern = isSpecific ? hs : `${hs}%`;
   const chapter = hs.slice(0, 2);
 
+  // Exact match, never a prefix.
+  //
+  // trade_facts holds the same trade at two levels: the HS2 chapter row and
+  // its HS6 children. `hs_code LIKE '71%'` matches both, so a chapter page
+  // summed every dollar twice: Ghana's chapter 71 read $40.35bn against a real
+  // $20.18bn. Worse, it was not even a constant factor, because a year whose
+  // HS6 detail was never fetched has no children to double, so the error
+  // appeared and vanished from one year to the next.
+  //
+  // A chapter request reads the chapter row. A product request reads the
+  // product row. Nothing sums across levels.
   const sideFor = async (flow: Flow): Promise<ProductCountry[]> => {
     const { results } = await c.env.DB.prepare(
       `WITH matched AS (
          SELECT entity_id, year, SUM(value_usd) AS value_usd
            FROM trade_facts
-          WHERE hs_code LIKE ? AND flow = ? AND stream = 'goods' AND partner_iso3 IS NULL
+          WHERE hs_code = ? AND flow = ? AND stream = 'goods' AND partner_iso3 IS NULL
           GROUP BY entity_id, year
        ),
        latest AS (SELECT entity_id, MAX(year) AS year FROM matched GROUP BY entity_id)
@@ -473,7 +494,7 @@ pub.get('/products/:hs', async (c) => {
         ORDER BY m.value_usd DESC
         LIMIT ?`,
     )
-      .bind(pattern, flow, hs, flow, MARKET_TOP_N)
+      .bind(hs, flow, hs, flow, MARKET_TOP_N)
       .all<Omit<ProductCountry, 'rank'>>();
     return (results ?? []).map((r, i) => ({ ...r, rank: i + 1 }));
   };
@@ -744,7 +765,7 @@ pub.get('/opportunities', async (c) => {
   // dominant legacy commodity (Ghanaian cocoa is always top-5, never a
   // "signal"). What that exclusion does NOT catch is a smaller, growing
   // mining/oil-type category that isn't top-5 yet but is still never
-  // realistically SME-accessible — the universal defaults + admin overrides
+  // realistically SME-accessible â€” the universal defaults + admin overrides
   // below catch that.
   const classificationsByEntity = await loadClassificationsBulk(
     c.env.DB,
@@ -782,13 +803,13 @@ pub.get('/opportunities', async (c) => {
   return json({ opportunities: [...products, ...services], count: products.length + services.length });
 });
 
-/** How many countries Marketplace shows per side (exporters / importers) of a product. */
+/** How many countries the product view shows per side (exporters / importers) of a product. */
 const MARKET_TOP_N = 10;
 
 /**
  * Live search over the specific products actually reported in the data --
  * "Fruit, edible; pineapples, fresh or dried", not the 2-digit chapter
- * "Fruit & nuts" -- for the Marketplace search typeahead. Hides
+ * "Fruit & nuts" -- for the product search typeahead. Hides
  * traditional/gated categories by default (oil, mining, precious metals, a
  * country's own dominant commodity): those are exactly the obvious
  * big-player categories an SME isn't shopping for. Pass all=1 to see them.
@@ -798,17 +819,25 @@ pub.get('/market/hs-codes', async (c) => {
   const includeTraditional = c.req.query('all') === '1';
   const LIMIT = q ? 60 : 30;
 
+  // Restricted to the specific-product level and to world-total rows.
+  //
+  // Without the level filter this ranks HS2 chapters and their HS6 children in
+  // one list, which both double-counts the underlying trade and puts a chapter
+  // above every product inside it. This endpoint exists to find a specific
+  // line, so it lists specific lines.
   const { results } = await c.env.DB.prepare(
     q
       ? `SELECT hs_code, MAX(product_name) AS product_name, SUM(value_usd) AS total_value
            FROM trade_facts
-          WHERE stream = 'goods' AND hs_code IS NOT NULL AND flow = 'export' AND product_name LIKE ?
+          WHERE stream = 'goods' AND length(hs_code) = 6 AND partner_iso3 IS NULL
+            AND flow = 'export' AND product_name LIKE ?
           GROUP BY hs_code
           ORDER BY total_value DESC
           LIMIT ?`
       : `SELECT hs_code, MAX(product_name) AS product_name, SUM(value_usd) AS total_value
            FROM trade_facts
-          WHERE stream = 'goods' AND hs_code IS NOT NULL AND flow = 'export'
+          WHERE stream = 'goods' AND length(hs_code) = 6 AND partner_iso3 IS NULL
+            AND flow = 'export'
           GROUP BY hs_code
           ORDER BY total_value DESC
           LIMIT ?`,
@@ -831,9 +860,9 @@ pub.get('/market/hs-codes', async (c) => {
 });
 
 /**
- * Marketplace: for one HS2 product/service chapter, rank every country by
+ * Product view: for one HS2 product/service chapter, rank every country by
  * trade volume. Partner detail attached per country is that country's own
- * general trading partners (already computed) — never product-specific,
+ * general trading partners (already computed) â€” never product-specific,
  * because Comtrade's keyless tier never fetches partner x HS-code together.
  */
 pub.get('/market/products', async (c) => {
@@ -843,10 +872,11 @@ pub.get('/market/products', async (c) => {
   if (!isChapter && !isSpecific) {
     return bad('hs must be a 2-digit HS chapter or 6-digit HS product code', 400);
   }
-  // A chapter search aggregates every specific line reported under it (all
-  // the gold sub-headings as one "Pearls, gems & precious metals" figure);
-  // a 6-digit search is the exact specific product line.
-  const pattern = isSpecific ? hs : `${hs}%`;
+  // Exact match at whichever level was asked for. A chapter request reads the
+  // chapter row, which already contains everything under it. Matching on a
+  // prefix would also pick up the HS6 children stored alongside it and count
+  // the same trade twice. See the note in /products/:hs.
+  const pattern = hs;
 
   interface Row {
     id: string;
@@ -863,7 +893,7 @@ pub.get('/market/products', async (c) => {
       `WITH matched AS (
          SELECT entity_id, year, SUM(value_usd) AS value_usd
            FROM trade_facts
-          WHERE hs_code LIKE ? AND flow = ? AND stream = 'goods' AND partner_iso3 IS NULL
+          WHERE hs_code = ? AND flow = ? AND stream = 'goods' AND partner_iso3 IS NULL
           GROUP BY entity_id, year
        ),
        latest AS (
@@ -898,7 +928,7 @@ pub.get('/market/products', async (c) => {
 
   const strip = (rows: (Row & { rank: number })[]) => rows.map(({ id, ...rest }) => rest);
 
-  // Global framing only here: a Marketplace search spans every country at
+  // Global framing only here: a product search spans every country at
   // once, so this reflects the universal defaults / admin-curated overrides
   // for the category itself, not any one country's own export mix (see
   // /dashboard/:slug for the per-country, dominant-commodity-aware version).

@@ -10,6 +10,44 @@ import { portal } from './routes/portal';
 
 const app = new Hono<{ Bindings: Env }>();
 
+/**
+ * Baseline response headers.
+ *
+ * The XSS surface here is already small: React escapes everything and the one
+ * markdown renderer builds nodes rather than HTML. These are the cheap
+ * defences that matter anyway, in particular framing, which the admin portal
+ * needs, and nosniff, which stops a stored string being reinterpreted as a
+ * script by content sniffing.
+ *
+ * The CSP is deliberately not `unsafe-inline` for scripts. It allows inline
+ * styles because the UI sets them on elements, and allows data: images for the
+ * inline SVG marks.
+ */
+app.use('*', async (c, next) => {
+  await next();
+  const h = c.res.headers;
+  h.set('x-content-type-options', 'nosniff');
+  h.set('referrer-policy', 'strict-origin-when-cross-origin');
+  h.set('x-frame-options', 'DENY');
+  h.set('permissions-policy', 'geolocation=(), microphone=(), camera=(), payment=()');
+  if (!h.has('content-security-policy')) {
+    h.set(
+      'content-security-policy',
+      [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: https:",
+        "connect-src 'self'",
+        "font-src 'self' data:",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+      ].join('; '),
+    );
+  }
+});
+
 app.get('/api/health', (c) =>
   c.json({ ok: true, app: c.env.APP_NAME ?? 'Tereflow', ts: new Date().toISOString() }),
 );

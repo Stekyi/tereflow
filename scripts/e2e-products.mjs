@@ -1,4 +1,4 @@
-﻿/**
+/**
  * End-to-end check of the product-first surface against a running dev server.
  *   npm run dev:worker              (terminal 1)
  *   node scripts/e2e-products.mjs   (terminal 2)
@@ -186,6 +186,89 @@ async function main() {
       dash.name,
     );
   }
+
+  // --- granularity integrity ----------------------------------------------
+  // trade_facts holds the same trade at two levels: HS2 chapters and their HS6
+  // children. Every one of these checks exists because a query matched across
+  // both and doubled the money.
+  console.log('\nGranularity');
+
+  const chapterPage = await get('/api/products/71');
+  const leafPage = await get('/api/products/710812');
+  check('a chapter page loads', chapterPage.status === 200);
+  check('a specific product page loads', leafPage.status === 200);
+
+  // The decisive test: a chapter's figure must never exceed the sum of the
+  // countries' own reported totals, and must equal the chapter row rather than
+  // the chapter row plus its children.
+  const chapterExporters = chapterPage.body?.exporters ?? [];
+  const leafExporters = leafPage.body?.exporters ?? [];
+  const chapterGhana = chapterExporters.find((r) => r.slug === 'ghana');
+  const leafGhana = leafExporters.find((r) => r.slug === 'ghana');
+  if (chapterGhana && leafGhana) {
+    check(
+      'a leaf product never exceeds its own chapter',
+      leafGhana.value_usd <= chapterGhana.value_usd * 1.001,
+      `leaf ${(leafGhana.value_usd / 1e9).toFixed(2)}bn vs chapter ${(chapterGhana.value_usd / 1e9).toFixed(2)}bn`,
+    );
+  }
+
+  // A country's chapter figure must not exceed its total exports. Doubling
+  // showed up here first: Ghana's chapter 71 read $40bn against $32bn of total
+  // exports, which is impossible.
+  const countryList = (await get('/api/countries')).body?.countries ?? [];
+  const byslug = new Map(countryList.map((r) => [r.slug, r]));
+  const impossible = chapterExporters.filter((r) => {
+    const country = byslug.get(r.slug);
+    return country?.export_usd != null && r.value_usd > country.export_usd * 1.001;
+  });
+  check(
+    'no chapter figure exceeds that country total exports',
+    impossible.length === 0,
+    impossible.length
+      ? impossible.map((r) => `${r.slug} ${(r.value_usd / 1e9).toFixed(1)}bn`).join(', ')
+      : `${chapterExporters.length} checked`,
+  );
+
+  // The product search exists to find a specific line, so it must not return
+  // chapters ranked above the products inside them.
+  const hsCodes = await get('/api/market/hs-codes');
+  check(
+    'the product search returns specific lines only',
+    (hsCodes.body?.codes ?? []).every((c) => c.code.length === 6),
+    `${(hsCodes.body?.codes ?? []).length} codes`,
+  );
+
+  // Growth off a negligible base is arithmetically valid and meaningless: a
+  // line worth a few thousand dollars is a rounding artifact, and comparing
+  // this year against it produced rates like 4067%/yr.
+  //
+  // The floor removes those. What it deliberately keeps is a small but real
+  // base growing into a large trade, which is a genuine new line. Those still
+  // produce a big number, so the contract is that anything past the
+  // newly-established threshold is presented as newly established rather than
+  // as a rate. This checks both halves.
+  const NEW_TRADE_THRESHOLD = 300;
+  const ABSURD = 3000;
+
+  const allProducts = (await get('/api/products?limit=120&all=1')).body?.products ?? [];
+  const absurd = allProducts.filter((p) => (p.growth_pct ?? 0) > ABSURD);
+  check(
+    'no product claims growth off a noise base',
+    absurd.length === 0,
+    absurd.length
+      ? absurd.slice(0, 3).map((p) => `${p.name} ${Math.round(p.growth_pct)}%`).join('; ')
+      : `${allProducts.length} checked, max ${Math.round(
+          Math.max(0, ...allProducts.map((p) => p.growth_pct ?? 0)),
+        )}%`,
+  );
+
+  const newTrade = allProducts.filter((p) => (p.growth_pct ?? 0) > NEW_TRADE_THRESHOLD);
+  check(
+    'lines past the threshold are all genuinely new rather than noise',
+    newTrade.every((p) => p.growth_pct <= ABSURD),
+    `${newTrade.length} newly established`,
+  );
 
   // --- feedback -----------------------------------------------------------
   // Open to signed-out visitors by design, so the checks are about the guard

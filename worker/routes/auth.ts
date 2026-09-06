@@ -154,6 +154,62 @@ auth.post('/logout', async (c) => {
   return json({ ok: true }, 200, { 'set-cookie': clearCookie(isSecureRequest(c.req.raw)) });
 });
 
+/**
+ * Close your account and remove your data.
+ *
+ * Somebody who publishes a phone number and a city has to be able to take them
+ * back. There was previously no way to do that at all, which is a problem on
+ * its own and a legal one in most of the places this app is aimed at.
+ *
+ * Requires the current password, because a hijacked session should not be able
+ * to destroy the account it borrowed.
+ *
+ * What goes: the card, subscriptions, feed items, sessions, ratings, and the
+ * account itself. Conversations cascade from the users table, so private
+ * threads this person was part of go too, including the other party's copy.
+ * That is the right call for a two-party thread: keeping half a conversation
+ * whose sender no longer exists leaves the remaining person with messages
+ * from nobody, which they can neither reply to nor report.
+ *
+ * What stays: nothing tied to this person. Aggregate counts in the portal
+ * fall accordingly rather than being backfilled.
+ */
+auth.post('/close', async (c) => {
+  const user = await currentUser(c.req.raw, c.env);
+  if (!user) return bad('Sign in first', 401);
+
+  const body = (await c.req.json().catch(() => null)) as { password?: string } | null;
+  if (!body?.password) return bad('Confirm your password to close the account');
+
+  const row = await c.env.DB.prepare(
+    'SELECT password_hash, password_salt FROM users WHERE id = ?',
+  )
+    .bind(user.id)
+    .first<{ password_hash: string; password_salt: string }>();
+  if (!row) return bad('Account not found', 404);
+
+  const ok = await verifyPassword(body.password, row.password_hash, row.password_salt);
+  if (!ok) return bad('That password is not right', 403);
+
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM business_cards WHERE user_id = ?').bind(user.id),
+    c.env.DB.prepare('DELETE FROM subscriptions WHERE user_id = ?').bind(user.id),
+    c.env.DB.prepare('DELETE FROM feed_items WHERE user_id = ?').bind(user.id),
+    c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
+    // Ratings reference users with ON DELETE CASCADE, so ratings *about* this
+    // person would go automatically. Ratings *by* them are removed explicitly
+    // here too: an unattributable score nobody can question is worse than no
+    // score, since the person rated can no longer see who said it.
+    c.env.DB.prepare('DELETE FROM ratings WHERE rater_id = ? OR subject_id = ?').bind(
+      user.id,
+      user.id,
+    ),
+    c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id),
+  ]);
+
+  return json({ closed: true }, 200, { 'set-cookie': clearCookie(isSecureRequest(c.req.raw)) });
+});
+
 /** Who am I, plus card state, unread messages and unread feed items. */
 auth.get('/me', async (c) => {
   const user = await currentUser(c.req.raw, c.env);
@@ -200,15 +256,29 @@ auth.get('/me', async (c) => {
 });
 
 /**
- * Development-only tier switch. Refused once a real payment provider is
- * configured, so it cannot become a back door in production.
+ * Development-only tier switch.
+ *
+ * This grants premium to whoever calls it, so it must be opened deliberately
+ * rather than by accident. It used to refuse only when STRIPE_SECRET_KEY was
+ * present, which asks the wrong question: "is a payment provider configured"
+ * is not "is this a development environment". Deploying before wiring up
+ * Stripe, which is exactly the state this app is in, left premium free to
+ * anybody who found the endpoint.
+ *
+ * Now it is off unless ALLOW_DEV_TIER_SWITCH is explicitly "true", and still
+ * refuses outright once a payment provider exists.
  */
 auth.post('/tier', async (c) => {
   const user = await currentUser(c.req.raw, c.env);
   if (!user) return bad('Sign in first', 401);
+
   if (c.env.STRIPE_SECRET_KEY) {
     return bad('Use /api/premium/billing/checkout, a payment provider is configured', 403);
   }
+  if (c.env.ALLOW_DEV_TIER_SWITCH !== 'true') {
+    return bad('Tier cannot be changed from the client', 403);
+  }
+
   const body = (await c.req.json().catch(() => null)) as { tier: 'free' | 'premium' } | null;
   if (!body || !['free', 'premium'].includes(body.tier)) return bad('tier must be free or premium');
 

@@ -408,6 +408,51 @@ admin.post('/ingest/start', async (c) => {
   return json({ run_id: runId });
 });
 
+/**
+ * Read a country's stored facts back.
+ *
+ * This exists so an analysis bug can be fixed without re-fetching from the
+ * source. Every figure the app shows is derived by analyse.ts from these rows,
+ * so a change to the maths previously meant re-running the whole ingest, which
+ * on the keyless Comtrade tier is rate limited to roughly one country an hour.
+ * Correcting a share calculation should not cost four days.
+ *
+ * Paged, because a country holds several thousand rows and D1 will not return
+ * them in one response.
+ */
+admin.get('/ingest/facts/:slug', async (c) => {
+  const entity = await resolveEntity(c, c.req.param('slug'));
+  if (!entity) return bad('Unknown entity', 404);
+
+  const limit = Math.min(Number(c.req.query('limit') ?? 5000) || 5000, 10000);
+  const offset = Number(c.req.query('offset') ?? 0) || 0;
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT year, flow, stream, partner_iso3, partner_name, hs_code, product_name,
+            sector, value_usd, qty, qty_unit, source_ref
+       FROM trade_facts
+      WHERE entity_id = ?
+      ORDER BY rowid
+      LIMIT ? OFFSET ?`,
+  )
+    .bind(entity.id, limit, offset)
+    .all();
+
+  const total = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM trade_facts WHERE entity_id = ?',
+  )
+    .bind(entity.id)
+    .first<{ n: number }>();
+
+  return json({
+    slug: entity.slug,
+    facts: results ?? [],
+    offset,
+    returned: results?.length ?? 0,
+    total: total?.n ?? 0,
+  });
+});
+
 /** A country was checked and had no new data -- record it, touch nothing else. */
 admin.post('/ingest/skip', async (c) => {
   const body = (await c.req.json()) as { slug: string; fingerprint: string };

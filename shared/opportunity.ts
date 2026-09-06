@@ -1,4 +1,3 @@
-import type { Flow } from './types';
 
 /**
  * A 0-100 readability score for one opportunity.
@@ -30,11 +29,6 @@ export function isNewTrade(cagr: number | null): boolean {
  * What to print where a growth rate would go. Returns null when the ordinary
  * percentage is the honest answer, so the caller formats it as usual.
  */
-export function growthLabel(cagr: number | null): string | null {
-  if (cagr == null) return 'Growth not comparable';
-  if (isNewTrade(cagr)) return 'Newly established trade';
-  return null;
-}
 export interface ScoreInput {
   cagr_3y: number | null;
   momentum: number | null;
@@ -103,19 +97,3 @@ export const SCORE_BASIS =
   'Blends growth rate, share gained, how steady the growth has been, and how big the trade already is. ' +
   'It ranks how well evidenced an opening is in the reported data. It is not a forecast of returns.';
 
-/**
- * Plain-English one-liner for a signal, used on cards where there is no room
- * for the full rationale.
- */
-export function opportunityHeadline(
-  productName: string,
-  flow: Flow,
-  countryName: string,
-  bestMarket: string | null,
-): string {
-  return flow === 'export'
-    ? `${countryName} sells more ${productName.toLowerCase()} every year` +
-        (bestMarket ? `, mostly to ${bestMarket}` : '')
-    : `${countryName} buys more ${productName.toLowerCase()} every year` +
-        (bestMarket ? `, mostly from ${bestMarket}` : '');
-}

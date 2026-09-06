@@ -56,7 +56,7 @@ export default function Feed() {
 
       <div className="section-head" style={{ marginTop: 0 }}>
         <h2>Following</h2>
-        <Link className="hint" to="/explore">
+        <Link className="hint" to="/">
           Add more ›
         </Link>
       </div>
@@ -64,11 +64,14 @@ export default function Feed() {
       {subs.length === 0 ? (
         <div className="card">
           <p className="small dim" style={{ marginTop: 0 }}>
-            Follow a product, sector or market and its weekly analysis lands here. Open any market
-            and tap Follow on a product.
+            Follow a product or a country and its weekly analysis lands here. Open any product and
+            tap Follow.
           </p>
-          <Link className="btn primary block" to="/explore">
-            Browse markets
+          <Link className="btn primary block" to="/">
+            Browse products
+          </Link>
+          <Link className="btn ghost block" to="/countries" style={{ marginTop: 8 }}>
+            Browse countries
           </Link>
         </div>
       ) : (
@@ -96,7 +99,7 @@ export default function Feed() {
           hint={
             subs.length === 0
               ? 'Follow something first.'
-              : 'The next analysis run is Friday 21:00 GMT. Items appear after it finishes.'
+              : 'Items appear here after the next pipeline run.'
           }
         />
       ) : (

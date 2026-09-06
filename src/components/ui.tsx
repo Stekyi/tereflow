@@ -101,6 +101,7 @@ export function BarRow({
   max,
   meta,
   action,
+  onClick,
 }: {
   rank: number;
   name: string;
@@ -109,10 +110,22 @@ export function BarRow({
   max: number;
   meta?: ReactNode;
   action?: ReactNode;
+  onClick?: () => void;
 }) {
   const pct = max > 0 ? Math.max(2, (share / max) * 100) : 0;
   return (
-    <div className="bar-row">
+    <div
+      className={`bar-row${onClick ? ' clickable' : ''}`}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
       <div className="bar-fill" style={{ width: `${pct}%` }} />
       <div className="bar-content">
         <span className="rank-badge">{rank}</span>

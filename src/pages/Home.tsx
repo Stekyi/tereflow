@@ -3,19 +3,19 @@ import { Link } from 'react-router-dom';
 import { api, type HomeStats } from '../lib/api';
 import { useSession } from '../lib/auth';
 import { Empty, Skeletons } from '../components/ui';
-import type { Entity } from '../../shared/types';
+import type { ExploreOpportunity } from '../../shared/types';
 
 export default function Home() {
   const [stats, setStats] = useState<HomeStats | null>(null);
-  const [active, setActive] = useState<Entity[]>([]);
+  const [opportunities, setOpportunities] = useState<ExploreOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, entitled, feedUnread } = useSession();
 
   useEffect(() => {
-    Promise.all([api.stats(), api.entities({ kind: 'country' })])
-      .then(([s, e]) => {
+    Promise.all([api.stats(), api.opportunities()])
+      .then(([s, o]) => {
         setStats(s);
-        setActive(e.entities);
+        setOpportunities(o.opportunities.slice(0, 6));
       })
       .catch(() => undefined)
       .finally(() => setLoading(false));
@@ -63,26 +63,25 @@ export default function Home() {
           </div>
 
           <div className="section-head">
-            <h2>Live markets</h2>
+            <h2>Opportunities right now</h2>
             <Link className="hint" to="/explore">
               See all ›
             </Link>
           </div>
 
-          {active.length === 0 ? (
+          {opportunities.length === 0 ? (
             <Empty
-              title="No country is activated yet"
-              hint="Open Admin, tick a country, then run the analysis to populate its dashboard."
+              title="No signals yet"
+              hint="Once a country completes its weekly analysis, growing non-traditional products and services show up here."
             />
           ) : (
-            active.slice(0, 8).map((e) => (
-              <Link className="list-item" key={e.slug} to={`/country/${e.slug}`}>
-                <span className="flag">{e.iso3 ?? '??'}</span>
+            opportunities.map((o) => (
+              <Link className="list-item" key={o.id} to={`/country/${o.slug}`}>
                 <span className="grow">
-                  <span className="name">{e.name}</span>
+                  <span className="name">{o.name}</span>
                   <span className="tiny dim">
-                    {e.continent}
-                    {e.last_ingest_at ? ` · updated ${e.last_ingest_at.slice(0, 10)}` : ' · awaiting first run'}
+                    {o.country}
+                    {o.growth_pct != null ? ` · growing ${o.growth_pct.toFixed(0)}%/yr` : ''}
                   </span>
                 </span>
                 <span className="dim">›</span>

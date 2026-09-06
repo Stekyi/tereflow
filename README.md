@@ -18,7 +18,8 @@ Working name only — change `APP_NAME` in `wrangler.toml` and the `<title>` in
 | Admin form with three link slots per data category | done |
 | Activation tick per record, plus bulk tick | done |
 | Weekly analysis agent | done |
-| Local pipeline, scheduled Friday 21:00 GMT | done |
+| Local pipeline, scheduled Friday 21:00 GMT, skips countries with no new data | done |
+| Traditional vs Non-Traditional Export classification, admin-curated | done |
 | Country dashboard: trend, products, partners, recommendations | done |
 | Early-signal engine behind a premium gate | done |
 | Free registration and sessions | done |
@@ -265,6 +266,40 @@ and subscribe it to `checkout.session.completed`, `invoice.payment_succeeded`,
 
 ---
 
+## Traditional vs Non-Traditional Exports
+
+Tereflow is for SMEs, not commodity traders -- they already have their own
+analytics and will never be its users. Gold, crude oil, and (in a given
+country) that country's own dominant legacy commodity -- Ghanaian cocoa, say
+-- are **Traditional Exports**: capital-intensive, licensed, and effectively
+closed to a new small exporter. Shea butter, moringa, pineapple, mango and
+similar processed or horticultural goods are **Non-Traditional Exports
+(NTEs)**, the same distinction real export-promotion agencies use (Ghana's
+GEPA and its regional equivalents).
+
+Every HS2 product category is classified, resolved cheapest-first:
+
+1. **Universal default** (seeded in `migrations/0006_export_classification.sql`):
+   metal ores, mineral fuels/oil, and precious metals/gems -- capital-intensive
+   and licensed almost everywhere, regardless of country.
+2. **Per-country heuristic**, computed at read time from data already on hand:
+   a country's own top 2-3 exports, if one carries an outsized share (25%+) of
+   everything it sells, count as *its* dominant legacy commodity. This is what
+   catches Ghanaian/Ivorian cocoa or Kenyan/Ethiopian coffee without hand-listing
+   every country.
+3. **Admin override**, curated over time via `PUT /api/admin/classifications`
+   with a cited source (e.g. GEPA's actual published list) -- always wins over
+   the above two.
+
+This is resolved at serving time (`worker/lib/classify.ts`), not baked in
+during the weekly pipeline run, so an admin edit takes effect immediately
+rather than waiting for Friday's cron. `GET /api/opportunities` (the
+SME-facing "Products" view) excludes traditional-tagged items by default;
+Marketplace and the country dashboard still show them but badge them honestly
+rather than presenting cocoa and shea butter as equally accessible.
+
+---
+
 ## Running the pipeline
 
 **The pipeline does not run in the cloud.** Fetching and analysing happen on a
@@ -273,10 +308,12 @@ machine you control, which then pushes finished analysis to the Worker.
 Three reasons:
 
 **It is the only way to cover the whole registry.** Workers cap subrequests per
-invocation at 50 on the free plan. Keyless, one country costs about 23 calls,
+invocation at 50 on the free plan. Keyless, one country costs about 18 calls,
 because the UN Comtrade preview endpoint accepts a single year per request. A
 cloud run managed two countries and rotated, so a full pass took six weeks.
-Locally there is no cap: 90 countries finish in roughly an hour.
+Locally there is no cap: 90 countries finish in roughly an hour -- and most
+weeks it's faster than that, since a country whose source data hasn't changed
+since the last run is skipped after a 2-4 call check (see below).
 
 **It costs nothing.** The heavy work runs on hardware you already own. The
 Worker stays on the free tier doing what it is genuinely good at, which is
@@ -318,6 +355,27 @@ node local/dist/pipeline.mjs --limit 10
 A dry run is the safe way to check a change: it fetches and analyses exactly as
 normal and prints the headline figures, but touches nothing in the cloud.
 
+### Skipping countries with no new data
+
+Before doing the expensive fetch for a country, the pipeline runs a cheap
+probe -- the latest reported year's world totals only, 2-4 Comtrade calls
+instead of ~18 -- plus the (already cheap) World Bank fetch, and compares the
+result against what was stored last time. If nothing has moved and the
+country has been ingested before, it's skipped entirely: no full fetch, no
+re-analysis, no publish. The console summary and `analysis_runs.entities_skipped`
+both reflect this.
+
+```bash
+node local/dist/pipeline.mjs --force      # ignore the check, always do the full fetch
+```
+
+`--force` is for when you've changed `analyse.ts` itself and want everyone
+recomputed even though the source data is unchanged. One disclosed limitation:
+the probe only compares the latest reported year, so a rare revision to an
+*older* year that doesn't move the latest year's totals could be missed until
+the next real change (or a `--force` run) -- catching that would require doing
+the full fetch every time, which defeats the point.
+
 ### Scheduling it
 
 Friday 21:00 GMT, on your machine or any always-on box.
@@ -349,7 +407,7 @@ per year, per flow) and 15s publishing. Ninety countries is a little over an
 hour, which is fine for an overnight job.
 
 A free key at <https://comtradedeveloper.un.org/> lets the adapter request
-several years in one call, cutting a country to about 9 requests. Put it in
+several years in one call, cutting a country to about 4 requests. Put it in
 `local/.env` as `COMTRADE_API_KEY`. It is not a Worker secret any more, because
 the Worker no longer fetches anything.
 

@@ -150,9 +150,14 @@ export default function Admin() {
         <span className="small dim">
           {entities.length} records · {activeCount} active
         </span>
-        <Link className="btn primary sm" to="/admin/new">
-          + New record
-        </Link>
+        <span className="row" style={{ gap: 8 }}>
+          <Link className="btn ghost sm" to="/admin/classifications">
+            Export classification
+          </Link>
+          <Link className="btn primary sm" to="/admin/new">
+            + New record
+          </Link>
+        </span>
       </div>
 
       <div className="row" style={{ gap: 8, marginBottom: 12 }}>

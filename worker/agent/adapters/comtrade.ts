@@ -1,6 +1,6 @@
 import type { Env } from '../../lib/db';
 import type { AdapterResult, FactRow } from '../types';
-import { ISO3_TO_M49, M49_TO_ISO3, hs2Label, hs2Sector } from '../codes';
+import { ISO3_TO_M49, M49_TO_ISO3, hs2Sector, hs6Label } from '../codes';
 import { ISO3_NAME } from '../country-names';
 
 const PREVIEW = 'https://comtradeapi.un.org/public/v1/preview/C/A/HS';
@@ -48,6 +48,7 @@ export async function fetchComtrade(
   env: Env,
   iso3: string,
   years: number[],
+  perCallDelayMs = 0,
 ): Promise<AdapterResult> {
   const reporter = ISO3_TO_M49[iso3?.toUpperCase()];
   if (!reporter) {
@@ -61,6 +62,7 @@ export async function fetchComtrade(
 
   const hasKey = Boolean(env.COMTRADE_API_KEY);
   const rows: FactRow[] = [];
+  const seenRows = new Set<string>();
   const notes: string[] = [];
   const yearsWithData = new Set<number>();
   // Track per flow so the product pass only targets years that reported both
@@ -70,12 +72,31 @@ export async function fetchComtrade(
     import: new Set(),
   };
 
+  // Defensive: aggregatesOnly() only dedupes within one response. Nothing
+  // upstream currently produces overlapping periods across calls, but a
+  // duplicate row here would silently double-count a country's whole trade
+  // total, so the cheapest possible guard is applied at the point everything
+  // funnels through anyway.
+  const pushRow = (row: FactRow) => {
+    const key = `${row.year}|${row.flow}|${row.partner_iso3 ?? ''}|${row.hs_code ?? ''}`;
+    if (seenRows.has(key)) return;
+    seenRows.add(key);
+    rows.push(row);
+  };
+
+  let callsMade = 0;
+  const paced = async (params: Record<string, string | number>) => {
+    if (perCallDelayMs > 0 && callsMade > 0) await sleep(perCallDelayMs);
+    callsMade++;
+    return call(env, hasKey, params);
+  };
+
   // Pass 1 — country totals and partner mix per year.
   // This also tells us which years actually have data.
   for (const [flowCode, flow] of FLOWS) {
     const periods = hasKey ? [years.join(',')] : years.map(String);
     for (const period of periods) {
-      const res = await call(env, hasKey, {
+      const res = await paced({
         reporterCode: reporter,
         period,
         cmdCode: 'TOTAL',
@@ -88,7 +109,7 @@ export async function fetchComtrade(
       for (const r of aggregatesOnly(res.data)) {
         const value = Number(r.primaryValue ?? 0);
         const year = Number(r.refYear ?? r.period ?? 0);
-        if (!value || !year) continue;
+        if (!(value > 0) || !year) continue;
 
         const partnerCode = Number(r.partnerCode ?? -1);
         const isWorld = partnerCode === 0;
@@ -103,7 +124,7 @@ export async function fetchComtrade(
 
         yearsWithData.add(year);
         if (isWorld) yearsByFlow[flow].add(year);
-        rows.push({
+        pushRow({
           year,
           flow,
           stream: 'goods',
@@ -141,11 +162,14 @@ export async function fetchComtrade(
     const periods = hasKey ? [productYears.join(',')] : productYears.map(String);
     for (const period of periods) {
       if (!period) continue;
-      const res = await call(env, hasKey, {
+      const res = await paced({
         reporterCode: reporter,
         period,
         partnerCode: '0',
-        cmdCode: 'AG2',
+        // 6-digit: the specific tradeable line ("pineapples, fresh or
+        // dried"), not the 2-digit chapter ("Fruit & nuts") -- an SME
+        // deciding what to trade in needs the former, not the latter.
+        cmdCode: 'AG6',
         flowCode,
       });
       if (res.error) {
@@ -155,19 +179,17 @@ export async function fetchComtrade(
       for (const r of aggregatesOnly(res.data)) {
         const value = Number(r.primaryValue ?? 0);
         const year = Number(r.refYear ?? r.period ?? 0);
-        if (!value || !year) continue;
-        const hs = String(r.cmdCode ?? '')
-          .padStart(2, '0')
-          .slice(0, 2);
-        if (!/^\d{2}$/.test(hs)) continue;
-        rows.push({
+        if (!(value > 0) || !year) continue;
+        const hs = hs6CodeOf(r.cmdCode);
+        if (!hs) continue;
+        pushRow({
           year,
           flow,
           stream: 'goods',
           partner_iso3: null,
           partner_name: null,
           hs_code: hs,
-          product_name: hs2Label(hs, r.cmdDesc || null),
+          product_name: hs6Label(hs, r.cmdDesc || null),
           sector: hs2Sector(hs),
           value_usd: value,
           qty: r.netWgt ?? null,
@@ -187,6 +209,70 @@ export async function fetchComtrade(
         (notes.length ? ` (${notes.length} partial failures)` : '')
       : notes.join('; ') || 'no rows returned',
   };
+}
+
+export interface ComtradeProbe {
+  ok: boolean;
+  year: number | null;
+  export_usd: number | null;
+  import_usd: number | null;
+}
+
+/**
+ * A cheap stand-in for the full fetch above, used to decide whether a country
+ * needs the full fetch at all (see local/pipeline.ts). Tries the most recent
+ * candidate year first (world totals only, both flows = 2 calls) and falls
+ * back one year if that's empty, so it costs 2-4 calls instead of the ~18 a
+ * full fetchComtrade() makes keyless.
+ */
+export async function probeComtrade(
+  env: Env,
+  iso3: string,
+  candidateYearsDescending: number[],
+): Promise<ComtradeProbe> {
+  const reporter = ISO3_TO_M49[iso3?.toUpperCase()];
+  if (!reporter) return { ok: false, year: null, export_usd: null, import_usd: null };
+  const hasKey = Boolean(env.COMTRADE_API_KEY);
+
+  for (const year of candidateYearsDescending.slice(0, 2)) {
+    const totals: Partial<Record<'export' | 'import', number>> = {};
+    for (const [flowCode, flow] of FLOWS) {
+      const res = await call(env, hasKey, {
+        reporterCode: reporter,
+        period: String(year),
+        cmdCode: 'TOTAL',
+        flowCode,
+      });
+      if (res.error) continue;
+      for (const r of aggregatesOnly(res.data)) {
+        if (Number(r.partnerCode ?? -1) !== 0) continue;
+        const value = Number(r.primaryValue ?? 0);
+        if (value > 0) totals[flow] = value;
+      }
+    }
+    if (totals.export != null && totals.import != null) {
+      return { ok: true, year, export_usd: totals.export, import_usd: totals.import };
+    }
+  }
+  return { ok: false, year: null, export_usd: null, import_usd: null };
+}
+
+/**
+ * A missing/empty cmdCode must never be treated as chapter "00" -- that
+ * chapter doesn't exist, so a blank code silently masquerading as it would
+ * corrupt the product mix with a fake category. Also reject anything that
+ * isn't a genuine 6-digit leaf code (a shorter code here would mean the API
+ * handed back a parent/aggregate row instead of the specific line asked for).
+ */
+function hs6CodeOf(cmdCode: string | undefined): string | null {
+  const raw = String(cmdCode ?? '').trim();
+  if (!raw || raw === 'TOTAL') return null;
+  const hs = raw.padStart(6, '0');
+  if (!/^\d{6}$/.test(hs) || hs.startsWith('00')) return null;
+  // 999999 is Comtrade's "commodities not specified according to kind" --
+  // real in the totals but not an actual product anyone is shopping for.
+  if (hs === '999999') return null;
+  return hs;
 }
 
 /**

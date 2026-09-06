@@ -243,6 +243,25 @@ main {
   margin: 0 auto;
 }
 
+.country-nav {
+  position: sticky;
+  top: 56px;
+  z-index: 30;
+  margin: calc(var(--pad) * -1) calc(var(--pad) * -1) 14px;
+  padding: var(--pad) var(--pad) 10px;
+  background: rgba(251, 250, 247, 0.94);
+  backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.country-nav .row {
+  margin-bottom: 12px !important;
+}
+
+.country-nav .scroll-x {
+  margin-bottom: 0;
+}
+
 /* ---------- bottom tab bar (the mobile-app feel) ---------- */
 
 .tabbar {
@@ -884,6 +903,57 @@ textarea {
   min-width: 0;
 }
 
+.opportunity-card {
+  display: block;
+  padding: 16px;
+  margin-bottom: 10px;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--gold-line);
+  border-radius: var(--r);
+  box-shadow: var(--card-shadow);
+}
+
+.opportunity-card:hover {
+  text-decoration: none;
+  border-color: var(--gold);
+  box-shadow: var(--lift);
+}
+
+.opportunity-card .small-flag {
+  width: 34px;
+  height: 26px;
+  font-size: 10px;
+}
+
+.opportunity-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 13px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.opportunity-partners {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.partner-chip {
+  padding: 4px 7px;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
 /* A name is always its own line, whatever container it sits in. */
 .name {
   display: block;
@@ -935,6 +1005,114 @@ textarea {
   margin-bottom: 6px;
   overflow: hidden;
   background: var(--bg-2);
+}
+
+.bar-row.clickable {
+  cursor: pointer;
+}
+
+.bar-row.clickable:focus-visible {
+  outline: 2px solid var(--brand-2);
+  outline-offset: 2px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(14, 28, 43, 0.46);
+}
+
+.modal {
+  width: min(720px, 100%);
+  max-height: min(760px, calc(100dvh - 36px));
+  overflow: auto;
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+}
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.product-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+  padding: 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+}
+
+.product-summary div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.product-summary strong {
+  overflow-wrap: anywhere;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.data-table th {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.data-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.data-table .align-right {
+  text-align: right;
+}
+
+@media (max-width: 560px) {
+  .modal {
+    padding: 18px;
+  }
+
+  .product-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .bar-fill {
@@ -1445,4 +1623,51 @@ textarea {
 }
 .dot.unknown {
   background: var(--dim);
+}
+
+/* Marketplace: product/service search typeahead. */
+.typeahead {
+  position: relative;
+}
+
+.typeahead-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin-top: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--lift);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.typeahead-item {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.typeahead-item:last-child {
+  border-bottom: 0;
+}
+
+.typeahead-item:hover,
+.typeahead-item:focus-visible {
+  background: var(--surface-2);
+}
+
+.typeahead-item .tiny {
+  display: block;
+  margin-top: 2px;
 }

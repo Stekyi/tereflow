@@ -2,12 +2,16 @@ import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { attachSources, bad, getEntityBySlug, json, slugify, uid } from '../lib/db';
 import { requireAdmin } from '../lib/auth';
+import { dominantCodes, loadClassifications, resolveAll } from '../lib/classify';
+import { loadResult } from './public';
 import {
   ENTITY_KINDS,
   SOURCE_CATEGORIES,
   SOURCE_FMTS,
   type Entity,
   type EntityInput,
+  type ExportCategory,
+  type Overview,
 } from '../../shared/types';
 
 export const admin = new Hono<{ Bindings: Env }>();
@@ -216,6 +220,93 @@ admin.get('/runs', async (c) => {
 });
 
 // ---------------------------------------------------------------------------
+// Traditional vs non-traditional export classification.
+//
+// entity='*' reads/writes the universal defaults (see
+// migrations/0006_export_classification.sql); any other entity slug
+// reads/writes that one country's curated override, which always wins over
+// the default and the dominant-commodity heuristic.
+// ---------------------------------------------------------------------------
+
+admin.get('/classifications', async (c) => {
+  const slug = c.req.query('entity') ?? '*';
+  let entityId = '*';
+  if (slug !== '*') {
+    const entity = await resolveEntity(c, slug);
+    if (!entity) return bad(`Unknown entity: ${slug}`, 404);
+    entityId = entity.id;
+  }
+
+  const resolved = await loadClassifications(c.env.DB, entityId);
+  const overview =
+    entityId === '*' ? null : await loadResult<Overview>(c.env.DB, entityId, 'overview');
+
+  return json({
+    entity_id: entityId,
+    rows: resolveAll(resolved, dominantCodes(overview?.export_chapter_shares)),
+  });
+});
+
+admin.put('/classifications', async (c) => {
+  const body = (await c.req.json()) as {
+    entity?: string;
+    hs_code: string;
+    category: ExportCategory;
+    note?: string | null;
+    source_url?: string | null;
+    source_label?: string | null;
+  };
+
+  const hsCode = String(body.hs_code ?? '').padStart(2, '0');
+  if (!/^\d{2}$/.test(hsCode)) return bad('hs_code must be a 2-digit HS chapter code');
+  if (!['traditional', 'non_traditional'].includes(body.category)) return bad('Invalid category');
+
+  let entityId = '*';
+  if (body.entity && body.entity !== '*') {
+    const entity = await resolveEntity(c, body.entity);
+    if (!entity) return bad(`Unknown entity: ${body.entity}`, 404);
+    entityId = entity.id;
+  }
+
+  await c.env.DB.prepare(
+    `INSERT INTO export_classifications (id, entity_id, hs_code, category, note, source_url, source_label)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (entity_id, hs_code) DO UPDATE SET
+       category = excluded.category,
+       note = excluded.note,
+       source_url = excluded.source_url,
+       source_label = excluded.source_label,
+       updated_at = datetime('now')`,
+  )
+    .bind(
+      uid('cls_'),
+      entityId,
+      hsCode,
+      body.category,
+      body.note ?? null,
+      body.source_url ?? null,
+      body.source_label ?? null,
+    )
+    .run();
+
+  return json({ ok: true });
+});
+
+/** Remove a country-specific override, falling back to the default/heuristic. */
+admin.delete('/classifications', async (c) => {
+  const slug = c.req.query('entity');
+  const hsCode = c.req.query('hs_code');
+  if (!slug || slug === '*') return bad('entity (a country slug) is required');
+  if (!hsCode) return bad('hs_code is required');
+  const entity = await resolveEntity(c, slug);
+  if (!entity) return bad(`Unknown entity: ${slug}`, 404);
+  await c.env.DB.prepare('DELETE FROM export_classifications WHERE entity_id = ? AND hs_code = ?')
+    .bind(entity.id, hsCode)
+    .run();
+  return json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
 // Ingest: how the local pipeline publishes its results.
 //
 // Fetching and analysing happens on a machine you control, not on Workers.
@@ -251,6 +342,38 @@ async function resolveEntity(c: { env: Env }, slug: string) {
     .bind(slug, slug)
     .first<{ id: string; slug: string; name: string }>();
 }
+
+/**
+ * Create the run row up front, decoupled from any one country's begin().
+ *
+ * Countries are checked for new data before anything expensive runs (see
+ * local/pipeline.ts), so the very first country in the list might turn out
+ * to be skipped -- the run still has to exist for that skip to be recorded
+ * against, which the old lazy-create-on-first-begin() path couldn't guarantee.
+ */
+admin.post('/ingest/start', async (c) => {
+  const runId = uid('run_');
+  await c.env.DB.prepare(
+    `INSERT INTO analysis_runs (id, trigger, status) VALUES (?, 'local', 'running')`,
+  )
+    .bind(runId)
+    .run();
+  return json({ run_id: runId });
+});
+
+/** A country was checked and had no new data -- record it, touch nothing else. */
+admin.post('/ingest/skip', async (c) => {
+  const body = (await c.req.json()) as { slug: string; fingerprint: string };
+  const entity = await resolveEntity(c, body.slug);
+  if (!entity) return bad(`Unknown entity: ${body.slug}`, 404);
+  await c.env.DB.prepare(
+    `UPDATE entities SET last_checked_at = datetime('now'), last_fingerprint = ?, updated_at = datetime('now')
+      WHERE id = ?`,
+  )
+    .bind(body.fingerprint, entity.id)
+    .run();
+  return json({ ok: true });
+});
 
 /** Open a run, or reuse the caller's, and clear the entity's existing facts. */
 admin.post('/ingest/begin', async (c) => {
@@ -338,6 +461,7 @@ admin.post('/ingest/commit', async (c) => {
     slug: string;
     run_id: string;
     coverage_score?: number;
+    fingerprint?: string;
     analysis: Record<string, unknown>;
     signals?: Record<string, unknown>[];
   };
@@ -390,11 +514,13 @@ admin.post('/ingest/commit', async (c) => {
 
   stmts.push(
     c.env.DB.prepare(
+      // COALESCE so a caller that omits the fingerprint (or a probe that
+      // failed) never wipes a previously-good one.
       `UPDATE entities
-          SET last_ingest_at = datetime('now'), last_error = NULL,
-              coverage_score = ?, updated_at = datetime('now')
+          SET last_ingest_at = datetime('now'), last_checked_at = datetime('now'), last_error = NULL,
+              coverage_score = ?, last_fingerprint = COALESCE(?, last_fingerprint), updated_at = datetime('now')
         WHERE id = ?`,
-    ).bind(body.coverage_score ?? 0, entity.id),
+    ).bind(body.coverage_score ?? 0, body.fingerprint ?? null, entity.id),
   );
 
   // D1 caps a batch, so apply in slices.
@@ -431,6 +557,7 @@ admin.post('/ingest/finish', async (c) => {
     entities_total: number;
     entities_ok: number;
     entities_failed: number;
+    entities_skipped?: number;
     facts_written: number;
     log?: unknown;
   };
@@ -450,7 +577,7 @@ admin.post('/ingest/finish', async (c) => {
   await c.env.DB.prepare(
     `UPDATE analysis_runs
         SET finished_at = datetime('now'), status = ?, entities_total = ?,
-            entities_ok = ?, entities_failed = ?, facts_written = ?, log = ?
+            entities_ok = ?, entities_failed = ?, entities_skipped = ?, facts_written = ?, log = ?
       WHERE id = ?`,
   )
     .bind(
@@ -458,6 +585,7 @@ admin.post('/ingest/finish', async (c) => {
       body.entities_total,
       body.entities_ok,
       body.entities_failed,
+      body.entities_skipped ?? 0,
       body.facts_written,
       JSON.stringify({ log: body.log ?? null, feed, feedError }).slice(0, 8000),
       body.run_id,

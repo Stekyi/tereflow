@@ -16,11 +16,14 @@ import { CHART } from '../lib/theme';
 import { Term } from '../components/Term';
 import { BarRow, Chips, Empty, FollowButton, Skeletons, Stat, useToast } from '../components/ui';
 import {
+  EXPORT_CATEGORY_HINT,
+  EXPORT_CATEGORY_LABEL,
   fmtPct,
   fmtUsd,
   linkHealth,
   LINK_HEALTH_LABEL,
   type CountryDashboard,
+  type ProductBreakdown,
   type RankedItem,
   type Recommendation,
 } from '../../shared/types';
@@ -42,6 +45,12 @@ export default function Country() {
   const tier = user?.tier ?? 'free';
   const t = useToast();
   const [subs, setSubs] = useState<Map<string, string>>(new Map());
+  const [productDetail, setProductDetail] = useState<ProductBreakdown | null>(null);
+  const [productLoading, setProductLoading] = useState(false);
+  // Traditional/gated products (gold, oil, ...) are hidden from the products
+  // list by default -- an SME can't act on them -- with an explicit toggle
+  // to reveal them, rather than ranking them alongside things it can trade.
+  const [showMajor, setShowMajor] = useState(false);
 
   // Key a subscription by kind+value so follow state survives a re-render.
   const subKey = (kind: string, value: string) => `${kind}:${value.toLowerCase()}`;
@@ -91,6 +100,19 @@ export default function Country() {
     }
   }
 
+  async function openProduct(item: RankedItem, flow: 'export' | 'import') {
+    if (!item.code) return;
+    setProductLoading(true);
+    setProductDetail(null);
+    try {
+      setProductDetail(await api.productBreakdown(slug, flow, item.code));
+    } catch (e) {
+      t.err((e as Error).message);
+    } finally {
+      setProductLoading(false);
+    }
+  }
+
   useEffect(() => {
     setLoading(true);
     setError('');
@@ -130,32 +152,43 @@ export default function Country() {
 
   return (
     <>
-      <Header
-        name={data.entity.name}
-        iso3={data.entity.iso3}
-        sub={`${data.entity.continent ?? ''} · figures for ${o.year}`}
-        action={
-          <FollowButton
-            kind="country"
-            value={data.entity.slug}
-            label={data.entity.name}
-            following={subs.has(subKey('country', data.entity.slug))}
-            onChange={toggleFollow}
-          />
-        }
-      />
+      <div className="country-nav">
+        <Header
+          name={data.entity.name}
+          iso3={data.entity.iso3}
+          sub={`${data.entity.continent ?? ''} · figures for ${o.year}`}
+          action={
+            <FollowButton
+              kind="country"
+              value={data.entity.slug}
+              label={data.entity.name}
+              following={subs.has(subKey('country', data.entity.slug))}
+              onChange={toggleFollow}
+            />
+          }
+        />
+        <Chips
+          options={[
+            { value: 'summary' as Tab, label: 'Summary' },
+            { value: 'products' as Tab, label: 'Products' },
+            { value: 'partners' as Tab, label: 'Partners' },
+            { value: 'outlook' as Tab, label: 'Outlook' },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
+      </div>
       {t.node}
-
-      <Chips
-        options={[
-          { value: 'summary' as Tab, label: 'Summary' },
-          { value: 'products' as Tab, label: 'Products' },
-          { value: 'partners' as Tab, label: 'Partners' },
-          { value: 'outlook' as Tab, label: 'Outlook' },
-        ]}
-        value={tab}
-        onChange={setTab}
-      />
+      {(productLoading || productDetail) && (
+        <ProductModal
+          detail={productDetail}
+          loading={productLoading}
+          onClose={() => {
+            setProductDetail(null);
+            setProductLoading(false);
+          }}
+        />
+      )}
       <div style={{ height: 14 }} />
 
       {tab === 'summary' && (
@@ -344,14 +377,27 @@ export default function Country() {
           <p className="tiny dim" style={{ marginTop: 0 }}>
             Tap ☆ on a product to follow it. Its weekly analysis then lands in your feed.
           </p>
+          <label className="row small dim" style={{ gap: 6, marginBottom: 10, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={showMajor}
+              onChange={(e) => setShowMajor(e.target.checked)}
+              style={{ width: 'auto' }}
+            />
+            Also show major/traditional trade (gold, oil, and similar — large-scale and licensed)
+          </label>
           <Ranked
             title="What it sells most"
-            items={data.top_exports}
+            items={reRank(data.top_exports, showMajor)}
+            flow="export"
+            onProductClick={openProduct}
             follow={{ subs, toggle: toggleFollow, subKey }}
           />
           <Ranked
             title="What it buys most"
-            items={data.top_imports}
+            items={reRank(data.top_imports, showMajor)}
+            flow="import"
+            onProductClick={openProduct}
             follow={{ subs, toggle: toggleFollow, subKey }}
           />
         </>
@@ -518,14 +564,26 @@ interface FollowWiring {
   subKey: (kind: string, value: string) => string;
 }
 
+/** Drops traditional/gated products unless explicitly revealed, then
+ *  renumbers so the visible list reads as a clean 1..N ranking rather than
+ *  showing gaps where a hidden item used to sit. */
+function reRank(items: RankedItem[], showMajor: boolean): RankedItem[] {
+  const visible = showMajor ? items : items.filter((i) => i.category !== 'traditional');
+  return visible.map((i, idx) => ({ ...i, rank: idx + 1 }));
+}
+
 function Ranked({
   title,
   items,
   follow,
+  flow,
+  onProductClick,
 }: {
   title: string;
   items: RankedItem[];
   follow?: FollowWiring;
+  flow?: 'export' | 'import';
+  onProductClick?: (item: RankedItem, flow: 'export' | 'import') => void;
 }) {
   if (!items.length) return null;
   const max = Math.max(...items.map((i) => i.share_pct), 1);
@@ -553,6 +611,15 @@ function Ranked({
           }
           meta={
             <>
+              {i.category && (
+                <span
+                  className={`badge ${i.category === 'traditional' ? 'watch' : 'on'}`}
+                  style={{ marginRight: 6 }}
+                  title={EXPORT_CATEGORY_HINT[i.category]}
+                >
+                  {EXPORT_CATEGORY_LABEL[i.category]}
+                </span>
+              )}
               {i.share_pct.toFixed(1)}% share
               {i.cagr_3y != null && (
                 <>
@@ -566,8 +633,119 @@ function Ranked({
               )}
             </>
           }
+          onClick={
+            flow && onProductClick && i.code ? () => onProductClick(i, flow) : undefined
+          }
         />
       ))}
+    </div>
+  );
+}
+
+function ProductModal({
+  detail,
+  loading,
+  onClose,
+}: {
+  detail: ProductBreakdown | null;
+  loading: boolean;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!loading && !detail) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [detail, loading, onClose]);
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="product-modal-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="row between" style={{ gap: 12 }}>
+          <div>
+            <p className="overline" style={{ margin: 0 }}>
+              Product breakdown
+            </p>
+            <h2 id="product-modal-title" style={{ margin: '3px 0 0', fontSize: 24 }}>
+              {detail?.product_name ?? 'Loading product details'}
+            </h2>
+          </div>
+          <button className="icon-btn" type="button" onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </div>
+
+        {loading || !detail ? (
+          <div className="skeleton" style={{ height: 120, marginTop: 18 }} />
+        ) : (
+          <>
+            <div className="product-summary">
+              <div>
+                <span className="tiny dim">Flow</span>
+                <strong>{detail.flow === 'export' ? 'Exported' : 'Imported'}</strong>
+              </div>
+              <div>
+                <span className="tiny dim">Year</span>
+                <strong>{detail.year}</strong>
+              </div>
+              <div>
+                <span className="tiny dim">Product total</span>
+                <strong>{fmtUsd(detail.product_value_usd)}</strong>
+              </div>
+              <div>
+                <span className="tiny dim">Volume</span>
+                <strong>
+                  {detail.product_qty != null
+                    ? `${detail.product_qty.toLocaleString()}${detail.product_qty_unit ? ` ${detail.product_qty_unit}` : ''}`
+                    : 'Not reported'}
+                </strong>
+              </div>
+            </div>
+            <p className="small muted" style={{ margin: '16px 0 10px' }}>
+              {detail.note}
+            </p>
+            {detail.rows.length ? (
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Trading partner</th>
+                      <th>Volume</th>
+                      <th className="align-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.rows.map((row, index) => (
+                      <tr key={`${row.partner_iso3 ?? row.partner_name}-${index}`}>
+                        <td>
+                          <strong>{row.partner_name}</strong>
+                          {row.partner_iso3 && <span className="tiny dim"> {row.partner_iso3}</span>}
+                        </td>
+                        <td>
+                          {row.qty != null
+                            ? `${row.qty.toLocaleString()}${row.qty_unit ? ` ${row.qty_unit}` : ''}`
+                            : 'Not reported'}
+                        </td>
+                        <td className="align-right num">{fmtUsd(row.value_usd)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <Empty title="No partner rows reported" hint="The product total is available above." />
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

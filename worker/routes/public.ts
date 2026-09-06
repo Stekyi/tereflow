@@ -2,10 +2,22 @@ import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { attachSources, bad, getEntityBySlug, json } from '../lib/db';
 import { currentUser, isEntitled } from '../lib/session';
+import { hs2Label, hs2Sector, hs6Label } from '../agent/codes';
+import {
+  classify,
+  dominantCodes,
+  loadClassifications,
+  loadClassificationsBulk,
+  resolveForEntity,
+} from '../lib/classify';
 import type {
   CountryDashboard,
   Entity,
+  ExploreOpportunity,
+  MarketProducts,
   OpportunitySignal,
+  ProductBreakdown,
+  ProductBreakdownRow,
   RankedItem,
   Recommendation,
   TrendPoint,
@@ -65,7 +77,7 @@ pub.get('/stats', async (c) => {
   return json(row ?? {});
 });
 
-async function loadResult<T>(db: D1Database, entityId: string, kind: string): Promise<T | null> {
+export async function loadResult<T>(db: D1Database, entityId: string, kind: string): Promise<T | null> {
   const row = await db
     .prepare('SELECT payload FROM analysis_results WHERE entity_id = ? AND kind = ?')
     .bind(entityId, kind)
@@ -132,11 +144,19 @@ pub.get('/dashboard/:slug', async (c) => {
     .bind(entity.id)
     .first<{ at: string | null }>();
 
+  // Traditional vs non-traditional: tag each product row so the UI can badge
+  // cocoa/gold-style bulk commodities differently from what an SME could
+  // actually enter. Partner rows have no HS code and are left untagged.
+  const classifications = await loadClassifications(c.env.DB, entity.id);
+  const dominant = dominantCodes(overview?.export_chapter_shares);
+  const tagProducts = (items: RankedItem[]) =>
+    items.map((r) => ({ ...r, category: classify(r.code, classifications, dominant) }));
+
   const payload: CountryDashboard = {
     entity,
     overview,
-    top_exports: topExports ?? [],
-    top_imports: topImports ?? [],
+    top_exports: tagProducts(topExports ?? []),
+    top_imports: tagProducts(topImports ?? []),
     services: services ?? [],
     partners_export: partnersExport ?? [],
     partners_import: partnersImport ?? [],
@@ -169,6 +189,79 @@ pub.get('/dashboard/:slug/sources', async (c) => {
       'The comparable figures charted above come from the harmonised sources so that ' +
       'countries can be compared on the same basis.',
   });
+});
+
+/** Product detail for the dashboard's clickable ranked rows. */
+pub.get('/dashboard/:slug/products/:flow/:hsCode', async (c) => {
+  const entity = await getEntityBySlug(c.env.DB, c.req.param('slug'));
+  if (!entity) return bad('Not found', 404);
+
+  const flow = c.req.param('flow');
+  const hsCode = decodeURIComponent(c.req.param('hsCode'));
+  if (flow !== 'export' && flow !== 'import') return bad('Invalid trade flow', 400);
+
+  const product = await c.env.DB.prepare(
+    `SELECT year, product_name, value_usd, qty, qty_unit
+       FROM trade_facts
+      WHERE entity_id = ? AND flow = ? AND stream = 'goods' AND hs_code = ?
+        AND partner_iso3 IS NULL
+      ORDER BY year DESC
+      LIMIT 1`,
+  )
+    .bind(entity.id, flow, hsCode)
+    .first<{
+      year: number;
+      product_name: string | null;
+      value_usd: number;
+      qty: number | null;
+      qty_unit: string | null;
+    }>();
+
+  if (!product) return bad('Product breakdown not found', 404);
+
+  const detailed = await c.env.DB.prepare(
+    `SELECT partner_iso3, partner_name, SUM(value_usd) AS value_usd,
+            SUM(qty) AS qty, MAX(qty_unit) AS qty_unit
+       FROM trade_facts
+      WHERE entity_id = ? AND year = ? AND flow = ? AND stream = 'goods'
+        AND hs_code = ? AND partner_iso3 IS NOT NULL
+      GROUP BY partner_iso3, partner_name, qty_unit
+      ORDER BY value_usd DESC`,
+  )
+    .bind(entity.id, product.year, flow, hsCode)
+    .all<ProductBreakdownRow>();
+
+  const detailAvailable = (detailed.results?.length ?? 0) > 0;
+  const rows = detailAvailable
+    ? detailed.results ?? []
+    : (
+        await c.env.DB.prepare(
+          `SELECT partner_iso3, partner_name, value_usd, qty, qty_unit
+             FROM trade_facts
+            WHERE entity_id = ? AND year = ? AND flow = ? AND stream = 'goods'
+              AND hs_code IS NULL AND partner_iso3 IS NOT NULL
+            ORDER BY value_usd DESC`,
+        )
+          .bind(entity.id, product.year, flow)
+          .all<ProductBreakdownRow>()
+      ).results ?? [];
+
+  const response: ProductBreakdown = {
+    product_name: product.product_name ?? hsCode,
+    hs_code: hsCode,
+    flow,
+    year: product.year,
+    product_value_usd: product.value_usd,
+    product_qty: product.qty,
+    product_qty_unit: product.qty_unit,
+    detail_available: detailAvailable,
+    note: detailAvailable
+      ? 'Partner rows are reported for this product.'
+      : 'Product-level partner detail was not published. Showing the available partner totals for this trade flow.',
+    rows,
+  };
+
+  return json(response, 200, { 'cache-control': 'private, max-age=300' });
 });
 
 /** Cross-country league table for the explore screen. */
@@ -205,6 +298,261 @@ pub.get('/rankings', async (c) => {
     .map((r, i) => ({ ...r, rank: i + 1 }));
 
   return json({ metric, rows });
+});
+
+/** Public SME view: growing, non-headline products and available services. */
+pub.get('/opportunities', async (c) => {
+  const includeTraditional = c.req.query('all') === '1';
+
+  const { results: productRows } = await c.env.DB.prepare(
+    `SELECT s.id, s.entity_id, s.hs_code, 'product' AS kind, e.slug, e.name AS country, e.iso3, e.continent,
+            s.product_name AS name, s.flow, f.year, f.value_usd,
+            s.cagr_3y AS growth_pct, s.current_rank AS rank,
+            s.momentum, s.rationale
+       FROM opportunity_signals s
+       JOIN entities e ON e.id = s.entity_id
+       LEFT JOIN trade_facts f ON f.entity_id = s.entity_id
+         AND f.flow = s.flow AND f.stream = 'goods' AND f.hs_code = s.hs_code
+         AND f.partner_iso3 IS NULL
+         AND f.year = (SELECT MAX(f2.year) FROM trade_facts f2
+                        WHERE f2.entity_id = s.entity_id AND f2.flow = s.flow
+                          AND f2.stream = 'goods' AND f2.hs_code = s.hs_code
+                          AND f2.partner_iso3 IS NULL)
+      WHERE e.is_active = 1
+      ORDER BY s.momentum DESC, s.cagr_3y DESC
+      LIMIT 100`,
+  ).all<ExploreOpportunity & { entity_id: string; hs_code: string | null }>();
+
+  const { results: partnerRows } = await c.env.DB.prepare(
+    `WITH latest AS (
+       SELECT entity_id, flow, MAX(year) AS year
+         FROM trade_facts
+        WHERE stream = 'goods' AND partner_iso3 IS NOT NULL
+        GROUP BY entity_id, flow
+    )
+    SELECT s.id AS signal_id, f.partner_iso3, f.partner_name, f.value_usd,
+           CASE WHEN f.hs_code = s.hs_code THEN 1 ELSE 0 END AS detail_available
+      FROM opportunity_signals s
+      JOIN entities e ON e.id = s.entity_id AND e.is_active = 1
+      JOIN latest l ON l.entity_id = s.entity_id AND l.flow = s.flow
+      JOIN trade_facts f ON f.entity_id = s.entity_id AND f.flow = s.flow
+        AND f.year = l.year AND f.stream = 'goods' AND f.partner_iso3 IS NOT NULL
+        AND (f.hs_code = s.hs_code OR f.hs_code IS NULL)
+     ORDER BY detail_available DESC, f.value_usd DESC`,
+  ).all<{
+    signal_id: string;
+    partner_iso3: string | null;
+    partner_name: string | null;
+    value_usd: number;
+    detail_available: number;
+  }>();
+
+  const partnersBySignal = new Map<string, ExploreOpportunity['partners']>();
+  for (const row of partnerRows ?? []) {
+    const current = partnersBySignal.get(row.signal_id) ?? [];
+    if (current.length >= 5) continue;
+    current.push({
+      iso3: row.partner_iso3,
+      name: row.partner_name ?? row.partner_iso3 ?? 'Unknown partner',
+      value_usd: row.value_usd,
+      detail_available: row.detail_available === 1,
+    });
+    partnersBySignal.set(row.signal_id, current);
+  }
+
+  const { results: serviceRows } = await c.env.DB.prepare(
+    `SELECT e.slug, e.name AS country, e.iso3, e.continent, f.flow,
+            f.year, f.product_name AS name, f.value_usd,
+            CASE WHEN previous.value_usd > 0
+                 THEN ((f.value_usd - previous.value_usd) / previous.value_usd) * 100
+                 ELSE NULL END AS growth_pct
+       FROM trade_facts f
+       JOIN entities e ON e.id = f.entity_id
+       LEFT JOIN trade_facts previous ON previous.entity_id = f.entity_id
+         AND previous.flow = f.flow AND previous.stream = 'services'
+         AND previous.year = f.year - 3
+      WHERE e.is_active = 1 AND f.stream = 'services'
+        AND f.year = (SELECT MAX(f2.year) FROM trade_facts f2
+                      WHERE f2.entity_id = f.entity_id AND f2.flow = f.flow
+                        AND f2.stream = 'services')
+      ORDER BY growth_pct DESC
+      LIMIT 40`,
+  ).all<ExploreOpportunity>();
+
+  // Traditional vs non-traditional: opportunity_signals already excludes each
+  // country's own top-5 headline products, which structurally rules out a
+  // dominant legacy commodity (Ghanaian cocoa is always top-5, never a
+  // "signal"). What that exclusion does NOT catch is a smaller, growing
+  // mining/oil-type category that isn't top-5 yet but is still never
+  // realistically SME-accessible — the universal defaults + admin overrides
+  // below catch that.
+  const classificationsByEntity = await loadClassificationsBulk(
+    c.env.DB,
+    (productRows ?? []).map((r) => r.entity_id),
+  );
+
+  const products = (productRows ?? [])
+    .map((row) => {
+      const category = classify(row.hs_code, resolveForEntity(classificationsByEntity, row.entity_id), new Set());
+      return {
+        ...row,
+        value_usd: row.value_usd ?? 0,
+        year: row.year ?? 0,
+        rationale: row.rationale ?? 'Growing outside the headline products.',
+        partners: partnersBySignal.get(row.id) ?? [],
+        category,
+      };
+    })
+    .filter((row) => includeTraditional || row.category !== 'traditional');
+  const services = (serviceRows ?? []).map((row) => ({
+    ...row,
+    id: `service-${row.slug}-${row.flow}`,
+    kind: 'service' as const,
+    rank: null,
+    momentum: null,
+    rationale:
+      'Services are available in the source data, but this source currently reports them as one broad category rather than individual service lines.',
+    value_usd: row.value_usd ?? 0,
+    year: row.year ?? 0,
+    growth_pct: row.growth_pct ?? null,
+    name: row.name ?? 'Commercial services',
+    partners: [],
+  }));
+
+  return json({ opportunities: [...products, ...services], count: products.length + services.length });
+});
+
+/** How many countries Marketplace shows per side (exporters / importers) of a product. */
+const MARKET_TOP_N = 10;
+
+/**
+ * Live search over the specific products actually reported in the data --
+ * "Fruit, edible; pineapples, fresh or dried", not the 2-digit chapter
+ * "Fruit & nuts" -- for the Marketplace search typeahead. Hides
+ * traditional/gated categories by default (oil, mining, precious metals, a
+ * country's own dominant commodity): those are exactly the obvious
+ * big-player categories an SME isn't shopping for. Pass all=1 to see them.
+ */
+pub.get('/market/hs-codes', async (c) => {
+  const q = (c.req.query('q') ?? '').trim();
+  const includeTraditional = c.req.query('all') === '1';
+  const LIMIT = q ? 60 : 30;
+
+  const { results } = await c.env.DB.prepare(
+    q
+      ? `SELECT hs_code, MAX(product_name) AS product_name, SUM(value_usd) AS total_value
+           FROM trade_facts
+          WHERE stream = 'goods' AND hs_code IS NOT NULL AND flow = 'export' AND product_name LIKE ?
+          GROUP BY hs_code
+          ORDER BY total_value DESC
+          LIMIT ?`
+      : `SELECT hs_code, MAX(product_name) AS product_name, SUM(value_usd) AS total_value
+           FROM trade_facts
+          WHERE stream = 'goods' AND hs_code IS NOT NULL AND flow = 'export'
+          GROUP BY hs_code
+          ORDER BY total_value DESC
+          LIMIT ?`,
+  )
+    .bind(...(q ? [`%${q}%`, LIMIT * 4] : [LIMIT * 4]))
+    .all<{ hs_code: string; product_name: string | null; total_value: number }>();
+
+  const globalClassifications = await loadClassifications(c.env.DB, '*');
+  const codes = (results ?? [])
+    .map((r) => ({
+      code: r.hs_code,
+      label: r.product_name ?? hs6Label(r.hs_code),
+      sector: hs2Sector(r.hs_code),
+      category: classify(r.hs_code, globalClassifications, new Set()),
+    }))
+    .filter((r) => includeTraditional || r.category !== 'traditional')
+    .slice(0, LIMIT);
+
+  return json({ codes });
+});
+
+/**
+ * Marketplace: for one HS2 product/service chapter, rank every country by
+ * trade volume. Partner detail attached per country is that country's own
+ * general trading partners (already computed) — never product-specific,
+ * because Comtrade's keyless tier never fetches partner x HS-code together.
+ */
+pub.get('/market/products', async (c) => {
+  const hs = (c.req.query('hs') ?? '').trim();
+  const isChapter = /^\d{2}$/.test(hs);
+  const isSpecific = /^\d{6}$/.test(hs);
+  if (!isChapter && !isSpecific) {
+    return bad('hs must be a 2-digit HS chapter or 6-digit HS product code', 400);
+  }
+  // A chapter search aggregates every specific line reported under it (all
+  // the gold sub-headings as one "Pearls, gems & precious metals" figure);
+  // a 6-digit search is the exact specific product line.
+  const pattern = isSpecific ? hs : `${hs}%`;
+
+  interface Row {
+    id: string;
+    slug: string;
+    name: string;
+    iso3: string;
+    continent: string;
+    year: number;
+    value_usd: number;
+  }
+
+  const rankFor = async (flow: 'export' | 'import') => {
+    const { results } = await c.env.DB.prepare(
+      `WITH matched AS (
+         SELECT entity_id, year, SUM(value_usd) AS value_usd
+           FROM trade_facts
+          WHERE hs_code LIKE ? AND flow = ? AND stream = 'goods' AND partner_iso3 IS NULL
+          GROUP BY entity_id, year
+       ),
+       latest AS (
+         SELECT entity_id, MAX(year) AS year FROM matched GROUP BY entity_id
+       )
+       SELECT e.id, e.slug, e.name, e.iso3, e.continent, m.year, m.value_usd
+         FROM matched m
+         JOIN latest l ON l.entity_id = m.entity_id AND l.year = m.year
+         JOIN entities e ON e.id = m.entity_id AND e.is_active = 1
+        ORDER BY m.value_usd DESC
+        LIMIT ?`,
+    )
+      .bind(pattern, flow, MARKET_TOP_N)
+      .all<Row>();
+    return (results ?? []).map((r, i) => ({ ...r, rank: i + 1 }));
+  };
+
+  const [exporters, importers] = await Promise.all([rankFor('export'), rankFor('import')]);
+
+  const idBySlug = new Map<string, string>();
+  for (const r of [...exporters, ...importers]) idBySlug.set(r.slug, r.id);
+
+  const partnerEntries = await Promise.all(
+    [...idBySlug.entries()].map(async ([slug, id]) => {
+      const [partnersExport, partnersImport] = await Promise.all([
+        loadResult<RankedItem[]>(c.env.DB, id, 'partners_export'),
+        loadResult<RankedItem[]>(c.env.DB, id, 'partners_import'),
+      ]);
+      return [slug, { export: partnersExport ?? [], import: partnersImport ?? [] }] as const;
+    }),
+  );
+
+  const strip = (rows: (Row & { rank: number })[]) => rows.map(({ id, ...rest }) => rest);
+
+  // Global framing only here: a Marketplace search spans every country at
+  // once, so this reflects the universal defaults / admin-curated overrides
+  // for the category itself, not any one country's own export mix (see
+  // /dashboard/:slug for the per-country, dominant-commodity-aware version).
+  const globalClassifications = await loadClassifications(c.env.DB, '*');
+
+  return json({
+    hs_code: hs,
+    label: isSpecific ? hs6Label(hs) : hs2Label(hs),
+    sector: hs2Sector(hs),
+    category: classify(hs, globalClassifications, new Set()),
+    exporters: strip(exporters),
+    importers: strip(importers),
+    partners_by_slug: Object.fromEntries(partnerEntries),
+  } satisfies MarketProducts);
 });
 
 /** Registry browser: every source link we hold, active or not. */

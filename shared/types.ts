@@ -98,6 +98,8 @@ export interface Overview {
   import_yoy_pct: number | null;
   /** 0..1 Herfindahl over export products. High = dangerously concentrated. */
   export_concentration: number | null;
+  /** HS chapter (2-digit) -> share of exports (0..1), full distribution. */
+  export_chapter_shares: Record<string, number>;
   partner_count: number;
   product_count: number;
   services_export_usd: number | null;
@@ -114,6 +116,72 @@ export interface RankedItem {
   share_pct: number;
   cagr_3y: number | null;
   yoy_pct: number | null;
+  /** Only set for product rows (partner rows have no export category). */
+  category?: ExportCategory;
+}
+
+// --- traditional vs non-traditional export classification -------------------
+
+/**
+ * Traditional = capital-intensive, licensed, state- or oligopoly-controlled
+ * (oil, mining, precious metals, and -- per country -- a dominant legacy
+ * commodity like Ghanaian cocoa). Non-traditional = the rest: processed and
+ * horticultural goods an SME can actually produce and ship. Same distinction
+ * real export-promotion agencies (Ghana's GEPA and its regional equivalents)
+ * already use.
+ */
+export type ExportCategory = 'traditional' | 'non_traditional';
+
+export const EXPORT_CATEGORY_LABEL: Record<ExportCategory, string> = {
+  traditional: 'Traditional export',
+  non_traditional: 'Non-traditional export',
+};
+
+export const EXPORT_CATEGORY_HINT: Record<ExportCategory, string> = {
+  traditional: 'Typically large-scale, licensed, or state-controlled production.',
+  non_traditional: 'Typically accessible to a small or growing exporter.',
+};
+
+export interface ExportClassification {
+  id: string;
+  entity_id: string;
+  hs_code: string;
+  category: ExportCategory;
+  note: string | null;
+  source_url: string | null;
+  source_label: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** One resolved row for the admin curation screen: what applies today, and why. */
+export interface ResolvedClassification {
+  hs_code: string;
+  label: string;
+  category: ExportCategory;
+  source: 'default' | 'heuristic' | 'override';
+  override: ExportClassification | null;
+}
+
+export interface ProductBreakdownRow {
+  partner_iso3: string | null;
+  partner_name: string;
+  value_usd: number;
+  qty: number | null;
+  qty_unit: string | null;
+}
+
+export interface ProductBreakdown {
+  product_name: string;
+  hs_code: string;
+  flow: Flow;
+  year: number;
+  product_value_usd: number;
+  product_qty: number | null;
+  product_qty_unit: string | null;
+  detail_available: boolean;
+  note: string;
+  rows: ProductBreakdownRow[];
 }
 
 export interface TrendPoint {
@@ -135,6 +203,63 @@ export interface OpportunitySignal {
   horizon_years: number;
   confidence: number | null;
   rationale: string | null;
+}
+
+export interface ExploreOpportunity {
+  id: string;
+  kind: 'product' | 'service';
+  slug: string;
+  country: string;
+  iso3: string;
+  continent: string;
+  name: string;
+  flow: Flow;
+  year: number;
+  value_usd: number;
+  growth_pct: number | null;
+  rank: number | null;
+  momentum: number | null;
+  rationale: string;
+  partners: ExplorePartner[];
+  /** Absent for services (no HS code to classify). */
+  category?: ExportCategory;
+}
+
+export interface ExplorePartner {
+  iso3: string | null;
+  name: string;
+  value_usd: number;
+  detail_available: boolean;
+}
+
+// --- marketplace (cross-country product ranking) ---------------------------
+
+export interface MarketCountryRank {
+  rank: number;
+  slug: string;
+  name: string;
+  iso3: string;
+  continent: string;
+  year: number;
+  value_usd: number;
+}
+
+export interface MarketProducts {
+  hs_code: string;
+  label: string;
+  sector: string;
+  category: ExportCategory;
+  exporters: MarketCountryRank[];
+  importers: MarketCountryRank[];
+  /** Each country's general trading partners — not specific to this product. */
+  partners_by_slug: Record<string, { export: RankedItem[]; import: RankedItem[] }>;
+}
+
+export interface MarketHsCode {
+  code: string;
+  label: string;
+  sector: string;
+  category: ExportCategory;
 }
 
 export interface Recommendation {

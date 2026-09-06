@@ -50,7 +50,9 @@ export async function fetchWorldBank(
     }),
   );
 
+  const lastupdated: Record<string, string | null> = {};
   for (const [key, series] of entries) {
+    lastupdated[key] = series.lastupdated;
     if (!series.ok) {
       notes.push(`${key}: ${series.error}`);
       continue;
@@ -85,6 +87,7 @@ export async function fetchWorldBank(
     source_ref: SOURCE_REF,
     ok: rows.length > 0 || Object.keys(context.gdp_by_year).length > 0,
     note: notes.length ? notes.join('; ') : `World Bank series loaded for ${iso3}`,
+    meta: { lastupdated },
   };
 }
 
@@ -108,23 +111,42 @@ async function series_(
   indicator: string,
   from: number,
   to: number,
-): Promise<{ ok: boolean; byYear: Record<number, number>; error?: string }> {
+): Promise<{ ok: boolean; byYear: Record<number, number>; lastupdated: string | null; error?: string }> {
   const url =
     `${BASE}/country/${encodeURIComponent(iso3)}/indicator/${indicator}` +
     `?format=json&per_page=200&date=${from}:${to}`;
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-    if (!res.ok) return { ok: false, byYear: {}, error: `HTTP ${res.status}` };
-    const body = (await res.json()) as unknown;
-    if (!Array.isArray(body) || body.length < 2) return { ok: false, byYear: {}, error: 'no data' };
-    const points = body[1] as { date: string; value: number | null }[] | null;
-    const byYear: Record<number, number> = {};
-    for (const p of points ?? []) {
-      if (p?.value == null) continue;
-      byYear[Number(p.date)] = p.value;
+
+  // Matches comtrade.ts's call(): a single dropped request shouldn't punch a
+  // hole in the trend line when a retry would likely succeed.
+  let lastError = 'unknown';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await sleep(600 * attempt);
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+      if (res.status === 429 || res.status >= 500) {
+        lastError = `HTTP ${res.status}`;
+        continue;
+      }
+      if (!res.ok) return { ok: false, byYear: {}, lastupdated: null, error: `HTTP ${res.status}` };
+      const body = (await res.json()) as unknown;
+      if (!Array.isArray(body) || body.length < 2) {
+        return { ok: false, byYear: {}, lastupdated: null, error: 'no data' };
+      }
+      const meta = body[0] as { lastupdated?: string } | null;
+      const points = body[1] as { date: string; value: number | null }[] | null;
+      const byYear: Record<number, number> = {};
+      for (const p of points ?? []) {
+        if (p?.value == null || !(p.value > 0)) continue;
+        byYear[Number(p.date)] = p.value;
+      }
+      return { ok: true, byYear, lastupdated: meta?.lastupdated ?? null };
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : 'fetch failed';
     }
-    return { ok: true, byYear };
-  } catch (err) {
-    return { ok: false, byYear: {}, error: err instanceof Error ? err.message : 'fetch failed' };
   }
+  return { ok: false, byYear: {}, lastupdated: null, error: lastError };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }

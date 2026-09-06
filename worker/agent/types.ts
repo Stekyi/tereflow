@@ -18,4 +18,6 @@ export interface AdapterResult {
   source_ref: string;
   ok: boolean;
   note: string;
+  /** Adapter-specific cheap change-detection signal (e.g. World Bank's `lastupdated`). */
+  meta?: Record<string, unknown>;
 }

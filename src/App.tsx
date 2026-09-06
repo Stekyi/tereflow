@@ -5,10 +5,12 @@ import { useSession } from './lib/auth';
 
 const Home = lazy(() => import('./pages/Home'));
 const Explore = lazy(() => import('./pages/Explore'));
+const Marketplace = lazy(() => import('./pages/Marketplace'));
 const Country = lazy(() => import('./pages/Country'));
 const Registry = lazy(() => import('./pages/Registry'));
 const Admin = lazy(() => import('./pages/Admin'));
 const AdminForm = lazy(() => import('./pages/AdminForm'));
+const AdminClassifications = lazy(() => import('./pages/AdminClassifications'));
 const Auth = lazy(() => import('./pages/Auth'));
 const Network = lazy(() => import('./pages/Network'));
 const CardDetail = lazy(() => import('./pages/CardDetail'));
@@ -23,7 +25,8 @@ const Upgrade = lazy(() => import('./pages/Upgrade'));
 
 const TITLES: Record<string, string> = {
   '/': 'Tereflow',
-  '/explore': 'Explore markets',
+  '/explore': 'Explore',
+  '/marketplace': 'Marketplace',
   '/network': 'Network',
   '/messages': 'Messages',
   '/me': 'Me',
@@ -34,10 +37,11 @@ const TITLES: Record<string, string> = {
   '/registry': 'Data registry',
   '/admin': 'Admin',
   '/admin/new': 'New record',
+  '/admin/classifications': 'Export classification',
   '/join': 'Join Tereflow',
 };
 
-const ROOTS = new Set(['/', '/explore', '/network', '/messages', '/me']);
+const ROOTS = new Set(['/', '/explore', '/marketplace', '/network', '/messages', '/me']);
 
 export default function App() {
   const location = useLocation();
@@ -67,6 +71,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/explore" element={<Explore />} />
+            <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/country/:slug" element={<Country />} />
             <Route path="/registry" element={<Registry />} />
 
@@ -85,6 +90,7 @@ export default function App() {
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/new" element={<AdminForm />} />
             <Route path="/admin/edit/:slug" element={<AdminForm />} />
+            <Route path="/admin/classifications" element={<AdminClassifications />} />
 
             <Route
               path="*"
@@ -110,8 +116,14 @@ export default function App() {
         />
         <Tab
           to="/explore"
-          label="Markets"
+          label="Countries"
           d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 0v20M2 12h20M12 2c3 3 3 17 0 20M12 2C9 5 9 19 12 22"
+          stroke
+        />
+        <Tab
+          to="/marketplace"
+          label="Marketplace"
+          d="M3 9l1.4-5h15.2L21 9M4 9v10a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9M4 9h16"
           stroke
         />
         <Tab

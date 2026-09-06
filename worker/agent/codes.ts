@@ -1,3 +1,6 @@
+import { HS6_LABEL } from './hs6-codes.generated';
+export { HS6_LABEL };
+
 /**
  * ISO3 -> UN M49 numeric code.
  *
@@ -79,6 +82,18 @@ export function hs2Label(code: string | null | undefined, fallback?: string | nu
   if (!code) return fallback ?? 'Unclassified';
   const key = code.padStart(2, '0').slice(0, 2);
   return HS2_LABEL[key] ?? fallback ?? `HS ${key}`;
+}
+
+/**
+ * Specific, tradeable product line -- "Fruit, edible; pineapples, fresh or
+ * dried" rather than the chapter-level "Fruit & nuts". Falls back to the
+ * chapter label so an HS6 code the reference table doesn't recognise still
+ * shows something better than a bare number.
+ */
+export function hs6Label(code: string | null | undefined, fallback?: string | null): string {
+  if (!code) return fallback ?? 'Unclassified';
+  const key = code.padStart(6, '0').slice(0, 6);
+  return HS6_LABEL[key] ?? fallback ?? hs2Label(key.slice(0, 2));
 }
 
 /**

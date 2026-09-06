@@ -6,12 +6,18 @@ import type {
   Entity,
   EntityInput,
   EntityWithSources,
+  ExploreOpportunity,
+  ExportCategory,
   FeedItem,
+  MarketHsCode,
+  MarketProducts,
   Message,
   Plan,
+  ProductBreakdown,
   Playbook,
   PlaybookSummary,
   Rating,
+  ResolvedClassification,
   SessionUser,
   Subscription,
   SubscriptionKind,
@@ -84,6 +90,11 @@ export const api = {
       `/api/dashboard/${slug}/sources`,
     ),
 
+  productBreakdown: (slug: string, flow: 'export' | 'import', hsCode: string) =>
+    req<ProductBreakdown>(
+      `/api/dashboard/${encodeURIComponent(slug)}/products/${flow}/${encodeURIComponent(hsCode)}`,
+    ),
+
   rankings: (metric: 'export' | 'import') =>
     req<{
       metric: string;
@@ -98,6 +109,21 @@ export const api = {
         balance_usd: number;
       }[];
     }>(`/api/rankings?metric=${metric}`),
+
+  opportunities: () =>
+    req<{ opportunities: ExploreOpportunity[]; count: number }>('/api/opportunities'),
+
+  market: {
+    hsCodes: (q?: string, includeTraditional?: boolean) => {
+      const qs = new URLSearchParams();
+      if (q) qs.set('q', q);
+      if (includeTraditional) qs.set('all', '1');
+      const s = qs.toString();
+      return req<{ codes: MarketHsCode[] }>(`/api/market/hs-codes${s ? `?${s}` : ''}`);
+    },
+    products: (hs: string) =>
+      req<MarketProducts>(`/api/market/products?hs=${encodeURIComponent(hs)}`),
+  },
 
   admin: {
     list: (params: Record<string, string | undefined> = {}) => {
@@ -142,6 +168,27 @@ export const api = {
       req<{ checked: number; ok: number; gated: number; broken: number }>(
         '/api/admin/sources/check',
         { method: 'POST' },
+      ),
+    classifications: (entity = '*') =>
+      req<{ entity_id: string; rows: ResolvedClassification[] }>(
+        `/api/admin/classifications?entity=${encodeURIComponent(entity)}`,
+      ),
+    setClassification: (input: {
+      entity?: string;
+      hs_code: string;
+      category: ExportCategory;
+      note?: string | null;
+      source_url?: string | null;
+      source_label?: string | null;
+    }) =>
+      req<{ ok: true }>('/api/admin/classifications', {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
+    clearClassification: (entity: string, hsCode: string) =>
+      req<{ ok: true }>(
+        `/api/admin/classifications?entity=${encodeURIComponent(entity)}&hs_code=${encodeURIComponent(hsCode)}`,
+        { method: 'DELETE' },
       ),
   },
 

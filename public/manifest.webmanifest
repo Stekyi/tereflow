@@ -4,8 +4,8 @@
   "description": "Global trade data, analysed weekly. See what a country buys, sells and makes, then find the people to trade with.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f4f2ee",
-  "theme_color": "#0a66c2",
+  "background_color": "#fbfaf7",
+  "theme_color": "#0b3d67",
   "orientation": "portrait-primary",
   "icons": [
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }

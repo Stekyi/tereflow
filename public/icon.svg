@@ -1,15 +1,25 @@
-﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Tereflow">
+  <title>Tereflow</title>
   <defs>
     <linearGradient id="ink" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#14324e"/>
       <stop offset="1" stop-color="#0e1c2b"/>
     </linearGradient>
   </defs>
+
   <rect width="512" height="512" rx="112" fill="url(#ink)"/>
-  <circle cx="256" cy="248" r="132" fill="none" stroke="#ffffff" stroke-width="14" opacity="0.28"/>
-  <path d="M124 248h264M256 116c50 40 50 224 0 264M256 116c-50 40-50 224 0 264"
-        fill="none" stroke="#ffffff" stroke-width="10" opacity="0.22"/>
-  <path d="M150 300l68-72 56 42 88-104" fill="none" stroke="#ffffff" stroke-width="30"
-        stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="176" y="404" width="160" height="7" rx="3.5" fill="#a8802c"/>
+
+  <!-- Same geometry as the Logo component in src/components/Brand.tsx, drawn in
+       its 40-unit space and scaled up, so the two marks cannot drift apart. -->
+  <g transform="translate(36.1 24.6) scale(11)" fill="#eaf1f7">
+    <rect x="15.5" y="18" width="9" height="4.4" rx="1.4" opacity="0.55"/>
+
+    <path d="M6.4 14.2c0-1.6 1.2-2.8 2.8-2.8h4.2c1.6 0 2.8 1.2 2.8 2.8v10.9c0 3.1-2.4 5.6-5.4 5.6s-5.4-2.5-5.4-5.6z"/>
+    <circle cx="10.8" cy="24.4" r="2.7" fill="#a8802c"/>
+
+    <path d="M23.8 14.2c0-1.6 1.2-2.8 2.8-2.8h4.2c1.6 0 2.8 1.2 2.8 2.8v10.9c0 3.1-2.4 5.6-5.4 5.6s-5.4-2.5-5.4-5.6z"/>
+    <circle cx="28.2" cy="24.4" r="2.7" fill="#a8802c"/>
+
+    <rect x="18.4" y="16.4" width="3.2" height="7.6" rx="1.5"/>
+  </g>
 </svg>

@@ -73,6 +73,39 @@ async function main() {
   }
 
   const sample = products[0];
+
+  /*
+   * The figures above the list must describe the list.
+   *
+   * `count` used to report the size of the page rather than the number of
+   * matches, so a caller asking for 20 of 339 was told there were 20.
+   */
+  const s20 = await get('/api/products?limit=20');
+  const sum = s20.body?.summary ?? {};
+  check('the product list carries a summary', typeof sum.total === 'number', JSON.stringify(sum));
+  check(
+    'count is the total, not the page size',
+    s20.body?.count === sum.total && sum.total >= (s20.body?.products?.length ?? 0),
+    `count ${s20.body?.count}, page ${s20.body?.products?.length}, total ${sum.total}`,
+  );
+  check(
+    'exports and imports account for every opening',
+    sum.exports + sum.imports === sum.total,
+    `${sum.exports} + ${sum.imports} vs ${sum.total}`,
+  );
+  check('strong is a subset of the total', sum.strong <= sum.total, `${sum.strong}/${sum.total}`);
+
+  const africa = await get('/api/products?limit=20&continent=Africa&flow=export');
+  const af = africa.body?.summary ?? {};
+  check(
+    'the summary follows the filters the list follows',
+    af.imports === 0 && af.total === af.exports && af.total <= sum.total,
+    `africa exports ${af.total}, imports ${af.imports}, of ${sum.total} global`,
+  );
+  check(
+    'every row returned matches the filter it was asked for',
+    (africa.body?.products ?? []).every((p) => p.flow === 'export' && p.continent === 'Africa'),
+  );
   const ins = await get(`/api/insight/${sample.hs_code}`);
   check('GET /api/insight/:hs responds', ins.status === 200, `status ${ins.status}`);
   const d = ins.body ?? {};

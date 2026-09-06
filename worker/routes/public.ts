@@ -368,6 +368,16 @@ pub.get('/products', async (c) => {
     binds.push(slug);
   }
 
+  /*
+   * No page cap on the query.
+   *
+   * Signals are capped at SIGNALS_PER_COUNTRY when they are written, so the
+   * whole table is a few hundred rows and would be a few thousand at ninety
+   * countries. Fetching all of them and paging in memory costs nothing and
+   * buys two things the previous LIMIT could not give: a `count` that is the
+   * real total rather than the size of the page, and a summary that counts
+   * every match rather than whatever happened to land in the first slice.
+   */
   const { results } = await c.env.DB.prepare(
     `SELECT s.entity_id, s.hs_code, s.product_name, s.flow, s.year, s.value_usd,
             s.cagr_3y, s.momentum, s.confidence, s.best_market, s.best_market_iso3,
@@ -376,10 +386,9 @@ pub.get('/products', async (c) => {
        FROM opportunity_signals s
        JOIN entities e ON e.id = s.entity_id
       WHERE ${clauses.join(' AND ')}
-      ORDER BY s.momentum DESC, s.cagr_3y DESC
-      LIMIT ?`,
+      ORDER BY s.momentum DESC, s.cagr_3y DESC`,
   )
-    .bind(...binds, limit * 3)
+    .bind(...binds)
     .all<SignalRow>();
 
   const classifications = await loadClassificationsBulk(
@@ -387,13 +396,31 @@ pub.get('/products', async (c) => {
     (results ?? []).map((r) => r.entity_id),
   );
 
-  const products = (results ?? [])
+  const matched = (results ?? [])
     .map((r) => toProductCard(r, classifications))
     .filter((p) => includeTraditional || p.category !== 'traditional')
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
 
-  return json({ products, count: products.length });
+  const settings = await loadSettings(c.env);
+
+  /*
+   * The figures the home page leads with.
+   *
+   * These follow the same filters as the list below them, so a reader who
+   * narrows to Africa sees how many openings are in Africa, not a global
+   * number sitting above an African list.
+   */
+  const summary = {
+    total: matched.length,
+    exports: matched.filter((p) => p.flow === 'export').length,
+    imports: matched.filter((p) => p.flow === 'import').length,
+    strong: matched.filter((p) => p.score >= settings.scoreBandStrong).length,
+    markets: new Set(matched.map((p) => p.slug)).size,
+    /** Biggest single line in view, so the scale of the list is visible. */
+    largest_usd: matched.length ? Math.max(...matched.map((p) => p.value_usd)) : 0,
+  };
+
+  return json({ products: matched.slice(0, limit), count: matched.length, summary });
 });
 
 interface SignalRow {

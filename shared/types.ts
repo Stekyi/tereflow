@@ -269,6 +269,18 @@ export interface MarketHsCode {
  * page and in the marketplace. This is the unit an SME actually decides about:
  * "guavas, mangoes and mangosteens out of Ghana", not "Fruit & nuts".
  */
+/** The figures shown above a filtered product list, on the same filters. */
+export interface ProductSummary {
+  total: number;
+  exports: number;
+  imports: number;
+  /** Openings scoring at or above the strong band. */
+  strong: number;
+  /** Distinct countries represented in the list. */
+  markets: number;
+  largest_usd: number;
+}
+
 export interface ProductCard {
   /** Stable across country and flow, so the modal can key on it. */
   hs_code: string;

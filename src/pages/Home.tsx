@@ -5,9 +5,26 @@ import { useSession } from '../lib/auth';
 import { Chips, Empty, Skeletons } from '../components/ui';
 import { HeroScene } from '../components/Brand';
 import ProductModal, { ProductCardRow } from '../components/ProductModal';
-import { CONTINENTS, type ProductCard } from '../../shared/types';
+import { CONTINENTS, type ProductCard, type ProductSummary } from '../../shared/types';
 
 type FlowFilter = 'all' | 'export' | 'import';
+
+/**
+ * One figure in the strip above the list.
+ *
+ * "To sell" and "To supply" rather than "Exports" and "Imports" because the
+ * reader is deciding what to do, not reading a trade statistic: an export
+ * opening is something they could sell, an import opening is a gap they could
+ * fill.
+ */
+function Kpi({ n, k }: { n: number; k: string }) {
+  return (
+    <div className="kpi">
+      <strong>{n}</strong>
+      <span className="tiny dim">{k}</span>
+    </div>
+  );
+}
 
 export default function Home() {
   const { user, entitled, feedUnread } = useSession();
@@ -15,6 +32,7 @@ export default function Home() {
   const [flow, setFlow] = useState<FlowFilter>('all');
   const [continent, setContinent] = useState<string>('all');
   const [products, setProducts] = useState<ProductCard[]>([]);
+  const [summary, setSummary] = useState<ProductSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalHs, setModalHs] = useState<string | null>(null);
   const [modalCountry, setModalCountry] = useState<string | null>(null);
@@ -36,8 +54,14 @@ export default function Home() {
           continent: continent === 'all' ? undefined : continent,
           limit: 40,
         })
-        .then((r) => setProducts(r.products))
-        .catch(() => setProducts([]))
+        .then((r) => {
+          setProducts(r.products);
+          setSummary(r.summary);
+        })
+        .catch(() => {
+          setProducts([]);
+          setSummary(null);
+        })
         .finally(() => setLoading(false));
     }, 200);
     return () => clearTimeout(handle);
@@ -97,11 +121,24 @@ export default function Home() {
       <Chips options={continentOptions} value={continent} onChange={setContinent} />
       <div style={{ height: 14 }} />
 
+      {summary && summary.total > 0 && (
+        <div className="kpi-strip">
+          <Kpi n={summary.total} k="Openings" />
+          <Kpi n={summary.exports} k="To sell" />
+          <Kpi n={summary.imports} k="To supply" />
+          <Kpi n={summary.strong} k="Strong case" />
+          <Kpi n={summary.markets} k={summary.markets === 1 ? 'Market' : 'Markets'} />
+        </div>
+      )}
+
       <div className="section-head">
         <h2 style={{ fontSize: 16 }}>{listHeading}</h2>
       </div>
       <p className="tiny dim" style={{ margin: '2px 0 12px' }}>
         Ranked by opportunity score across the markets Tereflow has analysed.
+        {summary && summary.total > products.length && (
+          <> Showing the top {products.length} of {summary.total}.</>
+        )}
       </p>
 
       {loading ? (

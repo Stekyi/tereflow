@@ -20,6 +20,7 @@ import type {
   ProductCard,
   ProductDetail,
   ProductInsight,
+  ProductSummary,
   Playbook,
   PlaybookSummary,
   Rating,
@@ -312,7 +313,9 @@ export const api = {
     if (params.all) qs.set('all', '1');
     if (params.limit) qs.set('limit', String(params.limit));
     const s = qs.toString();
-    return req<{ products: ProductCard[]; count: number }>(`/api/products${s ? `?${s}` : ''}`);
+    return req<{ products: ProductCard[]; count: number; summary: ProductSummary }>(
+      `/api/products${s ? `?${s}` : ''}`,
+    );
   },
 
   /** One product, everywhere it is traded. Backs the product modal. */

@@ -1797,6 +1797,16 @@ textarea {
   pointer-events: none;
 }
 
+/* The banner is the one place the ship is meant to be looked at rather than
+   sensed, so give it the height to be legible. Below this the masts and sails
+   collapse into a single dark shape and it stops reading as a ship at all. */
+.hero.with-scene {
+  min-height: 208px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 /* The scene is anchored right and the panel is darkened from the left, so the
    headline sits on flat ink while the ship stays readable beside it. Centring
    it put the binocular barrels directly behind the words. */
@@ -1813,9 +1823,22 @@ textarea {
 }
 
 /* On a narrow screen there is no room beside the text, so the scene drops back
-   to a texture rather than competing with the headline. */
+   to a corner accent rather than competing with the headline. Fading alone is
+   not enough now that it is drawn large enough to be legible: at full height
+   the barrels sit directly behind the words. */
 @media (max-width: 460px) {
-  .hero-scene { opacity: 0.55; }
+  .hero.with-scene {
+    min-height: 0;
+  }
+
+  .hero-scene {
+    height: 58%;
+    top: auto;
+    bottom: 10px;
+    right: -6px;
+    opacity: 0.5;
+  }
+
   .hero.with-scene::before {
     background:
       linear-gradient(
@@ -2316,4 +2339,56 @@ textarea {
 .chart-legend .swatch.faded {
   background: var(--muted);
   opacity: 0.45;
+}
+
+/* --- home: the figures above the list ---------------------------------- */
+
+/* The reference dashboard leads with numbers, not with a picture, and it is
+   right to: somebody arriving wants to know how much there is to look at
+   before they start scrolling. These follow the same filters as the list. */
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  padding: 14px 4px;
+  margin-bottom: 4px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.kpi strong {
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi .tiny {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Five columns of a two-digit number and a word do not fit a phone. Three
+   reads better than five squeezed, and the two that drop are the ones a
+   reader can get from the flow chips anyway. */
+@media (max-width: 520px) {
+  .kpi-strip {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px 8px;
+  }
+
+  .kpi strong {
+    font-size: 21px;
+  }
 }

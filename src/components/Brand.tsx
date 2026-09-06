@@ -59,7 +59,11 @@ export function HeroScene({ className }: { className?: string }) {
   return (
     <svg
       className={className}
-      viewBox="0 0 300 200"
+      // Cropped to the barrels rather than the old 0 0 300 200, which carried
+      // 34 units of dead margin on every side. At the size this renders in the
+      // banner that margin was costing about a quarter of the drawing, and the
+      // ship came out as an unreadable grey blob. Same artwork, more of it.
+      viewBox="28 28 244 144"
       // Anchored and scaled by height rather than stretched to fill. The hero
       // is a short wide band, so slicing a landscape composition into it
       // cropped the ship away and left only sky.

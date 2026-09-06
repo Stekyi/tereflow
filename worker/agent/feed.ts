@@ -148,8 +148,15 @@ export async function fanOutFeed(env: Env, runId: string): Promise<FanoutResult>
 function matches(sub: Subscription, s: SignalRow): boolean {
   const value = sub.value.trim().toLowerCase();
   switch (sub.kind) {
-    case 'hs_code':
-      return (s.hs_code ?? '').padStart(2, '0').slice(0, 2) === value.padStart(2, '0').slice(0, 2);
+    case 'hs_code': {
+      const signalCode = s.hs_code ?? '';
+      // Following a specific 6-digit line means that line, not its whole
+      // chapter. Following a 2-digit chapter still means the chapter. Before
+      // products were stored at HS6 every code was a chapter and this
+      // distinction did not exist.
+      if (value.length === 6 && signalCode.length === 6) return signalCode === value;
+      return signalCode.slice(0, 2) === value.padStart(2, '0').slice(0, 2);
+    }
     case 'sector':
       return hs2Sector(s.hs_code).toLowerCase() === value;
     case 'product':
@@ -168,6 +175,11 @@ function matches(sub: Subscription, s: SignalRow): boolean {
  * For a followed product, find which activated market exports the most of it
  * (the push) and which imports the most (the pull). This is the "who is
  * pushing and who is pulling" view.
+ *
+ * Scoped to chapter-level world-total rows. trade_facts now holds specific HS6
+ * lines and per-partner rows alongside the chapter totals, so an unscoped
+ * query here would both scan an order of magnitude more rows and double-count
+ * the same trade at two levels of detail.
  */
 async function pushPull(env: Env, sub: Subscription) {
   const hs =
@@ -177,14 +189,21 @@ async function pushPull(env: Env, sub: Subscription) {
   if (!hs) return null;
 
   const { results } = await env.DB.prepare(
-    `SELECT e.name, e.slug, f.flow, f.value_usd, f.year
-       FROM trade_facts f
-       JOIN entities e ON e.id = f.entity_id
-      WHERE f.hs_code = ? AND f.stream = 'goods' AND e.is_active = 1
-        AND f.year = (SELECT MAX(year) FROM trade_facts WHERE hs_code = ? AND entity_id = f.entity_id)
-      ORDER BY f.value_usd DESC`,
+    `WITH scoped AS (
+       SELECT entity_id, flow, value_usd, year
+         FROM trade_facts
+        WHERE hs_code = ? AND stream = 'goods' AND partner_iso3 IS NULL
+     ),
+     latest AS (
+       SELECT entity_id, flow, MAX(year) AS year FROM scoped GROUP BY entity_id, flow
+     )
+     SELECT e.name, e.slug, s.flow, s.value_usd, s.year
+       FROM scoped s
+       JOIN latest l ON l.entity_id = s.entity_id AND l.flow = s.flow AND l.year = s.year
+       JOIN entities e ON e.id = s.entity_id AND e.is_active = 1
+      ORDER BY s.value_usd DESC`,
   )
-    .bind(hs, hs)
+    .bind(hs)
     .all<{ name: string; slug: string; flow: 'export' | 'import'; value_usd: number; year: number }>();
 
   const rows = results ?? [];
@@ -216,11 +235,20 @@ async function pushPull(env: Env, sub: Subscription) {
   };
 }
 
-/** Best-effort map from a free-text product to an HS chapter we hold data for. */
+/**
+ * Best-effort map from a free-text product to an HS chapter we hold data for.
+ *
+ * `LIKE '%text%'` cannot use an index, so this is a scan and its cost is set
+ * by how many rows it has to look at. Restricting to chapter-level world-total
+ * rows takes that from every fact in the table to roughly one row per chapter
+ * per country per year, which is what keeps the weekly fan-out from stalling
+ * now that specific HS6 lines and per-partner rows share the table.
+ */
 async function hsForProduct(env: Env, text: string): Promise<string | null> {
   const row = await env.DB.prepare(
     `SELECT hs_code FROM trade_facts
-      WHERE hs_code IS NOT NULL AND lower(product_name) LIKE ?
+      WHERE length(hs_code) = 2 AND partner_iso3 IS NULL AND stream = 'goods'
+        AND lower(product_name) LIKE ?
       GROUP BY hs_code ORDER BY SUM(value_usd) DESC LIMIT 1`,
   )
     .bind(`%${text.trim().toLowerCase()}%`)

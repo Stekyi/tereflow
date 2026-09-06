@@ -70,14 +70,21 @@ export default function Admin() {
     }
   }
 
-  async function runNow(slug?: string) {
-    setBusy(slug ?? 'run');
+  /**
+   * Rebuilds subscriber feeds from the stored signals. It does not refresh the
+   * figures: fetching and analysing happen on the machine that runs
+   * `npm run pipeline`, because one country now costs well over a hundred
+   * source calls and a Worker cannot make that many in one invocation.
+   */
+  async function rebuildFeeds() {
+    setBusy('run');
     try {
-      const r = await api.admin.runNow(slug);
-      const failed = r.errors?.length
-        ? ` — ${r.errors.map((x) => `${x.slug}: ${x.error}`).join('; ').slice(0, 160)}`
-        : '';
-      t.ok(`Run ${r.status}: ${r.entities_ok} ok, ${r.entities_failed} failed${failed}`);
+      const r = await api.admin.runNow();
+      t.ok(
+        r.feedError
+          ? `Feed rebuild failed: ${r.feedError}`
+          : `Feeds rebuilt for ${r.feed?.subscribers ?? 0} subscriber(s), ${r.feed?.items_written ?? 0} new item(s)`,
+      );
       await load();
     } catch (e) {
       t.err((e as Error).message);
@@ -163,11 +170,12 @@ export default function Admin() {
       <div className="row" style={{ gap: 8, marginBottom: 12 }}>
         <button
           className="btn sm"
-          onClick={() => runNow()}
+          onClick={() => rebuildFeeds()}
           disabled={busy !== ''}
           style={{ flex: 1 }}
+          title="Rebuilds subscriber feeds from the stored analysis. Run the local pipeline to refresh the figures."
         >
-          {busy === 'run' ? 'Running…' : 'Run analysis'}
+          {busy === 'run' ? 'Rebuilding…' : 'Rebuild feeds'}
         </button>
         <button
           className="btn sm"
@@ -233,16 +241,6 @@ export default function Admin() {
                 </div>
               </div>
               <div className="row" style={{ gap: 6 }}>
-                {e.kind === 'country' && e.iso3 && (
-                  <button
-                    className="btn ghost sm"
-                    onClick={() => runNow(e.slug)}
-                    disabled={busy !== ''}
-                    title="Run analysis for this country now"
-                  >
-                    {busy === e.slug ? '…' : '▶'}
-                  </button>
-                )}
                 <Link className="btn ghost sm" to={`/admin/edit/${e.slug}`}>
                   Edit
                 </Link>

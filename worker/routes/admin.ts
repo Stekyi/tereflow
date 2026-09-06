@@ -204,12 +204,59 @@ admin.delete('/entities/:slug', async (c) => {
   return json({ deleted: true });
 });
 
-/** Kick the analysis agent by hand. Local-only in normal operation. */
+/**
+ * Rebuild the weekly feed by hand.
+ *
+ * This used to fetch from the source APIs and analyse inside the Worker. That
+ * no longer works and no longer belongs here. Fetching one country now costs
+ * well over a hundred Comtrade calls, because specific products have to be
+ * requested one HS chapter at a time to stay inside the source's row cap, and
+ * Workers cap outbound subrequests per invocation. Ingest and analysis run on
+ * the machine you control (see local/pipeline.ts) and push finished results
+ * through /api/admin/ingest/*.
+ *
+ * What is left here is the part that genuinely belongs in the cloud: turning
+ * the stored signals into subscriber feeds. It touches personal data and needs
+ * no outbound calls at all.
+ */
 admin.post('/runs', async (c) => {
-  const { runAnalysis } = await import('../agent/run');
-  const only = c.req.query('slug') ?? undefined;
-  const result = await runAnalysis(c.env, 'manual', only);
-  return json(result);
+  const { fanOutFeed } = await import('../agent/feed');
+
+  const runId = uid('run_');
+  await c.env.DB.prepare(
+    `INSERT INTO analysis_runs (id, trigger, status, started_at)
+     VALUES (?, 'manual', 'running', datetime('now'))`,
+  )
+    .bind(runId)
+    .run();
+
+  let feed = { subscribers: 0, subscriptions: 0, items_written: 0 };
+  let feedError: string | null = null;
+  try {
+    feed = await fanOutFeed(c.env, runId);
+  } catch (err) {
+    feedError = err instanceof Error ? err.message : String(err);
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE analysis_runs
+        SET finished_at = datetime('now'), status = ?, log = ?
+      WHERE id = ?`,
+  )
+    .bind(
+      feedError ? 'failed' : 'ok',
+      JSON.stringify({ feed, feedError, note: 'feed rebuild only' }).slice(0, 8000),
+      runId,
+    )
+    .run();
+
+  return json({
+    run_id: runId,
+    status: feedError ? 'failed' : 'ok',
+    feed,
+    feedError,
+    note: 'Rebuilt subscriber feeds from stored signals. Run `npm run pipeline` on the machine that holds the data to refresh the figures themselves.',
+  });
 });
 
 admin.get('/runs', async (c) => {
@@ -492,8 +539,10 @@ admin.post('/ingest/commit', async (c) => {
       c.env.DB.prepare(
         `INSERT INTO opportunity_signals
            (id, entity_id, hs_code, product_name, flow, cagr_3y, momentum,
-            current_rank, projected_rank, horizon_years, confidence, rationale, run_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            current_rank, projected_rank, horizon_years, confidence, rationale, run_id,
+            value_usd, share, year, best_market, best_market_iso3, best_market_value_usd,
+            best_market_product_specific)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         uid('sig_'),
         entity.id,
@@ -508,6 +557,13 @@ admin.post('/ingest/commit', async (c) => {
         (s.confidence as number) ?? null,
         (s.rationale as string) ?? null,
         body.run_id,
+        (s.value_usd as number) ?? null,
+        (s.share as number) ?? null,
+        (s.year as number) ?? null,
+        (s.best_market as string) ?? null,
+        (s.best_market_iso3 as string) ?? null,
+        (s.best_market_value_usd as number) ?? null,
+        s.best_market_product_specific ? 1 : 0,
       ),
     );
   }

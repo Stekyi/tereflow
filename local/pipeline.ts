@@ -285,7 +285,13 @@ async function main() {
         ...(comtrade.ok ? [comtrade.source_ref] : []),
         ...(worldbank.ok ? [worldbank.source_ref] : []),
       ];
-      const bundle = analyse(entity.name, rows, worldbank.context, sourceRefs);
+      const bundle = analyse(
+        entity.name,
+        rows,
+        worldbank.context,
+        sourceRefs,
+        comtrade.truncated_years ?? [],
+      );
 
       const coverage =
         (comtrade.ok ? 0.6 : 0) +

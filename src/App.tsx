@@ -5,6 +5,7 @@ import { useSession } from './lib/auth';
 
 const Home = lazy(() => import('./pages/Home'));
 const Explore = lazy(() => import('./pages/Explore'));
+const Countries = lazy(() => import('./pages/Countries'));
 const Marketplace = lazy(() => import('./pages/Marketplace'));
 const Country = lazy(() => import('./pages/Country'));
 const Registry = lazy(() => import('./pages/Registry'));
@@ -26,6 +27,7 @@ const Upgrade = lazy(() => import('./pages/Upgrade'));
 const TITLES: Record<string, string> = {
   '/': 'Tereflow',
   '/explore': 'Explore',
+  '/countries': 'Countries',
   '/marketplace': 'Marketplace',
   '/network': 'Network',
   '/messages': 'Messages',
@@ -41,7 +43,7 @@ const TITLES: Record<string, string> = {
   '/join': 'Join Tereflow',
 };
 
-const ROOTS = new Set(['/', '/explore', '/marketplace', '/network', '/messages', '/me']);
+const ROOTS = new Set(['/', '/explore', '/countries', '/marketplace', '/network', '/messages', '/me']);
 
 export default function App() {
   const location = useLocation();
@@ -71,6 +73,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/explore" element={<Explore />} />
+            <Route path="/countries" element={<Countries />} />
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/country/:slug" element={<Country />} />
             <Route path="/registry" element={<Registry />} />
@@ -115,7 +118,7 @@ export default function App() {
           badge={feedUnread}
         />
         <Tab
-          to="/explore"
+          to="/countries"
           label="Countries"
           d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 0v20M2 12h20M12 2c3 3 3 17 0 20M12 2C9 5 9 19 12 22"
           stroke

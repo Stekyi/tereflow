@@ -15,6 +15,7 @@ import { useSession } from '../lib/auth';
 import { CHART } from '../lib/theme';
 import { Term } from '../components/Term';
 import { BarRow, Chips, Empty, FollowButton, Skeletons, Stat, useToast } from '../components/ui';
+import GlobalProductModal from '../components/ProductModal';
 import {
   EXPORT_CATEGORY_HINT,
   EXPORT_CATEGORY_LABEL,
@@ -38,7 +39,7 @@ export default function Country() {
   const [sources, setSources] = useState<Awaited<ReturnType<typeof api.dashboardSources>> | null>(
     null,
   );
-  const [tab, setTab] = useState<Tab>('summary');
+  const [tab, setTab] = useState<Tab>('products');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { user, refresh } = useSession();
@@ -47,6 +48,10 @@ export default function Country() {
   const [subs, setSubs] = useState<Map<string, string>>(new Map());
   const [productDetail, setProductDetail] = useState<ProductBreakdown | null>(null);
   const [productLoading, setProductLoading] = useState(false);
+  // The HS code of the product currently open in the country-scoped breakdown,
+  // so the reader can jump from it to the global worldwide view.
+  const [openHs, setOpenHs] = useState<string | null>(null);
+  const [worldHs, setWorldHs] = useState<string | null>(null);
   // Traditional/gated products (gold, oil, ...) are hidden from the products
   // list by default -- an SME can't act on them -- with an explicit toggle
   // to reveal them, rather than ranking them alongside things it can trade.
@@ -104,6 +109,7 @@ export default function Country() {
     if (!item.code) return;
     setProductLoading(true);
     setProductDetail(null);
+    setOpenHs(item.code);
     try {
       setProductDetail(await api.productBreakdown(slug, flow, item.code));
     } catch (e) {
@@ -183,12 +189,15 @@ export default function Country() {
         <ProductModal
           detail={productDetail}
           loading={productLoading}
+          onWorldwide={openHs ? () => setWorldHs(openHs) : undefined}
           onClose={() => {
             setProductDetail(null);
             setProductLoading(false);
+            setOpenHs(null);
           }}
         />
       )}
+      {worldHs && <GlobalProductModal hsCode={worldHs} onClose={() => setWorldHs(null)} />}
       <div style={{ height: 14 }} />
 
       {tab === 'summary' && (
@@ -375,7 +384,8 @@ export default function Country() {
       {tab === 'products' && (
         <>
           <p className="tiny dim" style={{ marginTop: 0 }}>
-            Tap ☆ on a product to follow it. Its weekly analysis then lands in your feed.
+            Non-traditional openings an SME can act on are shown first. Tap a product for its partner
+            breakdown, then open the worldwide view. Tap the star to follow it in your feed.
           </p>
           <label className="row small dim" style={{ gap: 6, marginBottom: 10, cursor: 'pointer' }}>
             <input
@@ -384,7 +394,7 @@ export default function Country() {
               onChange={(e) => setShowMajor(e.target.checked)}
               style={{ width: 'auto' }}
             />
-            Also show major/traditional trade (gold, oil, and similar — large-scale and licensed)
+            Also show major/traditional trade (gold, oil, and similar, large-scale and licensed)
           </label>
           <Ranked
             title="What it sells most"
@@ -646,10 +656,12 @@ function ProductModal({
   detail,
   loading,
   onClose,
+  onWorldwide,
 }: {
   detail: ProductBreakdown | null;
   loading: boolean;
   onClose: () => void;
+  onWorldwide?: () => void;
 }) {
   useEffect(() => {
     if (!loading && !detail) return;
@@ -712,6 +724,16 @@ function ProductModal({
             <p className="small muted" style={{ margin: '16px 0 10px' }}>
               {detail.note}
             </p>
+            {onWorldwide && (
+              <button
+                type="button"
+                className="btn ghost sm"
+                onClick={onWorldwide}
+                style={{ marginBottom: 10 }}
+              >
+                See this product worldwide
+              </button>
+            )}
             {detail.rows.length ? (
               <div className="table-wrap">
                 <table className="data-table">

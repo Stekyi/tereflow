@@ -3,6 +3,8 @@ import type { Env } from '../lib/db';
 import { attachSources, bad, getEntityBySlug, json } from '../lib/db';
 import { currentUser, isEntitled } from '../lib/session';
 import { hs2Label, hs2Sector, hs6Label } from '../agent/codes';
+import { shortProductName } from '../../shared/product-name';
+import { opportunityScore } from '../../shared/opportunity';
 import {
   classify,
   dominantCodes,
@@ -12,12 +14,18 @@ import {
 } from '../lib/classify';
 import type {
   CountryDashboard,
+  CountrySummary,
   Entity,
   ExploreOpportunity,
+  ExportClassification,
+  Flow,
   MarketProducts,
   OpportunitySignal,
   ProductBreakdown,
   ProductBreakdownRow,
+  ProductCard,
+  ProductCountry,
+  ProductDetail,
   RankedItem,
   Recommendation,
   TrendPoint,
@@ -298,6 +306,358 @@ pub.get('/rankings', async (c) => {
     .map((r, i) => ({ ...r, rank: i + 1 }));
 
   return json({ metric, rows });
+});
+
+// --- product-first browsing -------------------------------------------------
+
+/** How many specific product lines a browse request returns at most. */
+const PRODUCT_PAGE = 60;
+
+/**
+ * The specific products an SME can look at, across every activated country.
+ *
+ * This is the app's front door. It reads opportunity_signals, which the
+ * pipeline already writes one row per (country, product, flow) with the value,
+ * growth, best market and momentum attached, so the hot path is a single
+ * indexed read rather than a per-row join back into trade_facts.
+ *
+ * Traditional/gated lines (oil, mining, precious metals, a country's own
+ * dominant legacy commodity) are hidden by default: an SME with working
+ * capital cannot enter them, and burying the things it can enter underneath
+ * them is exactly the complaint this endpoint exists to answer. Pass all=1
+ * to include them.
+ */
+pub.get('/products', async (c) => {
+  const q = (c.req.query('q') ?? '').trim();
+  const flow = c.req.query('flow');
+  const continent = c.req.query('continent');
+  const slug = c.req.query('country');
+  const includeTraditional = c.req.query('all') === '1';
+  const limit = Math.min(Number(c.req.query('limit') ?? PRODUCT_PAGE) || PRODUCT_PAGE, 120);
+
+  const clauses = ['e.is_active = 1', 's.hs_code IS NOT NULL'];
+  const binds: unknown[] = [];
+  if (q) {
+    clauses.push('(s.product_name LIKE ? OR s.hs_code LIKE ?)');
+    binds.push(`%${q}%`, `${q}%`);
+  }
+  if (flow === 'export' || flow === 'import') {
+    clauses.push('s.flow = ?');
+    binds.push(flow);
+  }
+  if (continent) {
+    clauses.push('e.continent = ?');
+    binds.push(continent);
+  }
+  if (slug) {
+    clauses.push('e.slug = ?');
+    binds.push(slug);
+  }
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT s.entity_id, s.hs_code, s.product_name, s.flow, s.year, s.value_usd,
+            s.cagr_3y, s.momentum, s.confidence, s.best_market, s.best_market_iso3,
+            s.best_market_product_specific,
+            e.slug, e.name AS country, e.iso3, e.continent
+       FROM opportunity_signals s
+       JOIN entities e ON e.id = s.entity_id
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY s.momentum DESC, s.cagr_3y DESC
+      LIMIT ?`,
+  )
+    .bind(...binds, limit * 3)
+    .all<SignalRow>();
+
+  const classifications = await loadClassificationsBulk(
+    c.env.DB,
+    (results ?? []).map((r) => r.entity_id),
+  );
+
+  const products = (results ?? [])
+    .map((r) => toProductCard(r, classifications))
+    .filter((p) => includeTraditional || p.category !== 'traditional')
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+
+  return json({ products, count: products.length });
+});
+
+interface SignalRow {
+  entity_id: string;
+  hs_code: string;
+  product_name: string | null;
+  flow: Flow;
+  year: number | null;
+  value_usd: number | null;
+  cagr_3y: number | null;
+  momentum: number | null;
+  confidence: number | null;
+  best_market: string | null;
+  best_market_iso3: string | null;
+  best_market_product_specific: number | null;
+  slug: string;
+  country: string;
+  iso3: string;
+  continent: string;
+}
+
+function toProductCard(
+  r: SignalRow,
+  classifications: Map<string, Map<string, ExportClassification>>,
+): ProductCard {
+  const full = r.product_name ?? hs6Label(r.hs_code);
+  return {
+    hs_code: r.hs_code,
+    name: shortProductName(full),
+    name_full: full,
+    sector: hs2Sector(r.hs_code),
+    category: classify(r.hs_code, resolveForEntity(classifications, r.entity_id), new Set()),
+    flow: r.flow,
+    country: r.country,
+    slug: r.slug,
+    iso3: r.iso3,
+    continent: r.continent,
+    year: r.year ?? 0,
+    value_usd: r.value_usd ?? 0,
+    growth_pct: r.cagr_3y,
+    score: opportunityScore({
+      cagr_3y: r.cagr_3y,
+      momentum: r.momentum,
+      confidence: r.confidence,
+      value_usd: r.value_usd,
+    }),
+    best_market: r.best_market,
+    best_market_iso3: r.best_market_iso3,
+    best_market_product_specific: r.best_market_product_specific === 1,
+    has_signal: true,
+    // A signal is only written when the years were comparable, so anything
+    // reaching here already passed the truncation check in analyse.ts.
+    partial_coverage: r.cagr_3y == null,
+  };
+}
+
+/**
+ * One product, everywhere it is traded.
+ *
+ * This backs the modal that opens when a product is tapped anywhere in the
+ * app. It is deliberately not scoped to a country: tapping a product should
+ * answer "who sells this, who buys it, where does it move", which is the
+ * question, rather than navigating away into whichever country the row
+ * happened to be listed under.
+ */
+pub.get('/products/:hs', async (c) => {
+  const hs = c.req.param('hs').trim();
+  if (!/^\d{2}$|^\d{6}$/.test(hs)) {
+    return bad('hs must be a 2-digit chapter or 6-digit product code', 400);
+  }
+  const isSpecific = hs.length === 6;
+  const pattern = isSpecific ? hs : `${hs}%`;
+  const chapter = hs.slice(0, 2);
+
+  const sideFor = async (flow: Flow): Promise<ProductCountry[]> => {
+    const { results } = await c.env.DB.prepare(
+      `WITH matched AS (
+         SELECT entity_id, year, SUM(value_usd) AS value_usd
+           FROM trade_facts
+          WHERE hs_code LIKE ? AND flow = ? AND stream = 'goods' AND partner_iso3 IS NULL
+          GROUP BY entity_id, year
+       ),
+       latest AS (SELECT entity_id, MAX(year) AS year FROM matched GROUP BY entity_id)
+       SELECT e.slug, e.name, e.iso3, e.continent, m.year, m.value_usd,
+              sig.cagr_3y AS growth_pct, sig.best_market
+         FROM matched m
+         JOIN latest l ON l.entity_id = m.entity_id AND l.year = m.year
+         JOIN entities e ON e.id = m.entity_id AND e.is_active = 1
+         LEFT JOIN opportunity_signals sig
+                ON sig.entity_id = m.entity_id AND sig.hs_code = ? AND sig.flow = ?
+        ORDER BY m.value_usd DESC
+        LIMIT ?`,
+    )
+      .bind(pattern, flow, hs, flow, MARKET_TOP_N)
+      .all<Omit<ProductCountry, 'rank'>>();
+    return (results ?? []).map((r, i) => ({ ...r, rank: i + 1 }));
+  };
+
+  const [exporters, importers] = await Promise.all([sideFor('export'), sideFor('import')]);
+
+  // Partner detail is reported per flow, not per product, on the keyless
+  // Comtrade tier. Rows carrying this exact HS code are preferred and marked;
+  // otherwise the country's overall partners are shown and marked as such, so
+  // the difference is visible rather than implied.
+  const { results: partnerRows } = await c.env.DB.prepare(
+    `WITH latest AS (
+       SELECT entity_id, flow, MAX(year) AS year
+         FROM trade_facts
+        WHERE stream = 'goods' AND partner_iso3 IS NOT NULL
+        GROUP BY entity_id, flow
+     )
+     SELECT f.partner_iso3, f.partner_name, SUM(f.value_usd) AS value_usd,
+            MAX(CASE WHEN f.hs_code = ? THEN 1 ELSE 0 END) AS product_specific
+       FROM trade_facts f
+       JOIN entities e ON e.id = f.entity_id AND e.is_active = 1
+       JOIN latest l ON l.entity_id = f.entity_id AND l.flow = f.flow AND l.year = f.year
+      WHERE f.stream = 'goods' AND f.partner_iso3 IS NOT NULL
+        AND (f.hs_code = ? OR f.hs_code IS NULL)
+      GROUP BY f.partner_iso3
+      ORDER BY product_specific DESC, value_usd DESC
+      LIMIT 8`,
+  )
+    .bind(hs, hs)
+    .all<{
+      partner_iso3: string | null;
+      partner_name: string | null;
+      value_usd: number;
+      product_specific: number;
+    }>();
+
+  const { results: relatedRows } = isSpecific
+    ? await c.env.DB.prepare(
+        `SELECT hs_code, MAX(product_name) AS product_name, SUM(value_usd) AS value_usd
+           FROM trade_facts
+          WHERE hs_code LIKE ? AND hs_code <> ? AND length(hs_code) = 6
+            AND stream = 'goods' AND partner_iso3 IS NULL
+          GROUP BY hs_code
+          ORDER BY value_usd DESC
+          LIMIT 6`,
+      )
+        .bind(`${chapter}%`, hs)
+        .all<{ hs_code: string; product_name: string | null; value_usd: number }>()
+    : { results: [] };
+
+  const nameRow = await c.env.DB.prepare(
+    `SELECT product_name FROM trade_facts
+      WHERE hs_code = ? AND product_name IS NOT NULL LIMIT 1`,
+  )
+    .bind(hs)
+    .first<{ product_name: string }>();
+
+  const full = nameRow?.product_name ?? (isSpecific ? hs6Label(hs) : hs2Label(hs));
+  const globalClassifications = await loadClassifications(c.env.DB, '*');
+
+  return json({
+    hs_code: hs,
+    name: shortProductName(full),
+    name_full: full,
+    sector: hs2Sector(hs),
+    chapter,
+    chapter_label: hs2Label(chapter),
+    category: classify(hs, globalClassifications, new Set()),
+    total_export_usd: exporters.reduce((s, r) => s + r.value_usd, 0),
+    total_import_usd: importers.reduce((s, r) => s + r.value_usd, 0),
+    exporters,
+    importers,
+    partners: (partnerRows ?? []).map((p) => ({
+      name: p.partner_name ?? p.partner_iso3 ?? 'Unknown',
+      iso3: p.partner_iso3,
+      value_usd: p.value_usd,
+      product_specific: p.product_specific === 1,
+    })),
+    related: (relatedRows ?? []).map((r) => ({
+      hs_code: r.hs_code,
+      name: shortProductName(r.product_name ?? hs6Label(r.hs_code)),
+      value_usd: r.value_usd,
+    })),
+    partial_coverage: [...exporters, ...importers].some((r) => r.growth_pct == null),
+  } satisfies ProductDetail);
+});
+
+/**
+ * The countries index: one row per country with its headline figures.
+ * Carries no product lists by design -- somebody who wanted a product would
+ * have opened the product, and mixing the two is what made the old home page
+ * unusable.
+ */
+pub.get('/countries', async (c) => {
+  const continent = c.req.query('continent');
+  const q = (c.req.query('q') ?? '').trim();
+
+  const clauses = ["kind = 'country'"];
+  const binds: unknown[] = [];
+  if (continent) {
+    clauses.push('continent = ?');
+    binds.push(continent);
+  }
+  if (q) {
+    clauses.push('(name LIKE ? OR iso3 LIKE ?)');
+    binds.push(`%${q}%`, `%${q}%`);
+  }
+
+  const { results: entities } = await c.env.DB.prepare(
+    `SELECT id, slug, name, iso3, continent, is_active, last_ingest_at
+       FROM entities WHERE ${clauses.join(' AND ')}
+      ORDER BY is_active DESC, continent, name`,
+  )
+    .bind(...binds)
+    .all<{
+      id: string;
+      slug: string;
+      name: string;
+      iso3: string | null;
+      continent: string | null;
+      is_active: number;
+      last_ingest_at: string | null;
+    }>();
+
+  const rows = entities ?? [];
+  const ids = rows.filter((r) => r.is_active === 1).map((r) => r.id);
+
+  // Opportunity counts for every listed country in one query. D1 caps bound
+  // parameters at 100, so the id list is chunked rather than inlined.
+  const counts = new Map<string, number>();
+  for (let i = 0; i < ids.length; i += 90) {
+    const chunk = ids.slice(i, i + 90);
+    if (!chunk.length) continue;
+    const { results } = await c.env.DB.prepare(
+      `SELECT entity_id, COUNT(*) AS n FROM opportunity_signals
+        WHERE entity_id IN (${chunk.map(() => '?').join(',')})
+        GROUP BY entity_id`,
+    )
+      .bind(...chunk)
+      .all<{ entity_id: string; n: number }>();
+    for (const r of results ?? []) counts.set(r.entity_id, r.n);
+  }
+
+  const summaries = await Promise.all(
+    rows.map(async (r): Promise<CountrySummary> => {
+      const base = {
+        slug: r.slug,
+        name: r.name,
+        iso3: r.iso3,
+        continent: r.continent,
+        is_active: r.is_active === 1,
+        opportunities: counts.get(r.id) ?? 0,
+        last_ingest_at: r.last_ingest_at,
+      };
+      if (r.is_active !== 1) {
+        return {
+          ...base,
+          year: null,
+          export_usd: null,
+          import_usd: null,
+          balance_usd: null,
+          top_export: null,
+          top_partner: null,
+        };
+      }
+      const [overview, topExports, partners] = await Promise.all([
+        loadResult<Overview>(c.env.DB, r.id, 'overview'),
+        loadResult<RankedItem[]>(c.env.DB, r.id, 'top_exports'),
+        loadResult<RankedItem[]>(c.env.DB, r.id, 'partners_export'),
+      ]);
+      const top = topExports?.[0];
+      return {
+        ...base,
+        year: overview?.year ?? null,
+        export_usd: overview?.export_usd ?? null,
+        import_usd: overview?.import_usd ?? null,
+        balance_usd: overview?.balance_usd ?? null,
+        top_export: top ? shortProductName(top.name) : null,
+        top_partner: partners?.[0]?.name ?? null,
+      };
+    }),
+  );
+
+  return json({ countries: summaries, count: summaries.length });
 });
 
 /** Public SME view: growing, non-headline products and available services. */

@@ -1,11 +1,20 @@
 import type { Env } from '../../lib/db';
 import type { AdapterResult, FactRow } from '../types';
-import { ISO3_TO_M49, M49_TO_ISO3, hs2Sector, hs6Label } from '../codes';
+import { ISO3_TO_M49, M49_TO_ISO3, hs2Label, hs2Sector, hs6Label } from '../codes';
+import { HS6_LABEL } from '../hs6-codes.generated';
 import { ISO3_NAME } from '../country-names';
 
 const PREVIEW = 'https://comtradeapi.un.org/public/v1/preview/C/A/HS';
 const FULL = 'https://comtradeapi.un.org/data/v1/get/C/A/HS';
 const SOURCE_REF = 'un-comtrade';
+
+/**
+ * Rows the keyless preview endpoint returns before it stops. A response of
+ * exactly this length has been cut off rather than completed, and the rows
+ * kept are not the largest ones, so anything derived from comparing two
+ * capped responses is meaningless.
+ */
+const PREVIEW_ROW_CAP = 500;
 
 interface ComtradeRow {
   refYear?: number;
@@ -142,9 +151,23 @@ export async function fetchComtrade(
     }
   }
 
-  // Pass 2 — product mix. Costly, so without a key we only pull the years the
-  // charts actually need: newest complete year, the one before it, and three
-  // years back for the growth rate.
+  // Pass 2 — product mix, at two levels of detail.
+  //
+  // AG2 (~97 chapters) always fits inside the keyless 500-row preview cap, so
+  // it is complete and safe to compute totals, shares and concentration from.
+  //
+  // AG6 is the specific tradeable line ("guavas, mangoes and mangosteens",
+  // not "Fruit & nuts") and is the whole reason somebody opens this app. A
+  // country reports thousands of those, and a plain cmdCode=AG6 request comes
+  // back cut off at the cap, in an arbitrary order that differs year to year.
+  // Comparing two such slices produces invented growth rates.
+  //
+  // So AG6 is requested one HS chapter at a time, passing that chapter's
+  // explicit code list. A single chapter holds at most a few hundred lines, so
+  // each response is complete, and the same chapter is comparable across
+  // years. Chapters are taken in descending order of value until the covered
+  // share passes CHAPTER_COVERAGE_TARGET, which keeps the call count bounded
+  // while still covering what the country actually trades.
   const completeYears = [...yearsByFlow.export]
     .filter((y) => yearsByFlow.import.has(y))
     .sort((a, b) => b - a);
@@ -158,6 +181,10 @@ export async function fetchComtrade(
       ? [...new Set([latest, latest - 1, latest - 3])].filter((y) => yearsWithData.has(y))
       : [];
 
+  const truncatedYears = new Set<number>();
+
+  // Pass 2a — chapters. Complete, and it tells us where the trade actually is.
+  const chapterValue = new Map<string, number>();
   for (const [flowCode, flow] of FLOWS) {
     const periods = hasKey ? [productYears.join(',')] : productYears.map(String);
     for (const period of periods) {
@@ -166,22 +193,20 @@ export async function fetchComtrade(
         reporterCode: reporter,
         period,
         partnerCode: '0',
-        // 6-digit: the specific tradeable line ("pineapples, fresh or
-        // dried"), not the 2-digit chapter ("Fruit & nuts") -- an SME
-        // deciding what to trade in needs the former, not the latter.
-        cmdCode: 'AG6',
+        cmdCode: 'AG2',
         flowCode,
       });
       if (res.error) {
-        notes.push(`${flow} products ${period}: ${res.error}`);
+        notes.push(`${flow} chapters ${period}: ${res.error}`);
         continue;
       }
       for (const r of aggregatesOnly(res.data)) {
         const value = Number(r.primaryValue ?? 0);
         const year = Number(r.refYear ?? r.period ?? 0);
         if (!(value > 0) || !year) continue;
-        const hs = hs6CodeOf(r.cmdCode);
+        const hs = hs2CodeOf(r.cmdCode);
         if (!hs) continue;
+        if (year === latest) chapterValue.set(hs, (chapterValue.get(hs) ?? 0) + value);
         pushRow({
           year,
           flow,
@@ -189,7 +214,7 @@ export async function fetchComtrade(
           partner_iso3: null,
           partner_name: null,
           hs_code: hs,
-          product_name: hs6Label(hs, r.cmdDesc || null),
+          product_name: hs2Label(hs, r.cmdDesc || null),
           sector: hs2Sector(hs),
           value_usd: value,
           qty: r.netWgt ?? null,
@@ -200,16 +225,128 @@ export async function fetchComtrade(
     }
   }
 
+  // Pass 2b — specific lines, chapter by chapter.
+  //
+  // Only the two years the growth rate is measured between. The intermediate
+  // year is used for the year-on-year figure, which is only ever shown at
+  // chapter level, so fetching it per chapter would add a third of the calls
+  // in this pass for nothing.
+  const detailYears = hasKey
+    ? productYears
+    : productYears.filter((y) => y === latest || y === Math.min(...productYears));
+  const chapters = chaptersToDetail(chapterValue);
+  for (const chapter of chapters) {
+    const codes = hs6CodesInChapter(chapter);
+    if (!codes.length) continue;
+    for (const [flowCode, flow] of FLOWS) {
+      const periods = hasKey ? [detailYears.join(',')] : detailYears.map(String);
+      for (const period of periods) {
+        if (!period) continue;
+        const res = await paced({
+          reporterCode: reporter,
+          period,
+          partnerCode: '0',
+          cmdCode: codes.join(','),
+          flowCode,
+        });
+        if (res.error) {
+          notes.push(`${flow} chapter ${chapter} ${period}: ${res.error}`);
+          continue;
+        }
+        // A chapter should never fill the cap. If one does, its lines were cut
+        // off and the year is not comparable for that chapter.
+        if (res.data.length >= PREVIEW_ROW_CAP) {
+          for (const y of period.split(',')) truncatedYears.add(Number(y));
+        }
+        for (const r of aggregatesOnly(res.data)) {
+          const value = Number(r.primaryValue ?? 0);
+          const year = Number(r.refYear ?? r.period ?? 0);
+          if (!(value > 0) || !year) continue;
+          const hs = hs6CodeOf(r.cmdCode);
+          if (!hs) continue;
+          pushRow({
+            year,
+            flow,
+            stream: 'goods',
+            partner_iso3: null,
+            partner_name: null,
+            hs_code: hs,
+            product_name: hs6Label(hs, r.cmdDesc || null),
+            sector: hs2Sector(hs),
+            value_usd: value,
+            qty: r.netWgt ?? null,
+            qty_unit: r.qtyUnitAbbr ?? null,
+            source_ref: SOURCE_REF,
+          });
+        }
+      }
+    }
+  }
+
+  const coveredShare = shareCovered(chapterValue, chapters);
+  const truncationNote = truncatedYears.size
+    ? ` Specific-product detail was capped by the source in ${[...truncatedYears].sort().join(', ')}.`
+    : '';
+  const coverageNote = chapters.length
+    ? ` Specific products cover the ${chapters.length} largest chapters, ${(coveredShare * 100).toFixed(0)}% of goods trade.`
+    : '';
+
   return {
     rows,
     source_ref: SOURCE_REF,
     ok: rows.length > 0,
+    truncated_years: [...truncatedYears].sort(),
     note: rows.length
       ? `${rows.length} rows from UN Comtrade covering ${available.join(', ') || 'no years'}` +
-        (notes.length ? ` (${notes.length} partial failures)` : '')
+        (notes.length ? ` (${notes.length} partial failures)` : '') +
+        coverageNote +
+        truncationNote
       : notes.join('; ') || 'no rows returned',
   };
 }
+
+/**
+ * How much of a country's goods trade the specific-product pass tries to
+ * cover, and the hard ceiling on how many chapters that is allowed to cost.
+ *
+ * Each chapter is one API call per year per flow, so the ceiling is what keeps
+ * a diversified economy from turning into hundreds of calls. Concentrated
+ * economies reach the target in a handful of chapters and stop early.
+ */
+const CHAPTER_COVERAGE_TARGET = 0.92;
+const MAX_DETAIL_CHAPTERS = 22;
+
+function chaptersToDetail(chapterValue: Map<string, number>): string[] {
+  const total = [...chapterValue.values()].reduce((s, v) => s + v, 0);
+  if (total <= 0) return [];
+  const ranked = [...chapterValue.entries()].sort((a, b) => b[1] - a[1]);
+  const picked: string[] = [];
+  let running = 0;
+  for (const [chapter, value] of ranked) {
+    if (picked.length >= MAX_DETAIL_CHAPTERS) break;
+    picked.push(chapter);
+    running += value;
+    if (running / total >= CHAPTER_COVERAGE_TARGET) break;
+  }
+  return picked;
+}
+
+function shareCovered(chapterValue: Map<string, number>, chapters: string[]): number {
+  const total = [...chapterValue.values()].reduce((s, v) => s + v, 0);
+  if (total <= 0) return 0;
+  return chapters.reduce((s, c) => s + (chapterValue.get(c) ?? 0), 0) / total;
+}
+
+/** Every HS6 code belonging to one chapter, from the static HS reference. */
+function hs6CodesInChapter(chapter: string): string[] {
+  const cached = CHAPTER_CODES.get(chapter);
+  if (cached) return cached;
+  const codes = Object.keys(HS6_LABEL).filter((c) => c.startsWith(chapter));
+  CHAPTER_CODES.set(chapter, codes);
+  return codes;
+}
+
+const CHAPTER_CODES = new Map<string, string[]>();
 
 export interface ComtradeProbe {
   ok: boolean;
@@ -255,6 +392,18 @@ export async function probeComtrade(
     }
   }
   return { ok: false, year: null, export_usd: null, import_usd: null };
+}
+
+/**
+ * Chapter code from an AG2 response. A blank code must never be padded into
+ * "00", which is not a real chapter, or unclassified trade would be filed
+ * under live animals.
+ */
+function hs2CodeOf(cmdCode: string | undefined): string | null {
+  const raw = String(cmdCode ?? '').trim();
+  if (!raw || raw.toUpperCase() === 'TOTAL') return null;
+  const hs = raw.padStart(2, '0').slice(0, 2);
+  return /^\d{2}$/.test(hs) && hs !== '00' ? hs : null;
 }
 
 /**

@@ -30,16 +30,70 @@ export interface SignalDraft {
   projected_rank: number | null;
   horizon_years: number;
   confidence: number | null;
+  /** Latest reported value for this line, so the UI never has to re-derive it. */
+  value_usd: number;
+  /** Fraction of the country's trade in this flow, 0..1. */
+  share: number;
+  year: number;
+  /** Largest counterpart country for this flow. Falls back to the country's
+   *  overall largest partner when the source reports no partner x product
+   *  breakdown, which is the common case on the keyless Comtrade tier. */
+  best_market: string | null;
+  best_market_iso3: string | null;
+  best_market_value_usd: number | null;
+  /** False when best_market is the country's overall partner for this flow
+   *  rather than this product's. Without it every row for one country shows
+   *  the same "best market" and reads as a per-product finding when it is not. */
+  best_market_product_specific: boolean;
   rationale: string;
 }
 
+/**
+ * Noise floors for what counts as a signal.
+ *
+ * These are granularity-dependent. At HS2 there are ~97 chapters, so 0.2% of
+ * a country's trade is a small chapter. At HS6 the same trade is split across
+ * thousands of lines, and 0.2% would be a top-20 product: Ghana's mango and
+ * guava exports are 0.19% of its total, and shea is smaller still, so an HS2
+ * floor silently deletes exactly the openings an SME is looking for.
+ *
+ * The absolute floor is what stops the lower share floor pulling in rounding
+ * noise: a line has to be a real, financeable trade before it is shown.
+ */
+const NOISE_FLOOR = {
+  hs2: { share: 0.002, valueUsd: 5_000_000 },
+  hs6: { share: 0.0002, valueUsd: 2_000_000 },
+} as const;
+
+/** Minimum compound annual growth, in percent, before a line is interesting. */
+const MIN_GROWTH_PCT = 8;
+
 const TOP_N = 12;
+
+/**
+ * How many product openings are kept per country, and per flow before they are
+ * merged.
+ *
+ * These were 12 and 8, which suited a country dashboard showing a short
+ * "early signals" teaser. The app is now product-first: the home page and
+ * marketplace browse these rows across every country, and a reader filtering
+ * by flow, continent or search term needs enough depth that the list does not
+ * empty out after two filters. A country reports thousands of HS6 lines, so
+ * the cost of keeping more is a few dozen rows, not a scaling problem.
+ *
+ * Classification then hides traditional lines by default, which removes a
+ * large share of these again, so the visible list is smaller than it looks.
+ */
+const SIGNALS_PER_COUNTRY = 40;
+const SIGNALS_PER_FLOW = 25;
 
 export function analyse(
   entityName: string,
   rows: FactRow[],
   context: WorldBankContext,
   sourceRefs: string[],
+  /** Years whose specific-product detail the source capped. See AdapterResult. */
+  truncatedYears: number[] = [],
 ): AnalysisBundle {
   // A year only counts for headline figures if BOTH flows reported a world
   // total. Otherwise the trade balance is comparing a number against nothing.
@@ -118,12 +172,13 @@ export function analyse(
     coverage_note: buildCoverageNote(years, latest, productYear),
   };
 
+  const truncated = new Set(truncatedYears);
   const signals = [
-    ...detectSignals(rows, 'export', productYears, topExports),
-    ...detectSignals(rows, 'import', productYears, topImports),
+    ...detectSignals(rows, 'export', productYears, topExports, truncated),
+    ...detectSignals(rows, 'import', productYears, topImports, truncated),
   ]
     .sort((a, b) => b.momentum - a.momentum)
-    .slice(0, 12);
+    .slice(0, SIGNALS_PER_COUNTRY);
 
   const recommendations = recommend(
     entityName,
@@ -152,6 +207,38 @@ export function analyse(
 
 // --- building blocks --------------------------------------------------------
 
+/**
+ * The adapter now stores two levels of product detail for the same trade:
+ * complete HS2 chapters, and best-effort HS6 specific lines. Every row carries
+ * a real value, so any function that sums or ranks across `hs_code IS NOT NULL`
+ * without choosing a level counts the same dollar twice.
+ *
+ * Rules applied consistently below:
+ *   - chapter structure, shares and concentration  -> HS2 (complete)
+ *   - product ranking, signals, product detail     -> HS6 when present, else HS2
+ */
+const CHAPTER_LEN = 2;
+const SPECIFIC_LEN = 6;
+
+function atLevel(rows: FactRow[], level: number): FactRow[] {
+  return rows.filter((r) => (r.hs_code ?? '').length === level);
+}
+
+/** HS6 rows for the year if the source provided any, otherwise HS2. */
+function productRows(
+  rows: FactRow[],
+  flow: 'export' | 'import',
+  year: number,
+): { rows: FactRow[]; level: number } {
+  const inScope = rows.filter(
+    (r) => r.year === year && r.flow === flow && r.stream === 'goods' && r.hs_code,
+  );
+  const specific = atLevel(inScope, SPECIFIC_LEN);
+  return specific.length
+    ? { rows: specific, level: SPECIFIC_LEN }
+    : { rows: atLevel(inScope, CHAPTER_LEN), level: CHAPTER_LEN };
+}
+
 function buildTrend(rows: FactRow[], years: number[]): TrendPoint[] {
   return years.map((year) => {
     // Country totals come from the partner rows (cmdCode=TOTAL against World),
@@ -172,9 +259,12 @@ function totalFor(rows: FactRow[], year: number, flow: 'export' | 'import'): num
       r.partner_iso3 === null,
   );
   if (worldRow) return worldRow.value_usd;
-  return rows
-    .filter((r) => r.year === year && r.flow === flow && r.stream === 'goods' && r.hs_code)
-    .reduce((sum, r) => sum + r.value_usd, 0);
+  // Fall back to the chapter level, which is complete, rather than the
+  // specific-product level, which the source may have capped.
+  return atLevel(
+    rows.filter((r) => r.year === year && r.flow === flow && r.stream === 'goods'),
+    CHAPTER_LEN,
+  ).reduce((sum, r) => sum + r.value_usd, 0);
 }
 
 function rankProducts(
@@ -183,9 +273,7 @@ function rankProducts(
   latest: number,
   years: number[],
 ): RankedItem[] {
-  const current = rows.filter(
-    (r) => r.year === latest && r.flow === flow && r.stream === 'goods' && r.hs_code,
-  );
+  const { rows: current } = productRows(rows, flow, latest);
   const total = current.reduce((s, r) => s + r.value_usd, 0);
   if (total <= 0) return [];
 
@@ -227,8 +315,11 @@ function chapterSharesFor(
   flow: 'export' | 'import',
   year: number,
 ): Record<string, number> {
-  const current = rows.filter(
-    (r) => r.year === year && r.flow === flow && r.stream === 'goods' && r.hs_code,
+  // Chapter rows only. Mixing in the HS6 rows would count the same trade at
+  // both levels and halve every share.
+  const current = atLevel(
+    rows.filter((r) => r.year === year && r.flow === flow && r.stream === 'goods'),
+    CHAPTER_LEN,
   );
   const total = current.reduce((s, r) => s + r.value_usd, 0);
   if (total <= 0) return {};
@@ -437,6 +528,7 @@ function detectSignals(
   flow: 'export' | 'import',
   years: number[],
   currentTop: RankedItem[],
+  truncatedYears: Set<number>,
 ): SignalDraft[] {
   if (years.length < 3) return [];
   const latest = years[years.length - 1];
@@ -445,45 +537,73 @@ function detectSignals(
   const span = latest - base;
   if (span < 2) return [];
 
-  const current = rows.filter(
-    (r) => r.year === latest && r.flow === flow && r.stream === 'goods' && r.hs_code,
-  );
+  const { rows: current, level } = productRows(rows, flow, latest);
   const total = current.reduce((s, r) => s + r.value_usd, 0);
   if (total <= 0) return [];
 
+  // Growth is the whole basis of a signal. When the source capped the
+  // specific-product detail, the two years being compared are different
+  // arbitrary slices of the product range, and the "growth" between them
+  // measures which rows the API returned, not any change in trade. Detecting
+  // at the chapter level instead is honest; inventing a rate is not.
+  const specificTruncated =
+    level === SPECIFIC_LEN && (truncatedYears.has(latest) || truncatedYears.has(base));
+  const working = specificTruncated
+    ? atLevel(
+        rows.filter((r) => r.year === latest && r.flow === flow && r.stream === 'goods'),
+        CHAPTER_LEN,
+      )
+    : current;
+  if (!working.length) return [];
+  const workingLevel = specificTruncated ? CHAPTER_LEN : level;
+  const workingTotal = working.reduce((s, r) => s + r.value_usd, 0);
+  if (workingTotal <= 0) return [];
+
   const topCodes = new Set(currentTop.slice(0, 5).map((t) => t.code));
-  const ranked = [...current].sort((a, b) => b.value_usd - a.value_usd);
+  const ranked = [...working].sort((a, b) => b.value_usd - a.value_usd);
   const rankOf = new Map(ranked.map((r, i) => [r.hs_code, i + 1]));
+
+  // Floors follow the level actually being scored, not a build-time guess.
+  const floor = workingLevel === SPECIFIC_LEN ? NOISE_FLOOR.hs6 : NOISE_FLOOR.hs2;
 
   const drafts: SignalDraft[] = [];
 
-  for (const r of current) {
+  for (const r of working) {
     // HS 99 is "commodities not elsewhere specified". It is real in the totals
     // but meaningless as an investment signal, so it never gets surfaced.
-    if (r.hs_code === '99') continue;
+    if (r.hs_code === '99' || r.hs_code?.startsWith('99')) continue;
 
     const past = valueOf(rows, base, flow, r.hs_code);
     const growth = cagr(past, r.value_usd, span);
     if (growth == null) continue;
 
-    const share = r.value_usd / total;
-    // Filter out noise: must be at least 0.2% of trade and growing above 8%/yr.
-    if (share < 0.002 || growth < 8) continue;
+    const share = r.value_usd / workingTotal;
+    // Must be a real trade in its own right, and growing.
+    if (share < floor.share || r.value_usd < floor.valueUsd) continue;
+    if (growth < MIN_GROWTH_PCT) continue;
     // Already a headline product — not an early signal.
     if (topCodes.has(r.hs_code)) continue;
 
     const shareGain = past ? share - past / sumYear(rows, base, flow) : share;
     const consistency = consistencyScore(rows, flow, r.hs_code, years);
 
+    // Share-derived terms are expressed as multiples of the applicable noise
+    // floor rather than absolute percentages. A fixed multiplier tuned for
+    // HS2 chapter shares evaluates to ~0 at HS6, which would flatten every
+    // specific product to the same momentum and destroy the ranking.
+    const relativeShare = clamp01(share / (floor.share * 25));
+    const relativeGain = clamp01(shareGain / (floor.share * 12));
+
     // Momentum blends how fast it grows, how much share it took, and whether
     // the growth was steady rather than one freak year.
     const momentum = clamp01(
-      0.5 * clamp01(growth / 60) + 0.3 * clamp01(shareGain * 40) + 0.2 * consistency,
+      0.5 * clamp01(growth / 60) + 0.3 * relativeGain + 0.2 * consistency,
     );
     if (momentum < 0.25) continue; // below this the signal is too weak to be worth surfacing
 
     const rank = rankOf.get(r.hs_code) ?? null;
     const projected = rank ? Math.max(1, Math.round(rank * (1 - clamp01(growth / 100)))) : null;
+    const bestMarket = topPartnerFor(rows, flow, latest, r.hs_code);
 
     drafts.push({
       hs_code: r.hs_code,
@@ -496,23 +616,37 @@ function detectSignals(
       // Fixed presentation horizon -- deliberately independent of `span`
       // (the variable CAGR lookback window above), not a bug.
       horizon_years: 4,
-      confidence: clamp01(0.4 + 0.4 * consistency + 0.2 * clamp01(share * 30)),
+      confidence: clamp01(0.4 + 0.4 * consistency + 0.2 * relativeShare),
+      value_usd: r.value_usd,
+      share,
+      year: latest,
+      best_market: bestMarket?.name ?? null,
+      best_market_iso3: bestMarket?.iso3 ?? null,
+      best_market_value_usd: bestMarket?.value_usd ?? null,
+      best_market_product_specific: bestMarket?.product_specific ?? false,
       rationale:
         `${sector(r.hs_code)}: growing ${growth.toFixed(0)}% a year since ${base}, ` +
         `now ${(share * 100).toFixed(2)}% of ${flow}s at rank ${rank ?? '?'}. ` +
+        (bestMarket
+          ? bestMarket.product_specific
+            ? `Largest counterpart for this product is ${bestMarket.name}. `
+            : `Largest counterpart across all ${flow}s is ${bestMarket.name}. `
+          : '') +
         (consistency > 0.6
           ? 'Growth has been steady rather than a single spike.'
           : 'Growth is uneven, so treat the projection as directional.'),
     });
   }
 
-  return drafts.sort((a, b) => b.momentum - a.momentum).slice(0, 8);
+  return drafts.sort((a, b) => b.momentum - a.momentum).slice(0, SIGNALS_PER_FLOW);
 }
 
 function sumYear(rows: FactRow[], year: number, flow: 'export' | 'import'): number {
-  const t = rows
-    .filter((r) => r.year === year && r.flow === flow && r.stream === 'goods' && r.hs_code)
-    .reduce((s, r) => s + r.value_usd, 0);
+  // Chapter level: complete, and the only level safe to divide by.
+  const t = atLevel(
+    rows.filter((r) => r.year === year && r.flow === flow && r.stream === 'goods'),
+    CHAPTER_LEN,
+  ).reduce((s, r) => s + r.value_usd, 0);
   return t || 1;
 }
 
@@ -534,6 +668,41 @@ function consistencyScore(
 
 function sector(hs: string | null): string {
   return hs2Sector(hs);
+}
+
+/**
+ * The biggest counterpart country for one product line.
+ *
+ * Prefers a partner row recorded against this exact HS code. The keyless
+ * Comtrade tier cannot fetch partner and product together, so in practice it
+ * falls back to the country's largest partner for the flow as a whole. That
+ * fallback is marked by `product_specific: false` so callers can be honest
+ * about which of the two they are showing.
+ */
+function topPartnerFor(
+  rows: FactRow[],
+  flow: 'export' | 'import',
+  year: number,
+  hs: string | null,
+): { name: string; iso3: string | null; value_usd: number; product_specific: boolean } | null {
+  const partners = rows.filter(
+    (r) => r.year === year && r.flow === flow && r.stream === 'goods' && r.partner_iso3 !== null,
+  );
+  if (!partners.length) return null;
+
+  const pick = (subset: FactRow[]) =>
+    subset.reduce<FactRow | null>((best, r) => (!best || r.value_usd > best.value_usd ? r : best), null);
+
+  const specific = hs ? pick(partners.filter((r) => r.hs_code === hs)) : null;
+  const chosen = specific ?? pick(partners.filter((r) => r.hs_code === null));
+  if (!chosen) return null;
+
+  return {
+    name: chosen.partner_name ?? chosen.partner_iso3 ?? 'Unknown',
+    iso3: chosen.partner_iso3,
+    value_usd: chosen.value_usd,
+    product_specific: specific !== null,
+  };
 }
 
 function clamp01(n: number): number {

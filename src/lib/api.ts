@@ -3,6 +3,7 @@ import type {
   BusinessCardInput,
   ConversationSummary,
   CountryDashboard,
+  CountrySummary,
   Entity,
   EntityInput,
   EntityWithSources,
@@ -14,6 +15,8 @@ import type {
   Message,
   Plan,
   ProductBreakdown,
+  ProductCard,
+  ProductDetail,
   Playbook,
   PlaybookSummary,
   Rating,
@@ -113,6 +116,40 @@ export const api = {
   opportunities: () =>
     req<{ opportunities: ExploreOpportunity[]; count: number }>('/api/opportunities'),
 
+  /** Specific product lines across every activated country. The app's front door. */
+  products: (
+    params: {
+      q?: string;
+      flow?: 'export' | 'import';
+      continent?: string;
+      country?: string;
+      all?: boolean;
+      limit?: number;
+    } = {},
+  ) => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set('q', params.q);
+    if (params.flow) qs.set('flow', params.flow);
+    if (params.continent) qs.set('continent', params.continent);
+    if (params.country) qs.set('country', params.country);
+    if (params.all) qs.set('all', '1');
+    if (params.limit) qs.set('limit', String(params.limit));
+    const s = qs.toString();
+    return req<{ products: ProductCard[]; count: number }>(`/api/products${s ? `?${s}` : ''}`);
+  },
+
+  /** One product, everywhere it is traded. Backs the product modal. */
+  product: (hs: string) => req<ProductDetail>(`/api/products/${encodeURIComponent(hs)}`),
+
+  /** Countries index: summary figures only, no product lists. */
+  countries: (params: { continent?: string; q?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.continent) qs.set('continent', params.continent);
+    if (params.q) qs.set('q', params.q);
+    const s = qs.toString();
+    return req<{ countries: CountrySummary[]; count: number }>(`/api/countries${s ? `?${s}` : ''}`);
+  },
+
   market: {
     hsCodes: (q?: string, includeTraditional?: boolean) => {
       const qs = new URLSearchParams();
@@ -157,11 +194,16 @@ export const api = {
       }),
     remove: (slug: string) =>
       req<{ deleted: boolean }>(`/api/admin/entities/${slug}`, { method: 'DELETE' }),
-    runNow: (slug?: string) =>
-      req<{ run_id: string; status: string; entities_ok: number; entities_failed: number; errors: { slug: string; error: string }[] }>(
-        `/api/admin/runs${slug ? `?slug=${encodeURIComponent(slug)}` : ''}`,
-        { method: 'POST' },
-      ),
+    /** Rebuilds subscriber feeds from stored signals. Does not refetch source
+     *  data: that runs on the operator's machine via `npm run pipeline`. */
+    runNow: () =>
+      req<{
+        run_id: string;
+        status: string;
+        feed: { subscribers: number; subscriptions: number; items_written: number };
+        feedError: string | null;
+        note: string;
+      }>('/api/admin/runs', { method: 'POST' }),
     runs: () =>
       req<{ runs: Record<string, unknown>[] }>('/api/admin/runs'),
     checkLinks: () =>

@@ -102,13 +102,16 @@ r = await anon.get('/api/premium/subscriptions');
 check('anonymous cannot list subscriptions', r.status === 401);
 
 // 2. feed fan-out ------------------------------------------------------------
+// Ingest and analysis run on the operator's machine, not in the Worker, so
+// this drives the cloud half only: turning stored signals into feeds. The
+// figures themselves are whatever the last local pipeline run published.
 console.log('\n2. Weekly fan-out');
-r = await fetch(`${BASE}/api/admin/runs?slug=ghana`, {
+r = await fetch(`${BASE}/api/admin/runs`, {
   method: 'POST',
   headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
 });
 const run = await r.json();
-check('analysis run completes', run?.status === 'ok', `${run?.facts_written} facts`);
+check('feed rebuild completes', run?.status === 'ok', run?.feedError ?? 'no error');
 check('fan-out reports subscribers', (run?.feed?.subscribers ?? 0) >= 1,
   `${run?.feed?.subscribers} subscriber(s), ${run?.feed?.items_written} item(s)`);
 
@@ -123,7 +126,7 @@ check('locked items keep their title', items.filter((i) => i.locked).every((i) =
 check('free items are readable', items.filter((i) => !i.premium_only).every((i) => i.body !== null));
 
 const beforeCount = items.length;
-r = await fetch(`${BASE}/api/admin/runs?slug=ghana`, {
+r = await fetch(`${BASE}/api/admin/runs`, {
   method: 'POST',
   headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
 });

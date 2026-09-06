@@ -262,6 +262,112 @@ export interface MarketHsCode {
   category: ExportCategory;
 }
 
+// --- product-first browsing -------------------------------------------------
+
+/**
+ * One specific tradeable product line in one country, as shown on the home
+ * page and in the marketplace. This is the unit an SME actually decides about:
+ * "guavas, mangoes and mangosteens out of Ghana", not "Fruit & nuts".
+ */
+export interface ProductCard {
+  /** Stable across country and flow, so the modal can key on it. */
+  hs_code: string;
+  /** Shortened for display. */
+  name: string;
+  /** The source's full description. Shown in detail so the short form is never
+   *  the only thing the reader is given. */
+  name_full: string;
+  sector: string;
+  category: ExportCategory;
+  flow: Flow;
+  country: string;
+  slug: string;
+  iso3: string;
+  continent: string;
+  year: number;
+  value_usd: number;
+  /** Compound annual growth, percent. Null when the source's product detail
+   *  was capped and the years are not comparable. */
+  growth_pct: number | null;
+  /** 0-100, computed at read time. See shared/opportunity.ts. */
+  score: number;
+  /** Largest counterpart country for this flow. */
+  best_market: string | null;
+  best_market_iso3: string | null;
+  /**
+   * False when `best_market` is the country's largest counterpart for the
+   * whole flow rather than for this product. The sources currently ingested
+   * report partners per flow, not per product, so this is usually false and
+   * the UI must not present it as a per-product finding.
+   */
+  best_market_product_specific: boolean;
+  /** True when the figures come from a completed opportunity signal rather
+   *  than raw facts, so growth and momentum are available. */
+  has_signal: boolean;
+  /** Set when this country's product detail was capped by the source. */
+  partial_coverage: boolean;
+}
+
+/** One country's position in a single product, for the product modal. */
+export interface ProductCountry {
+  rank: number;
+  slug: string;
+  name: string;
+  iso3: string;
+  continent: string;
+  year: number;
+  value_usd: number;
+  growth_pct: number | null;
+  /** Where this country's trade in this flow mostly goes or comes from. */
+  best_market: string | null;
+}
+
+/**
+ * Everything shown when a product is opened from anywhere in the app.
+ * Deliberately global: the whole point of the modal is that clicking a product
+ * shows the product, not the country it happened to be listed under.
+ */
+export interface ProductDetail {
+  hs_code: string;
+  name: string;
+  name_full: string;
+  sector: string;
+  chapter: string;
+  chapter_label: string;
+  category: ExportCategory;
+  total_export_usd: number;
+  total_import_usd: number;
+  exporters: ProductCountry[];
+  importers: ProductCountry[];
+  /** Trading partners aggregated across the countries above. Partner detail is
+   *  reported per flow, not per product, on the sources currently ingested;
+   *  `product_specific` says which it is. */
+  partners: { name: string; iso3: string | null; value_usd: number; product_specific: boolean }[];
+  /** Other specific lines in the same chapter, so a dead end still offers a
+   *  next step. */
+  related: { hs_code: string; name: string; value_usd: number }[];
+  /** Countries reporting this product whose detail was capped by the source. */
+  partial_coverage: boolean;
+}
+
+/** A country as listed on the countries index: summary only, no products. */
+export interface CountrySummary {
+  slug: string;
+  name: string;
+  iso3: string | null;
+  continent: string | null;
+  is_active: boolean;
+  year: number | null;
+  export_usd: number | null;
+  import_usd: number | null;
+  balance_usd: number | null;
+  top_export: string | null;
+  top_partner: string | null;
+  /** How many non-traditional openings are on record for this country. */
+  opportunities: number;
+  last_ingest_at: string | null;
+}
+
 export interface Recommendation {
   headline: string;
   detail: string;

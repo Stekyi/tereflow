@@ -1671,3 +1671,95 @@ textarea {
   display: block;
   margin-top: 2px;
 }
+
+/* ---------- product row ---------- */
+
+/* One product as a tappable row. Shares the list-item surface but has to be a
+   button (it opens the modal rather than navigating), so the layout is set
+   here rather than inherited from the anchor rules. */
+.product-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  text-align: left;
+  padding: 15px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--card-shadow);
+  border-radius: var(--r);
+  margin-bottom: 9px;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s;
+}
+
+.product-row:hover {
+  border-color: var(--line);
+  box-shadow: var(--lift);
+  transform: translateY(-1px);
+}
+
+.product-row:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.product-row .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.product-row .name {
+  display: block;
+  font-weight: 620;
+  font-size: 14.5px;
+  margin-bottom: 3px;
+}
+
+.product-row-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.product-row-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.product-row-score .tiny {
+  max-width: 62px;
+  line-height: 1.25;
+}
+
+/* ---------- country figures ---------- */
+
+.country-figs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 10px 14px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.country-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.country-fig .num {
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

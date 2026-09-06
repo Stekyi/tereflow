@@ -60,7 +60,7 @@ export default function App() {
           </span>
         ) : (
           <button className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
-            â€¹ Back
+            ‹ Back
           </button>
         )}
         <h1>{title}</h1>

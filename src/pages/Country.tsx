@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Area,
   AreaChart,
@@ -21,6 +21,7 @@ import { Term } from '../components/Term';
 import { shortProductName } from '../../shared/product-name';
 import { BarRow, Empty, FollowButton, Skeletons, Stat, useToast } from '../components/ui';
 import GlobalProductModal from '../components/ProductModal';
+import SectionNav, { type Section } from '../components/SectionNav';
 import {
   EXPORT_CATEGORY_HINT,
   EXPORT_CATEGORY_LABEL,
@@ -29,11 +30,62 @@ import {
   linkHealth,
   LINK_HEALTH_LABEL,
   type CountryDashboard,
+  type CountrySummary,
   type ExportCategory,
-  type ProductBreakdown,
   type RankedItem,
   type Recommendation,
 } from '../../shared/types';
+
+// --- sector colouring for the product charts ---------------------------------
+//
+// Colour carries meaning here: each bar is tinted by the product's sector,
+// derived from its HS2 chapter (the first two digits of the code). We rebuild
+// the chapter grouping on the client rather than importing the worker's
+// hs2Sector, so no server code leaks into the bundle. A chapter we cannot place
+// falls to an honest "Other" instead of being forced into a family.
+interface Sector {
+  key: string;
+  label: string;
+  color: string;
+}
+
+const SECTORS: Record<string, Sector> = {
+  agrifood: { key: 'agrifood', label: 'Agriculture and food', color: '#4f7a3f' },
+  minerals: { key: 'minerals', label: 'Minerals and fuels', color: '#6b5744' },
+  chemicals: { key: 'chemicals', label: 'Chemicals and plastics', color: '#6f5aa0' },
+  textiles: { key: 'textiles', label: 'Textiles and clothing', color: '#a4557a' },
+  metals: { key: 'metals', label: 'Metals and gems', color: '#9c6b3b' },
+  machinery: { key: 'machinery', label: 'Machinery and electronics', color: '#2f6f9f' },
+  vehicles: { key: 'vehicles', label: 'Vehicles and transport', color: '#2b8a8a' },
+  other: { key: 'other', label: 'Other sectors', color: '#8a94a2' },
+};
+
+// Stable order for the legend, so families always read in the same sequence.
+const SECTOR_ORDER = [
+  'agrifood',
+  'minerals',
+  'chemicals',
+  'textiles',
+  'metals',
+  'machinery',
+  'vehicles',
+  'other',
+];
+
+/** Maps an HS code to a sector family via its HS2 chapter. A missing or
+ *  unrecognised code returns the honest "Other" family rather than a guess. */
+function sectorFor(code: string | null | undefined): Sector {
+  const hs2 = code ? Number(code.slice(0, 2)) : NaN;
+  if (!Number.isFinite(hs2)) return SECTORS.other;
+  if (hs2 >= 1 && hs2 <= 24) return SECTORS.agrifood;
+  if (hs2 >= 25 && hs2 <= 27) return SECTORS.minerals;
+  if (hs2 >= 28 && hs2 <= 40) return SECTORS.chemicals;
+  if (hs2 >= 50 && hs2 <= 67) return SECTORS.textiles;
+  if (hs2 === 71 || (hs2 >= 72 && hs2 <= 83)) return SECTORS.metals;
+  if (hs2 === 84 || hs2 === 85) return SECTORS.machinery;
+  if (hs2 >= 86 && hs2 <= 89) return SECTORS.vehicles;
+  return SECTORS.other;
+}
 
 export default function Country() {
   const { slug = '' } = useParams();
@@ -48,12 +100,17 @@ export default function Country() {
   const { user, refresh } = useSession();
   const t = useToast();
   const [subs, setSubs] = useState<Map<string, string>>(new Map());
-  const [productDetail, setProductDetail] = useState<ProductBreakdown | null>(null);
-  const [productLoading, setProductLoading] = useState(false);
-  // The HS code of the product currently open in the country-scoped breakdown,
-  // so the reader can jump from it to the global worldwide view.
-  const [openHs, setOpenHs] = useState<string | null>(null);
-  const [worldHs, setWorldHs] = useState<string | null>(null);
+  // One product modal, scoped to this country and the flow the row or bar was
+  // listed under, so the reader sees this country's figures for that product.
+  // A worldwide tap (an early signal) leaves slug and flow unset.
+  const [modal, setModal] = useState<{ hs: string; slug?: string; flow?: 'export' | 'import' } | null>(
+    null,
+  );
+  // ISO3 -> slug for countries we actually have a page for, so partner names
+  // only become links when the destination exists (no dead links to untracked
+  // partners).
+  const [partnerSlug, setPartnerSlug] = useState<Map<string, string>>(new Map());
+  const navigate = useNavigate();
   // Traditional/gated products (gold, oil, ...) are hidden from the products
   // list by default -- an SME can't act on them -- with an explicit toggle
   // to reveal them, rather than ranking them alongside things it can trade.
@@ -107,18 +164,11 @@ export default function Country() {
     }
   }
 
-  async function openProduct(item: RankedItem, flow: 'export' | 'import') {
+  // Open the shared modal scoped to this country and flow. Guard a null code
+  // so a partner-style row with no HS code can never open an empty modal.
+  function openProduct(item: RankedItem, flow: 'export' | 'import') {
     if (!item.code) return;
-    setProductLoading(true);
-    setProductDetail(null);
-    setOpenHs(item.code);
-    try {
-      setProductDetail(await api.productBreakdown(slug, flow, item.code));
-    } catch (e) {
-      t.err((e as Error).message);
-    } finally {
-      setProductLoading(false);
-    }
+    setModal({ hs: item.code, slug, flow });
   }
 
   useEffect(() => {
@@ -131,6 +181,22 @@ export default function Country() {
       .finally(() => setLoading(false));
     api.dashboardSources(slug).then(setSources).catch(() => undefined);
   }, [slug]);
+
+  // Build the ISO3 -> slug map once, from the countries that actually have a
+  // page (active only), so a trading partner links through when we cover it and
+  // stays plain text when we do not.
+  useEffect(() => {
+    api
+      .countries({})
+      .then((r) => {
+        const map = new Map<string, string>();
+        for (const c of r.countries as CountrySummary[]) {
+          if (c.is_active && c.iso3) map.set(c.iso3.toUpperCase(), c.slug);
+        }
+        setPartnerSlug(map);
+      })
+      .catch(() => undefined);
+  }, []);
 
   if (loading) return <Skeletons n={6} />;
   if (error) return <Empty title="Could not load this market" hint={error} />;
@@ -158,6 +224,22 @@ export default function Country() {
     );
   }
 
+  // Only advertise sections that actually render, so the sticky nav never points
+  // at an anchor that is not on the page. The charts and balance always render
+  // (they show their own empty state), so they are unconditional.
+  const hasSignals = !!(data.opportunities?.length || data.opportunities_locked > 0);
+  const hasPartners = data.partners_export.length > 0 || data.partners_import.length > 0;
+  const sectionLinks: Section[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'imports', label: 'Imports' },
+    { id: 'exports', label: 'Exports' },
+    { id: 'balance', label: 'Trade balance' },
+    { id: 'read', label: 'What this means' },
+    ...(hasSignals ? [{ id: 'signals', label: 'Early signals' }] : []),
+    ...(hasPartners ? [{ id: 'partners', label: 'Partners' }] : []),
+    ...(sources ? [{ id: 'sources', label: 'Sources' }] : []),
+  ];
+
   return (
     <>
       <Header
@@ -179,21 +261,19 @@ export default function Country() {
         {o.coverage_note ? ` · ${o.coverage_note}` : ''}
       </p>
       {t.node}
-      {(productLoading || productDetail) && (
-        <ProductModal
-          detail={productDetail}
-          loading={productLoading}
-          onWorldwide={openHs ? () => setWorldHs(openHs) : undefined}
-          onClose={() => {
-            setProductDetail(null);
-            setProductLoading(false);
-            setOpenHs(null);
-          }}
+      {modal && (
+        <GlobalProductModal
+          hsCode={modal.hs}
+          countrySlug={modal.slug ?? null}
+          flow={modal.flow ?? null}
+          onClose={() => setModal(null)}
         />
       )}
-      {worldHs && <GlobalProductModal hsCode={worldHs} onClose={() => setWorldHs(null)} />}
+
+      <SectionNav sections={sectionLinks} />
       <div style={{ height: 12 }} />
 
+      <section id="overview" className="section-anchor" aria-label="Overview">
       <div className="grid three" style={{ marginBottom: 16 }}>
         <Stat
           label={
@@ -228,7 +308,9 @@ export default function Country() {
           deltaTone={o.balance_usd >= 0 ? 'up' : 'down'}
         />
       </div>
+      </section>
 
+      <section id="imports" className="section-anchor" aria-label="Top imports">
       <label className="row small dim" style={{ gap: 6, marginBottom: 14, cursor: 'pointer' }}>
         <input
           type="checkbox"
@@ -241,24 +323,27 @@ export default function Country() {
 
       <ProductBarChart
         title="Top imports by value"
-        caption="What this country buys most. Green bars are non-traditional lines an SME can supply; grey bars are large licensed trade. Tap a bar for its partner breakdown."
+        caption="What this country buys most, coloured by sector so you can read the mix at a glance. Faded bars are large licensed trade (gold, oil, and similar); solid bars are non-traditional lines an SME can supply. Tap a bar for this country's figures on that product."
         items={reRank(data.top_imports, showMajor)}
         flow="import"
-        colorByCategory
         onProductClick={openProduct}
         emptyHint="No import breakdown recorded for this year."
       />
+      </section>
 
+      <section id="exports" className="section-anchor" aria-label="Non-traditional exports">
       <ProductBarChart
         title="Non-traditional exports"
-        caption="Value sold abroad outside the headline commodities, with recent yearly growth per line. Tap a bar for its partner breakdown."
+        caption="Value sold abroad outside the headline commodities, coloured by sector, with recent yearly growth per line. Tap a bar for this country's figures on that product."
         items={data.top_exports.filter((i) => i.category === 'non_traditional')}
         flow="export"
         showGrowth
         onProductClick={openProduct}
         emptyHint="No non-traditional export lines recorded for this year."
       />
+      </section>
 
+      <section id="balance" className="section-anchor" aria-label="Trade balance">
       {data.trend.length > 1 ? (
         <div className="card">
           <p className="card-title">Merchandise trade balance</p>
@@ -345,7 +430,9 @@ export default function Country() {
           <Empty title="Not enough history" hint="A trend needs at least two years of data." />
         </div>
       )}
+      </section>
 
+      <section id="read" className="section-anchor" aria-label="What this means">
       <div className="section-head">
         <h2>What this means</h2>
       </div>
@@ -354,7 +441,9 @@ export default function Country() {
       ) : (
         data.recommendations.map((r, i) => <Rec key={i} rec={r} />)
       )}
+      </section>
 
+      <section id="signals" className="section-anchor" aria-label="Early signals">
       {/* Premium. Kept on this page because the signals are per country: a
           reader looking at one market is exactly who this is for. The count is
           shown to everyone and the detail only to entitled accounts, so the
@@ -409,7 +498,7 @@ export default function Country() {
                       type="button"
                       className="btn ghost sm"
                       style={{ marginTop: 12 }}
-                      onClick={() => setWorldHs(s.hs_code)}
+                      onClick={() => setModal({ hs: s.hs_code as string })}
                     >
                       See this product worldwide
                     </button>
@@ -441,12 +530,18 @@ export default function Country() {
           )}
         </>
       )}
+      </section>
 
-      <Ranked title="Where exports go" items={data.partners_export} />
-      <Ranked title="Where imports come from" items={data.partners_import} />
+      <section id="partners" className="section-anchor" aria-label="Trading partners">
+      <div className="section-head">
+        <h2>Trading partners</h2>
+      </div>
+      <Ranked title="Where exports go" items={data.partners_export} partnerSlug={partnerSlug} onGo={(s) => navigate(`/country/${s}`)} />
+      <Ranked title="Where imports come from" items={data.partners_import} partnerSlug={partnerSlug} onGo={(s) => navigate(`/country/${s}`)} />
+      </section>
 
       {sources && (
-        <>
+        <section id="sources" className="section-anchor" aria-label="Where this comes from">
           <div className="section-head">
             <h2>Where this comes from</h2>
           </div>
@@ -478,7 +573,7 @@ export default function Country() {
               ) : null,
             )}
           </div>
-        </>
+        </section>
       )}
 
       {data.computed_at && (
@@ -537,19 +632,28 @@ function Ranked({
   follow,
   flow,
   onProductClick,
+  partnerSlug,
+  onGo,
 }: {
   title: string;
   items: RankedItem[];
   follow?: FollowWiring;
   flow?: 'export' | 'import';
   onProductClick?: (item: RankedItem, flow: 'export' | 'import') => void;
+  // For partner lists: an ISO3 -> slug map and a go handler, so a partner we
+  // cover becomes a tap through to its own market and one we do not stays plain.
+  partnerSlug?: Map<string, string>;
+  onGo?: (slug: string) => void;
 }) {
   if (!items.length) return null;
   const max = Math.max(...items.map((i) => i.share_pct), 1);
   return (
     <div className="card">
       <p className="card-title">{title}</p>
-      {items.map((i) => (
+      {items.map((i) => {
+        const partnerDest =
+          !flow && onGo && partnerSlug && i.code ? partnerSlug.get(i.code.toUpperCase()) : undefined;
+        return (
         <BarRow
           key={`${i.rank}-${i.code}`}
           rank={i.rank}
@@ -590,133 +694,24 @@ function Ranked({
                   </span>
                 </>
               )}
+              {partnerDest && (
+                <>
+                  {' · '}
+                  <span className="u">View market {'\u203a'}</span>
+                </>
+              )}
             </>
           }
           onClick={
-            flow && onProductClick && i.code ? () => onProductClick(i, flow) : undefined
+            flow && onProductClick && i.code
+              ? () => onProductClick(i, flow)
+              : partnerDest
+                ? () => onGo!(partnerDest)
+                : undefined
           }
         />
-      ))}
-    </div>
-  );
-}
-
-function ProductModal({
-  detail,
-  loading,
-  onClose,
-  onWorldwide,
-}: {
-  detail: ProductBreakdown | null;
-  loading: boolean;
-  onClose: () => void;
-  onWorldwide?: () => void;
-}) {
-  useEffect(() => {
-    if (!loading && !detail) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [detail, loading, onClose]);
-
-  return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <section
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="product-modal-title"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="row between" style={{ gap: 12 }}>
-          <div>
-            <p className="overline" style={{ margin: 0 }}>
-              Product breakdown
-            </p>
-            <h2 id="product-modal-title" style={{ margin: '3px 0 0', fontSize: 24 }}>
-              {detail?.product_name ?? 'Loading product details'}
-            </h2>
-          </div>
-          <button className="icon-btn" type="button" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
-
-        {loading || !detail ? (
-          <div className="skeleton" style={{ height: 120, marginTop: 18 }} />
-        ) : (
-          <>
-            <div className="product-summary">
-              <div>
-                <span className="tiny dim">Flow</span>
-                <strong>{detail.flow === 'export' ? 'Exported' : 'Imported'}</strong>
-              </div>
-              <div>
-                <span className="tiny dim">Year</span>
-                <strong>{detail.year}</strong>
-              </div>
-              <div>
-                <span className="tiny dim">Product total</span>
-                <strong>{fmtUsd(detail.product_value_usd)}</strong>
-              </div>
-              <div>
-                <span className="tiny dim">Volume</span>
-                <strong>
-                  {detail.product_qty != null
-                    ? `${detail.product_qty.toLocaleString()}${detail.product_qty_unit ? ` ${detail.product_qty_unit}` : ''}`
-                    : 'Not reported'}
-                </strong>
-              </div>
-            </div>
-            <p className="small muted" style={{ margin: '16px 0 10px' }}>
-              {detail.note}
-            </p>
-            {onWorldwide && (
-              <button
-                type="button"
-                className="btn ghost sm"
-                onClick={onWorldwide}
-                style={{ marginBottom: 10 }}
-              >
-                See this product worldwide
-              </button>
-            )}
-            {detail.rows.length ? (
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Trading partner</th>
-                      <th>Volume</th>
-                      <th className="align-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detail.rows.map((row, index) => (
-                      <tr key={`${row.partner_iso3 ?? row.partner_name}-${index}`}>
-                        <td>
-                          <strong>{row.partner_name}</strong>
-                          {row.partner_iso3 && <span className="tiny dim"> {row.partner_iso3}</span>}
-                        </td>
-                        <td>
-                          {row.qty != null
-                            ? `${row.qty.toLocaleString()}${row.qty_unit ? ` ${row.qty_unit}` : ''}`
-                            : 'Not reported'}
-                        </td>
-                        <td className="align-right num">{fmtUsd(row.value_usd)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <Empty title="No partner rows reported" hint="The product total is available above." />
-            )}
-          </>
-        )}
-      </section>
+        );
+      })}
     </div>
   );
 }
@@ -848,16 +843,16 @@ function BarTooltip({
 }
 
 /** Horizontal bar chart of products. Bars are tappable and open the product
- *  modal rather than navigating away. When colorByCategory is set, non-traditional
- *  (SME-accessible) lines are drawn in the up/green colour and traditional lines
- *  in the muted one. */
+ *  modal rather than navigating away. Each bar is coloured by its product's
+ *  sector (from the HS2 chapter) so the mix reads at a glance, and traditional
+ *  (licensed) lines are drawn faded so that separate signal stays visible. A
+ *  legend below lists only the sectors actually present. */
 function ProductBarChart({
   title,
   caption,
   items,
   flow,
   onProductClick,
-  colorByCategory,
   showGrowth,
   emptyHint,
 }: {
@@ -866,7 +861,6 @@ function ProductBarChart({
   items: RankedItem[];
   flow: 'export' | 'import';
   onProductClick: (item: RankedItem, flow: 'export' | 'import') => void;
-  colorByCategory?: boolean;
   showGrowth?: boolean;
   emptyHint: string;
 }) {
@@ -878,6 +872,11 @@ function ProductBarChart({
     category: i.category,
     item: i,
   }));
+  // Sectors present in this chart, in the stable legend order, so the key only
+  // shows families that actually appear.
+  const present = new Set(rows.map((r) => sectorFor(r.item.code).key));
+  const legend = SECTOR_ORDER.filter((k) => present.has(k)).map((k) => SECTORS[k]);
+  const hasTraditional = rows.some((r) => r.category === 'traditional');
   // Height grows with the row count so bars stay tall enough to tap on a phone,
   // and so two-line axis labels are not clipped by their neighbours.
   const height = Math.max(150, rows.length * 40 + 24);
@@ -927,13 +926,8 @@ function ProductBarChart({
                   {rows.map((r, idx) => (
                     <Cell
                       key={idx}
-                      fill={
-                        colorByCategory
-                          ? r.category === 'non_traditional'
-                            ? CHART.up
-                            : CHART.muted
-                          : CHART.up
-                      }
+                      fill={sectorFor(r.item.code).color}
+                      fillOpacity={r.category === 'traditional' ? 0.45 : 1}
                     />
                   ))}
                   {showGrowth && (
@@ -947,6 +941,20 @@ function ProductBarChart({
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+          </div>
+          <div className="chart-legend" aria-hidden="true">
+            {legend.map((s) => (
+              <span className="chart-legend-item" key={s.key}>
+                <span className="swatch" style={{ background: s.color }} />
+                {s.label}
+              </span>
+            ))}
+            {hasTraditional && (
+              <span className="chart-legend-item">
+                <span className="swatch faded" />
+                Traditional (licensed)
+              </span>
+            )}
           </div>
           <p className="tiny dim" style={{ margin: '8px 4px 0' }}>
             {caption}

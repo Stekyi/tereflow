@@ -2189,3 +2189,131 @@ textarea {
   display: flex;
   flex-direction: column;
 }
+
+/* --- portal: editable thresholds -------------------------------------- */
+
+/* A row per setting rather than one big form. Each saves on its own, so a
+   change is always traceable to the number that caused it. */
+.setting-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.setting-row:first-child {
+  border-top: none;
+}
+
+.setting-row code {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+
+.setting-input {
+  width: 116px;
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.setting-input:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+  border-color: var(--brand);
+}
+
+.btn.small {
+  padding: 7px 11px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+/* Below the fold of a phone the controls need their own line, or the
+   description column collapses to two words per row. */
+@media (max-width: 560px) {
+  .setting-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .setting-input {
+    flex: 1;
+    width: auto;
+    text-align: left;
+  }
+
+  .setting-row > .row {
+    width: 100%;
+  }
+}
+
+/* ---------- in-page section nav (Country) ---------- */
+
+/* Mirrors .country-nav so it sticks just under the app topbar and bleeds to the
+   screen edges inside main's padding. top matches the topbar height. */
+.section-nav {
+  position: sticky;
+  top: 56px;
+  z-index: 30;
+  margin: calc(var(--pad) * -1) calc(var(--pad) * -1) 0;
+  padding: 10px var(--pad);
+  background: rgba(251, 250, 247, 0.94);
+  backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.section-nav .scroll-x {
+  margin-bottom: 0;
+}
+
+/* The chips are anchors here, so drop the default underline. */
+.section-nav .chip {
+  text-decoration: none;
+}
+
+/* Offset in-page jumps and IntersectionObserver activation past the topbar and
+   this sticky nav, so a section is not hidden behind them when focused. */
+.section-anchor {
+  scroll-margin-top: 118px;
+  outline: none;
+}
+
+/* ---------- product chart legend ---------- */
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 10px 4px 0;
+}
+
+.chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.chart-legend .swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex: none;
+}
+
+/* The faded swatch stands for traditional (licensed) lines, drawn at reduced
+   opacity in the bars themselves. */
+.chart-legend .swatch.faded {
+  background: var(--muted);
+  opacity: 0.45;
+}

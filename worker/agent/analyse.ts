@@ -18,6 +18,28 @@ export interface AnalysisBundle {
   yearly_trend: TrendPoint[];
   recommendations: Recommendation[];
   signals: SignalDraft[];
+  /** Per-product rows for product_analytics, so the modal is a single read. */
+  product_analytics: ProductAnalyticsRow[];
+}
+
+/**
+ * One product, one direction, for this country.
+ *
+ * Computed here rather than on request because the alternative is scanning
+ * every country's facts every time somebody opens a product, and because the
+ * cross-country price comparison can only be settled once every country has
+ * been through.
+ */
+export interface ProductAnalyticsRow {
+  hs_code: string;
+  flow: 'export' | 'import';
+  year: number;
+  value_usd: number;
+  qty_kg: number | null;
+  /** Dollars per tonne. Null, never zero, when no weight was reported. */
+  unit_value_usd_t: number | null;
+  cagr_pct: number | null;
+  share: number | null;
 }
 
 export interface SignalDraft {
@@ -202,7 +224,65 @@ export function analyse(
     yearly_trend: trend,
     recommendations,
     signals,
+    product_analytics: buildProductAnalytics(rows, productYear, productYears, truncated),
   };
+}
+
+/**
+ * Every specific product this country reports, with its price per tonne.
+ *
+ * Covers the whole product list rather than the top N, because the product
+ * modal is opened by HS code from anywhere in the app and a product outside
+ * this country's top twelve is still a product somebody can look up.
+ */
+function buildProductAnalytics(
+  rows: FactRow[],
+  latest: number,
+  years: number[],
+  truncatedYears: Set<number>,
+): ProductAnalyticsRow[] {
+  const out: ProductAnalyticsRow[] = [];
+  const threeBack = nearestPastYear(years, latest - 3, latest);
+
+  for (const flow of ['export', 'import'] as const) {
+    const { rows: current, level } = productRows(rows, flow, latest);
+    if (!current.length) continue;
+
+    const reported = totalFor(rows, latest, flow);
+    const total = reported > 0 ? reported : current.reduce((s, r) => s + r.value_usd, 0);
+    const floor = level === SPECIFIC_LEN ? NOISE_FLOOR.hs6 : NOISE_FLOOR.hs2;
+    const comparable =
+      level !== SPECIFIC_LEN ||
+      (!truncatedYears.has(latest) && threeBack != null && !truncatedYears.has(threeBack));
+
+    for (const r of current) {
+      if (!r.hs_code) continue;
+
+      // netWgt is kilograms, so a tonne is a thousand of them. Left null
+      // rather than zero when there is no weight: "no price reported" and "a
+      // price of nothing" are different claims and only one of them is true.
+      const tonnes = r.qty && r.qty > 0 ? r.qty / 1000 : null;
+      const unitValue = tonnes ? r.value_usd / tonnes : null;
+
+      const past = threeBack != null ? valueOf(rows, threeBack, flow, r.hs_code) : undefined;
+
+      out.push({
+        hs_code: r.hs_code,
+        flow,
+        year: latest,
+        value_usd: r.value_usd,
+        qty_kg: r.qty ?? null,
+        unit_value_usd_t: unitValue,
+        cagr_pct:
+          comparable && threeBack != null
+            ? growthFrom(past, r.value_usd, latest - threeBack, floor.valueUsd)
+            : null,
+        share: total > 0 ? r.value_usd / total : null,
+      });
+    }
+  }
+
+  return out;
 }
 
 // --- building blocks --------------------------------------------------------

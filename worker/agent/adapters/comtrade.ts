@@ -100,7 +100,7 @@ export async function fetchComtrade(
     return call(env, hasKey, params);
   };
 
-  // Pass 1 — country totals and partner mix per year.
+  // Pass 1 â€” country totals and partner mix per year.
   // This also tells us which years actually have data.
   for (const [flowCode, flow] of FLOWS) {
     const periods = hasKey ? [years.join(',')] : years.map(String);
@@ -127,7 +127,7 @@ export async function fetchComtrade(
           : r.partnerISO || M49_TO_ISO3[partnerCode] || null;
 
         // Comtrade reports aggregates like "Areas, nes" and free-trade zones
-        // that have no ISO3. They must never fall through to the world row —
+        // that have no ISO3. They must never fall through to the world row â€”
         // doing so corrupts the country total the whole trend hangs off.
         if (!isWorld && !partnerIso) continue;
 
@@ -151,7 +151,7 @@ export async function fetchComtrade(
     }
   }
 
-  // Pass 2 — product mix, at two levels of detail.
+  // Pass 2 â€” product mix, at two levels of detail.
   //
   // AG2 (~97 chapters) always fits inside the keyless 500-row preview cap, so
   // it is complete and safe to compute totals, shares and concentration from.
@@ -183,7 +183,7 @@ export async function fetchComtrade(
 
   const truncatedYears = new Set<number>();
 
-  // Pass 2a — chapters. Complete, and it tells us where the trade actually is.
+  // Pass 2a â€” chapters. Complete, and it tells us where the trade actually is.
   const chapterValue = new Map<string, number>();
   for (const [flowCode, flow] of FLOWS) {
     const periods = hasKey ? [productYears.join(',')] : productYears.map(String);
@@ -218,14 +218,17 @@ export async function fetchComtrade(
           sector: hs2Sector(hs),
           value_usd: value,
           qty: r.netWgt ?? null,
-          qty_unit: r.qtyUnitAbbr ?? null,
+          // netWgt is kilograms by definition. qtyUnitAbbr is absent on the
+          // preview tier, and storing null there left every quantity
+          // unitless, which makes a unit value impossible to compute.
+          qty_unit: r.netWgt != null ? 'kg' : null,
           source_ref: SOURCE_REF,
         });
       }
     }
   }
 
-  // Pass 2b — specific lines, chapter by chapter.
+  // Pass 2b â€” specific lines, chapter by chapter.
   //
   // Only the two years the growth rate is measured between. The intermediate
   // year is used for the year-on-year figure, which is only ever shown at
@@ -275,7 +278,7 @@ export async function fetchComtrade(
             sector: hs2Sector(hs),
             value_usd: value,
             qty: r.netWgt ?? null,
-            qty_unit: r.qtyUnitAbbr ?? null,
+            qty_unit: r.netWgt != null ? 'kg' : null,
             source_ref: SOURCE_REF,
           });
         }
@@ -429,7 +432,7 @@ function hs6CodeOf(cmdCode: string | undefined): string | null {
  * of transport (0), and all second partners (0).
  *
  * Comtrade repeats the same value across each of those sub-dimensions. Skipping
- * any one of them silently corrupts the totals — Germany, for instance, files
+ * any one of them silently corrupts the totals â€” Germany, for instance, files
  * imports broken down by country of origin as well as country of consignment,
  * so without pinning partner2Code the world total falls off the end of the
  * response and the country appears to import almost nothing.

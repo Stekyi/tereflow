@@ -387,6 +387,126 @@ export const FEEDBACK_KIND_LABEL: Record<FeedbackKind, string> = {
   other: 'Something else',
 };
 
+// --- product analytics ------------------------------------------------------
+
+/** Where a country's price sits against the world median for that product. */
+export type PricePremium = 'high' | 'typical' | 'low' | 'unknown';
+
+export const PRICE_PREMIUM_LABEL: Record<PricePremium, string> = {
+  high: 'Above the world median',
+  typical: 'Around the world median',
+  low: 'Below the world median',
+  unknown: 'No price reported',
+};
+
+/** One country's position in one product, on one side of the trade. */
+export interface ProductCountryRow {
+  rank: number;
+  slug: string;
+  name: string;
+  iso3: string | null;
+  continent: string | null;
+  year: number;
+  value_usd: number;
+  /** Kilograms as reported. Null where the source gave a value but no weight. */
+  qty_kg: number | null;
+  /** Dollars per tonne. Null rather than zero when no weight was reported. */
+  unit_value_usd_t: number | null;
+  /** Percent per year. Null when the years were not comparable. */
+  cagr_pct: number | null;
+  /** Fraction of that country's trade in this direction, 0..1. */
+  share: number | null;
+  /** This country's unit value over the world median. Null without a price. */
+  price_ratio: number | null;
+  price_premium: PricePremium;
+}
+
+/**
+ * Everything the product modal shows.
+ *
+ * Deliberately does not carry a gross margin. Margin needs a cost basis, and
+ * the sources here report traded values and weights, not costs. Unit value and
+ * the premium against the world median are the honest neighbours of that idea:
+ * they say what the trade actually fetches, not what it earns.
+ */
+export interface ProductInsight {
+  hs_code: string;
+  name: string;
+  name_full: string;
+  sector: string;
+  chapter: string;
+  chapter_label: string;
+  category: ExportCategory;
+
+  /** 0-100, the same score used on the cards. */
+  score: number;
+  /** Percent per year for the country in focus, or the largest seller. */
+  growth_pct: number | null;
+  value_usd: number;
+  year: number | null;
+  unit_value_usd_t: number | null;
+  price_premium: PricePremium;
+  price_ratio: number | null;
+  /** Median dollars per tonne across every country reporting a weight. */
+  world_median_usd_t: number | null;
+  /**
+   * Set when the headline country reports no weight, so its price had to come
+   * from the next largest seller that does. Naming that country is the
+   * difference between a quoted price and an unattributed one.
+   */
+  price_from_name: string | null;
+
+  /** Set when the modal was opened scoped to one country. */
+  focus_slug: string | null;
+  focus_name: string | null;
+
+  sellers: ProductCountryRow[];
+  buyers: ProductCountryRow[];
+
+  /**
+   * Where the demand is growing. Importing countries ranked by growth rather
+   * than size, which is the question somebody choosing a market is asking.
+   */
+  target_markets: { slug: string; name: string; iso3: string | null; value_usd: number; cagr_pct: number | null }[];
+
+  /** Other lines in the same chapter, so a dead end still offers a next step. */
+  related: { hs_code: string; name: string; value_usd: number }[];
+
+  /** People on Tereflow who follow this product, for reaching out. */
+  subscribers: ProductSubscriber[];
+  subscriber_count: number;
+
+  /**
+   * True when no country reports a partner breakdown for this product, which
+   * is the normal state on the keyless source tier. Says plainly that the
+   * buyer and seller lists are country totals, not country-to-country flows.
+   */
+  partner_detail_available: boolean;
+  totals: {
+    export_usd: number;
+    import_usd: number;
+    reporting_countries: number;
+    /**
+     * Countries carrying analysed product data at all, so the reader can see
+     * that four reporters out of eleven is thin coverage of this line rather
+     * than four countries being the whole world market.
+     */
+    countries_with_data: number;
+  };
+}
+
+/** A person following a product, shown so somebody can actually reach them. */
+export interface ProductSubscriber {
+  card_id: string | null;
+  display_name: string;
+  company: string | null;
+  headline: string | null;
+  country_iso3: string | null;
+  intents: string[];
+  rating_avg: number | null;
+  rating_count: number;
+}
+
 export interface Recommendation {  headline: string;
   detail: string;
   /** why an investor should care */

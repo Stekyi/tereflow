@@ -188,6 +188,20 @@ class Api {
       body: JSON.stringify(payload),
     });
   }
+  /** Per-product rows for the product modal. Sent after the analysis commits. */
+  productAnalytics(slug: string, rows: unknown[]) {
+    return this.call<{ written: number }>('/api/admin/ingest/product-analytics', {
+      method: 'POST',
+      body: JSON.stringify({ slug, rows }),
+    });
+  }
+  /**
+   * Settle the cross-country price comparison. Runs once at the end of a pass,
+   * because a country's price only means something next to everybody else's.
+   */
+  priceRatios() {
+    return this.call<{ priced: number }>('/api/admin/ingest/price-ratios', { method: 'POST' });
+  }
   fail(slug: string, error: string) {
     return this.call<{ ok: true }>('/api/admin/ingest/fail', {
       method: 'POST',
@@ -329,6 +343,7 @@ async function main() {
           },
           signals: bundle.signals,
         });
+        await api.productAnalytics(entity.slug, bundle.product_analytics);
 
         const o = bundle.overview;
         console.log(
@@ -430,6 +445,7 @@ async function main() {
         },
         signals: bundle.signals,
       });
+      await api.productAnalytics(entity.slug, bundle.product_analytics);
 
       ok++;
       factsTotal += rows.length;
@@ -477,6 +493,18 @@ async function main() {
       log: { errors },
     });
     console.log(`Run ${result.status}. Feed: ${JSON.stringify(result.feed)}`);
+
+    // Prices can only be compared once every country in this pass has been
+    // through, so the cross-country ratio is settled here rather than per
+    // country.
+    if (ok > 0) {
+      try {
+        const priced = await api.priceRatios();
+        console.log(`Prices: ${priced.priced} product rows compared to the world median`);
+      } catch (err) {
+        console.log(`Price comparison skipped: ${err instanceof Error ? err.message : err}`);
+      }
+    }
 
     // Link health is cheap and belongs on the same schedule.
     try {

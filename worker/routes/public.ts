@@ -5,6 +5,7 @@ import { currentUser, isEntitled } from '../lib/session';
 import { hs2Label, hs2Sector, hs6Label } from '../agent/codes';
 import { shortProductName } from '../../shared/product-name';
 import { opportunityScore } from '../../shared/opportunity';
+import { buildProductInsight } from '../lib/product-insight';
 import {
   classify,
   dominantCodes,
@@ -446,6 +447,23 @@ function toProductCard(
     partial_coverage: r.cagr_3y == null,
   };
 }
+
+/**
+ * The product insight behind the modal.
+ *
+ * Reads precomputed analytics rather than aggregating on request. Pass
+ * `?country=slug` to scope the headline figures to one country while keeping
+ * the global lists, which is what the country page does.
+ */
+pub.get('/insight/:hs', async (c) => {
+  const hs = c.req.param('hs').trim();
+  if (!/^\d{2}$|^\d{6}$/.test(hs)) {
+    return bad('hs must be a 2-digit chapter or 6-digit product code', 400);
+  }
+  const country = c.req.query('country')?.trim() || null;
+  const insight = await buildProductInsight(c.env, hs, country);
+  return json(insight, 200, { 'cache-control': 'public, max-age=300', vary: 'Cookie' });
+});
 
 /**
  * One product, everywhere it is traded.

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { attachSources, bad, getEntityBySlug, json, slugify, uid } from '../lib/db';
 import { requireAdmin } from '../lib/auth';
+import { loadSettings } from '../lib/settings';
 import { dominantCodes, loadClassifications, resolveAll } from '../lib/classify';
 import { loadResult } from './public';
 import {
@@ -406,6 +407,149 @@ admin.post('/ingest/start', async (c) => {
     .bind(runId)
     .run();
   return json({ run_id: runId });
+});
+
+/**
+ * Per-product analytics for one country.
+ *
+ * Written after the analysis commits, so the product modal is a single indexed
+ * read rather than an aggregation across every country. Replaces this
+ * country's rows wholesale: a product it no longer reports should disappear,
+ * not linger at its old value.
+ */
+admin.post('/ingest/product-analytics', async (c) => {
+  const body = (await c.req.json()) as {
+    slug: string;
+    rows: {
+      hs_code: string;
+      flow: 'export' | 'import';
+      year: number;
+      value_usd: number;
+      qty_kg: number | null;
+      unit_value_usd_t: number | null;
+      cagr_pct: number | null;
+      share: number | null;
+    }[];
+  };
+
+  const entity = await resolveEntity(c, body.slug);
+  if (!entity) return bad(`Unknown entity: ${body.slug}`, 404);
+
+  const rows = body.rows ?? [];
+  const stmts: D1PreparedStatement[] = [
+    c.env.DB.prepare('DELETE FROM product_analytics WHERE entity_id = ?').bind(entity.id),
+  ];
+
+  // Nine columns, so seven rows keeps each statement under D1's 100 bound
+  // parameter ceiling with room to spare.
+  const CHUNK = 7;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const values = chunk.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
+    const binds: unknown[] = [];
+    for (const r of chunk) {
+      binds.push(
+        r.hs_code,
+        entity.id,
+        r.flow,
+        r.year,
+        r.value_usd,
+        r.qty_kg,
+        r.unit_value_usd_t,
+        r.cagr_pct,
+        r.share,
+      );
+    }
+    stmts.push(
+      c.env.DB.prepare(
+        `INSERT INTO product_analytics
+           (hs_code, entity_id, flow, year, value_usd, qty_kg, unit_value_usd_t, cagr_pct, share)
+         VALUES ${values}
+         ON CONFLICT (hs_code, entity_id, flow) DO UPDATE SET
+           year = excluded.year,
+           value_usd = excluded.value_usd,
+           qty_kg = excluded.qty_kg,
+           unit_value_usd_t = excluded.unit_value_usd_t,
+           cagr_pct = excluded.cagr_pct,
+           share = excluded.share,
+           computed_at = datetime('now')`,
+      ).bind(...binds),
+    );
+  }
+
+  await c.env.DB.batch(stmts);
+  return json({ written: rows.length });
+});
+
+/**
+ * Settle the cross-country price comparison.
+ *
+ * A country's price only means something next to everybody else's, so this
+ * runs once at the end of a pipeline pass rather than per country. It divides
+ * each unit value by the median unit value for that product across every
+ * country reporting one.
+ */
+admin.post('/ingest/price-ratios', async (c) => {
+  const settings = await loadSettings(c.env);
+  const floor = settings.pricingMinValueUsd;
+
+  // Clear first, or a row that fell below the floor since the last pass would
+  // keep the ratio it was given when it was still above it.
+  await c.env.DB.prepare('UPDATE product_analytics SET price_ratio = NULL').run();
+
+  // The floor sits on both sides deliberately. A country shipping a token
+  // amount of a good can report a weight that implies almost any price, and
+  // such a row is wrong twice over if it is left in: it gets classified as a
+  // discount or a premium itself, and it drags the median that classifies
+  // everybody else.
+  await c.env.DB.prepare(
+    `WITH ranked AS (
+       SELECT hs_code, unit_value_usd_t,
+              ROW_NUMBER() OVER (PARTITION BY hs_code ORDER BY unit_value_usd_t) AS rn,
+              COUNT(*) OVER (PARTITION BY hs_code) AS n
+         FROM product_analytics
+        WHERE unit_value_usd_t IS NOT NULL AND unit_value_usd_t > 0
+          AND value_usd >= ?1
+     ),
+     medians AS (
+       SELECT hs_code, AVG(unit_value_usd_t) AS median_value
+         FROM ranked
+        WHERE rn IN ((n + 1) / 2, (n + 2) / 2)
+        GROUP BY hs_code
+     )
+     UPDATE product_analytics
+        SET price_ratio = (
+          SELECT product_analytics.unit_value_usd_t / m.median_value
+            FROM medians m
+           WHERE m.hs_code = product_analytics.hs_code AND m.median_value > 0
+        )
+      WHERE unit_value_usd_t IS NOT NULL AND unit_value_usd_t > 0
+        AND value_usd >= ?1`,
+  )
+    .bind(floor)
+    .run();
+
+  const counted = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM product_analytics WHERE price_ratio IS NOT NULL',
+  ).first<{ n: number }>();
+
+  // A ratio this far from the median is not a discount, it is a weight the
+  // reporter got wrong: twelve million dollars of gold cannot weigh six
+  // hundred tonnes. The value is still sound, so only the weight and
+  // everything derived from it is dropped.
+  const dropped = await c.env.DB.prepare(
+    `UPDATE product_analytics
+        SET qty_kg = NULL, unit_value_usd_t = NULL, price_ratio = NULL
+      WHERE price_ratio IS NOT NULL
+        AND (price_ratio > ?1 OR price_ratio < 1.0 / ?1)`,
+  )
+    .bind(settings.pricingMaxDeviation)
+    .run();
+
+  return json({
+    priced: (counted?.n ?? 0) - (dropped.meta?.changes ?? 0),
+    implausible_weights_dropped: dropped.meta?.changes ?? 0,
+  });
 });
 
 /**

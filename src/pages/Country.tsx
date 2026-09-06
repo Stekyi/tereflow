@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
+  Cell,
+  LabelList,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -14,7 +18,8 @@ import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
 import { CHART } from '../lib/theme';
 import { Term } from '../components/Term';
-import { BarRow, Chips, Empty, FollowButton, Skeletons, Stat, useToast } from '../components/ui';
+import { shortProductName } from '../../shared/product-name';
+import { BarRow, Empty, FollowButton, Skeletons, Stat, useToast } from '../components/ui';
 import GlobalProductModal from '../components/ProductModal';
 import {
   EXPORT_CATEGORY_HINT,
@@ -24,12 +29,11 @@ import {
   linkHealth,
   LINK_HEALTH_LABEL,
   type CountryDashboard,
+  type ExportCategory,
   type ProductBreakdown,
   type RankedItem,
   type Recommendation,
 } from '../../shared/types';
-
-type Tab = 'summary' | 'products' | 'partners' | 'outlook';
 
 export default function Country() {
   const { slug = '' } = useParams();
@@ -39,11 +43,9 @@ export default function Country() {
   const [sources, setSources] = useState<Awaited<ReturnType<typeof api.dashboardSources>> | null>(
     null,
   );
-  const [tab, setTab] = useState<Tab>('products');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { user, refresh } = useSession();
-  const tier = user?.tier ?? 'free';
   const t = useToast();
   const [subs, setSubs] = useState<Map<string, string>>(new Map());
   const [productDetail, setProductDetail] = useState<ProductBreakdown | null>(null);
@@ -158,32 +160,24 @@ export default function Country() {
 
   return (
     <>
-      <div className="country-nav">
-        <Header
-          name={data.entity.name}
-          iso3={data.entity.iso3}
-          sub={`${data.entity.continent ?? ''} · figures for ${o.year}`}
-          action={
-            <FollowButton
-              kind="country"
-              value={data.entity.slug}
-              label={data.entity.name}
-              following={subs.has(subKey('country', data.entity.slug))}
-              onChange={toggleFollow}
-            />
-          }
-        />
-        <Chips
-          options={[
-            { value: 'summary' as Tab, label: 'Summary' },
-            { value: 'products' as Tab, label: 'Products' },
-            { value: 'partners' as Tab, label: 'Partners' },
-            { value: 'outlook' as Tab, label: 'Outlook' },
-          ]}
-          value={tab}
-          onChange={setTab}
-        />
-      </div>
+      <Header
+        name={data.entity.name}
+        iso3={data.entity.iso3}
+        sub={data.entity.continent ?? ''}
+        action={
+          <FollowButton
+            kind="country"
+            value={data.entity.slug}
+            label={data.entity.name}
+            following={subs.has(subKey('country', data.entity.slug))}
+            onChange={toggleFollow}
+          />
+        }
+      />
+      <p className="tiny dim" style={{ margin: '-6px 0 14px' }}>
+        Trade figures for {o.year}
+        {o.coverage_note ? ` · ${o.coverage_note}` : ''}
+      </p>
       {t.node}
       {(productLoading || productDetail) && (
         <ProductModal
@@ -198,303 +192,171 @@ export default function Country() {
         />
       )}
       {worldHs && <GlobalProductModal hsCode={worldHs} onClose={() => setWorldHs(null)} />}
-      <div style={{ height: 14 }} />
+      <div style={{ height: 12 }} />
 
-      {tab === 'summary' && (
-        <>
-          <div className="grid two" style={{ marginBottom: 14 }}>
-            <Stat
-              label="Exports"
-              value={fmtUsd(o.export_usd)}
-              delta={o.export_yoy_pct != null ? `${fmtPct(o.export_yoy_pct)} yr/yr` : null}
-              deltaTone={o.export_yoy_pct != null ? (o.export_yoy_pct >= 0 ? 'up' : 'down') : null}
-            />
-            <Stat
-              label="Imports"
-              value={fmtUsd(o.import_usd)}
-              delta={o.import_yoy_pct != null ? `${fmtPct(o.import_yoy_pct)} yr/yr` : null}
-              deltaTone={o.import_yoy_pct != null ? (o.import_yoy_pct >= 0 ? 'up' : 'down') : null}
-            />
-            <Stat
-              label={<Term k="trade_balance">Trade balance</Term>}
-              value={fmtUsd(o.balance_usd)}
-              delta={
-                o.balance_usd >= 0 ? (
-                  <Term k="surplus">Surplus</Term>
-                ) : (
-                  <Term k="deficit">Deficit</Term>
-                )
-              }
-              deltaTone={o.balance_usd >= 0 ? 'up' : 'down'}
-            />
-            <Stat
-              label={<Term k="partner">Trading partners</Term>}
-              value={String(o.partner_count)}
-              delta={
-                <>
-                  {o.product_count} <Term k="hs_code">product groups</Term>
-                </>
-              }
-            />
-          </div>
-
-          {o.export_concentration != null && (
-            <div className="card tight">
-              <div className="row between">
-                <span className="small muted">
-                  <Term k="hhi">Export concentration</Term>
-                </span>
-                <span
-                  className={`badge ${
-                    o.export_concentration > 0.25
-                      ? 'watch'
-                      : o.export_concentration > 0.15
-                        ? 'moderate'
-                        : 'strong'
-                  }`}
-                >
-                  {o.export_concentration > 0.25
-                    ? 'Concentrated'
-                    : o.export_concentration > 0.15
-                      ? 'Moderate'
-                      : 'Diversified'}
-                </span>
-              </div>
-              <div
-                style={{
-                  height: 6,
-                  background: 'var(--bg-2)',
-                  borderRadius: 999,
-                  marginTop: 10,
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  style={{
-                    height: '100%',
-                    width: `${Math.min(100, o.export_concentration * 200)}%`,
-                    background:
-                      o.export_concentration > 0.25 ? 'var(--gold)' : 'var(--brand)',
-                  }}
-                />
-              </div>
-              <p className="tiny dim" style={{ margin: '9px 0 0' }}>
-                How much of what this country sells depends on a handful of products. Higher means
-                one price shock moves the whole economy.
-              </p>
-            </div>
-          )}
-
-          {data.trend.length > 1 && (
-            <div className="card">
-              <p className="card-title">Yearly trend</p>
-              <div style={{ height: 210, margin: '0 -8px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data.trend} margin={{ top: 4, right: 8, left: -14, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gx" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={CHART.brand} stopOpacity={0.22} />
-                        <stop offset="100%" stopColor={CHART.brand} stopOpacity={0.01} />
-                      </linearGradient>
-                      <linearGradient id="gm" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={CHART.contrast} stopOpacity={0.16} />
-                        <stop offset="100%" stopColor={CHART.contrast} stopOpacity={0.01} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="year"
-                      stroke={CHART.axis}
-                      tick={{ fontSize: 11 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      stroke={CHART.axis}
-                      tick={{ fontSize: 11 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v: number) => fmtUsd(v).replace('$', '')}
-                      width={52}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        background: CHART.tooltipBg,
-                        border: `1px solid ${CHART.tooltipBorder}`,
-                        borderRadius: 8,
-                        fontSize: 13,
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      }}
-                      labelStyle={{ color: CHART.tooltipLabel }}
-                      formatter={(v: number, n: string) => [fmtUsd(v), n]}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
-                    <Area
-                      type="monotone"
-                      dataKey="export_usd"
-                      name="Exports"
-                      stroke={CHART.brand}
-                      strokeWidth={2}
-                      fill="url(#gx)"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="import_usd"
-                      name="Imports"
-                      stroke={CHART.contrast}
-                      strokeWidth={2}
-                      fill="url(#gm)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
-
-          {data.services.length > 0 && (
-            <div className="card">
-              <p className="card-title">
-                <Term k="services_trade">Services</Term>
-              </p>
-              {data.services.map((s) => (
-                <div className="row between" key={s.code} style={{ marginBottom: 7 }}>
-                  <span className="small">{s.name}</span>
-                  <span className="small num" style={{ fontWeight: 700 }}>
-                    {fmtUsd(s.value_usd)}{' '}
-                    {s.yoy_pct != null && (
-                      <span className={s.yoy_pct >= 0 ? 'up' : 'down'}>{fmtPct(s.yoy_pct)}</span>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {o.coverage_note && (
-            <p className="tiny dim" style={{ marginTop: 16 }}>
-              <Term k="coverage" tone="quiet">
-                Data coverage
-              </Term>
-              : {o.coverage_note}
-            </p>
-          )}
-        </>
-      )}
-
-      {tab === 'products' && (
-        <>
-          <p className="tiny dim" style={{ marginTop: 0 }}>
-            Non-traditional openings an SME can act on are shown first. Tap a product for its partner
-            breakdown, then open the worldwide view. Tap the star to follow it in your feed.
-          </p>
-          <label className="row small dim" style={{ gap: 6, marginBottom: 10, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={showMajor}
-              onChange={(e) => setShowMajor(e.target.checked)}
-              style={{ width: 'auto' }}
-            />
-            Also show major/traditional trade (gold, oil, and similar, large-scale and licensed)
-          </label>
-          <Ranked
-            title="What it sells most"
-            items={reRank(data.top_exports, showMajor)}
-            flow="export"
-            onProductClick={openProduct}
-            follow={{ subs, toggle: toggleFollow, subKey }}
-          />
-          <Ranked
-            title="What it buys most"
-            items={reRank(data.top_imports, showMajor)}
-            flow="import"
-            onProductClick={openProduct}
-            follow={{ subs, toggle: toggleFollow, subKey }}
-          />
-        </>
-      )}
-
-      {tab === 'partners' && (
-        <>
-          <Ranked title="Where exports go" items={data.partners_export} />
-          <Ranked title="Where imports come from" items={data.partners_import} />
-        </>
-      )}
-
-      {tab === 'outlook' && (
-        <>
-          <div className="section-head">
-            <h2>What this means</h2>
-          </div>
-          {data.recommendations.length === 0 ? (
-            <Empty title="No read yet" hint="Recommendations appear after the first analysis run." />
-          ) : (
-            data.recommendations.map((r, i) => <Rec key={i} rec={r} />)
-          )}
-
-          <div className="section-head">
-            <h2>Early signals</h2>
-            <span className="badge premium">Premium</span>
-          </div>
-
-          {tier === 'premium' && data.opportunities ? (
-            data.opportunities.length === 0 ? (
-              <Empty title="No emerging signal detected" hint="Nothing is growing fast enough outside the top products yet." />
+      <div className="grid three" style={{ marginBottom: 16 }}>
+        <Stat
+          label={
+            <>
+              Total exports <span className="dim">({o.year})</span>
+            </>
+          }
+          value={fmtUsd(o.export_usd)}
+          delta={o.export_yoy_pct != null ? `${fmtPct(o.export_yoy_pct)} yr/yr` : null}
+          deltaTone={o.export_yoy_pct != null ? (o.export_yoy_pct >= 0 ? 'up' : 'down') : null}
+        />
+        <Stat
+          label={
+            <>
+              Total imports <span className="dim">({o.year})</span>
+            </>
+          }
+          value={fmtUsd(o.import_usd)}
+          delta={o.import_yoy_pct != null ? `${fmtPct(o.import_yoy_pct)} yr/yr` : null}
+          deltaTone={o.import_yoy_pct != null ? (o.import_yoy_pct >= 0 ? 'up' : 'down') : null}
+        />
+        <Stat
+          label={<Term k="trade_balance">Trade balance</Term>}
+          value={fmtUsd(o.balance_usd)}
+          delta={
+            o.balance_usd >= 0 ? (
+              <Term k="surplus">Surplus</Term>
             ) : (
-              data.opportunities.map((s) => (
-                <div className="card" key={s.id}>
-                  <div className="row between" style={{ marginBottom: 6 }}>
-                    <strong style={{ fontSize: 15 }}>{s.product_name}</strong>
-                    <span className={`badge ${s.momentum > 0.6 ? 'strong' : 'watch'}`}>
-                      <Term k="momentum" tone="quiet">
-                        {(s.momentum * 100).toFixed(0)}% momentum
-                      </Term>
-                    </span>
-                  </div>
-                  <p className="small muted" style={{ margin: 0 }}>
-                    {s.rationale}
-                  </p>
-                  <div className="row" style={{ marginTop: 12, gap: 16 }}>
-                    <span className="tiny dim">
-                      Rank now <strong style={{ color: 'var(--ink)' }}>{s.current_rank ?? '—'}</strong>
-                    </span>
-                    <span className="tiny dim">
-                      Projected in {s.horizon_years}y{' '}
-                      <strong style={{ color: 'var(--gold)' }}>{s.projected_rank ?? '—'}</strong>
-                    </span>
-                    <span className="tiny dim">
-                      Confidence{' '}
-                      <strong style={{ color: 'var(--ink)' }}>
-                        {s.confidence != null ? `${(s.confidence * 100).toFixed(0)}%` : '—'}
-                      </strong>
-                    </span>
-                  </div>
-                </div>
-              ))
+              <Term k="deficit">Deficit</Term>
             )
-          ) : (
-            <div className="locked">
-              <div style={{ fontSize: 26 }}>🔒</div>
-              <h3>
-                {data.opportunities_locked} emerging{' '}
-                {data.opportunities_locked === 1 ? 'signal' : 'signals'} detected
-              </h3>
-              <p>
-                Products growing fast enough to change this market inside four years, while they are
-                still outside the headline rankings.
-              </p>
-              {user ? (
-                <Link className="btn gold" to="/me">
-                  Turn on premium preview
-                </Link>
-              ) : (
-                <Link className="btn primary" to={`/join?next=/country/${slug}`}>
-                  Join free to unlock
-                </Link>
-              )}
-            </div>
-          )}
-        </>
+          }
+          deltaTone={o.balance_usd >= 0 ? 'up' : 'down'}
+        />
+      </div>
+
+      <label className="row small dim" style={{ gap: 6, marginBottom: 14, cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={showMajor}
+          onChange={(e) => setShowMajor(e.target.checked)}
+          style={{ width: 'auto' }}
+        />
+        Include major traditional trade (gold, oil, and similar) in the imports chart
+      </label>
+
+      <ProductBarChart
+        title="Top imports by value"
+        caption="What this country buys most. Green bars are non-traditional lines an SME can supply; grey bars are large licensed trade. Tap a bar for its partner breakdown."
+        items={reRank(data.top_imports, showMajor)}
+        flow="import"
+        colorByCategory
+        onProductClick={openProduct}
+        emptyHint="No import breakdown recorded for this year."
+      />
+
+      <ProductBarChart
+        title="Non-traditional exports"
+        caption="Value sold abroad outside the headline commodities, with recent yearly growth per line. Tap a bar for its partner breakdown."
+        items={data.top_exports.filter((i) => i.category === 'non_traditional')}
+        flow="export"
+        showGrowth
+        onProductClick={openProduct}
+        emptyHint="No non-traditional export lines recorded for this year."
+      />
+
+      {data.trend.length > 1 ? (
+        <div className="card">
+          <p className="card-title">Merchandise trade balance</p>
+          <div style={{ height: 220, margin: '0 -8px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.trend} margin={{ top: 4, right: 8, left: -14, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gx" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={CHART.brand} stopOpacity={0.22} />
+                    <stop offset="100%" stopColor={CHART.brand} stopOpacity={0.01} />
+                  </linearGradient>
+                  <linearGradient id="gm" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={CHART.contrast} stopOpacity={0.16} />
+                    <stop offset="100%" stopColor={CHART.contrast} stopOpacity={0.01} />
+                  </linearGradient>
+                  <linearGradient id="gb" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={CHART.up} stopOpacity={0.2} />
+                    <stop offset="100%" stopColor={CHART.up} stopOpacity={0.01} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="year"
+                  stroke={CHART.axis}
+                  tick={{ fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke={CHART.axis}
+                  tick={{ fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v: number) => fmtUsd(v).replace('$', '')}
+                  width={52}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: CHART.tooltipBg,
+                    border: `1px solid ${CHART.tooltipBorder}`,
+                    borderRadius: 8,
+                    fontSize: 13,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  }}
+                  labelStyle={{ color: CHART.tooltipLabel }}
+                  formatter={(v: number, n: string) => [fmtUsd(v), n]}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
+                <Area
+                  type="monotone"
+                  dataKey="export_usd"
+                  name="Exports"
+                  stroke={CHART.brand}
+                  strokeWidth={2}
+                  fill="url(#gx)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="import_usd"
+                  name="Imports"
+                  stroke={CHART.contrast}
+                  strokeWidth={2}
+                  fill="url(#gm)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="balance_usd"
+                  name="Balance"
+                  stroke={CHART.up}
+                  strokeWidth={2}
+                  fill="url(#gb)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="tiny dim" style={{ margin: '8px 4px 0' }}>
+            Exports, imports and the balance between them over {data.trend[0].year} to{' '}
+            {data.trend[data.trend.length - 1].year}. Balance above zero is a surplus.
+          </p>
+        </div>
+      ) : (
+        <div className="card">
+          <p className="card-title">Merchandise trade balance</p>
+          <Empty title="Not enough history" hint="A trend needs at least two years of data." />
+        </div>
       )}
+
+      <div className="section-head">
+        <h2>What this means</h2>
+      </div>
+      {data.recommendations.length === 0 ? (
+        <Empty title="No read yet" hint="Recommendations appear after the first analysis run." />
+      ) : (
+        data.recommendations.map((r, i) => <Rec key={i} rec={r} />)
+      )}
+
+      <Ranked title="Where exports go" items={data.partners_export} />
+      <Ranked title="Where imports come from" items={data.partners_import} />
 
       {sources && (
         <>
@@ -786,6 +648,223 @@ function Rec({ rec }: { rec: Recommendation }) {
             <div key={i}>• {e}</div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+interface ChartDatum {
+  name: string;
+  short: string;
+  value: number;
+  growthLabel: string;
+  category?: ExportCategory;
+  item: RankedItem;
+}
+
+/**
+ * Axis labels for these charts.
+ *
+ * Product names arrive as full tariff descriptions, which repeat a shelving
+ * word before the semicolon: four different vehicle lines all begin
+ * "Vehicles; with...". Truncating those to one short line produced four
+ * identical labels. So the shortener runs first to drop the repeated head,
+ * then the result is split across two lines. The untouched name stays in the
+ * tooltip.
+ */
+function axisLabel(name: string): string[] {
+  const short = shortProductName(name);
+  const words = short.split(' ');
+  const lines: string[] = [];
+  let line = '';
+
+  for (const word of words) {
+    if (lines.length === 1 && `${line} ${word}`.trim().length > AXIS_CHARS) break;
+    if (`${line} ${word}`.trim().length > AXIS_CHARS) {
+      lines.push(line.trim());
+      line = word;
+    } else {
+      line = `${line} ${word}`.trim();
+    }
+  }
+  if (line && lines.length < 2) lines.push(line.trim());
+
+  // Mark that something was cut so nobody reads a clipped label as complete.
+  const consumed = lines.join(' ').length;
+  if (consumed < short.length - 1) lines[lines.length - 1] += '...';
+  return lines.length ? lines : [short];
+}
+
+/** Characters per axis line. Two of these is the budget. */
+const AXIS_CHARS = 22;
+
+/** Renders the two-line label; recharts ticks do not wrap on their own. */
+function AxisTick({
+  x,
+  y,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value?: string };
+}) {
+  const lines = (payload?.value ?? '').split('\n');
+  return (
+    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
+      {lines.map((line, i) => (
+        <text
+          key={i}
+          x={-6}
+          y={i * 11 - (lines.length - 1) * 5.5}
+          dy={3.5}
+          textAnchor="end"
+          fontSize={10}
+          fill={CHART.axis}
+        >
+          {line}
+        </text>
+      ))}
+    </g>
+  );
+}
+
+function BarTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: ChartDatum }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div
+      style={{
+        background: CHART.tooltipBg,
+        border: `1px solid ${CHART.tooltipBorder}`,
+        borderRadius: 8,
+        fontSize: 13,
+        padding: '8px 10px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        maxWidth: 240,
+      }}
+    >
+      <div style={{ color: CHART.tooltipLabel, marginBottom: 2 }}>{d.name}</div>
+      <div style={{ fontWeight: 700 }}>{fmtUsd(d.value)}</div>
+      {d.growthLabel && (
+        <div className="tiny" style={{ color: CHART.tooltipLabel, marginTop: 2 }}>
+          {d.growthLabel} growth
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Horizontal bar chart of products. Bars are tappable and open the product
+ *  modal rather than navigating away. When colorByCategory is set, non-traditional
+ *  (SME-accessible) lines are drawn in the up/green colour and traditional lines
+ *  in the muted one. */
+function ProductBarChart({
+  title,
+  caption,
+  items,
+  flow,
+  onProductClick,
+  colorByCategory,
+  showGrowth,
+  emptyHint,
+}: {
+  title: string;
+  caption: string;
+  items: RankedItem[];
+  flow: 'export' | 'import';
+  onProductClick: (item: RankedItem, flow: 'export' | 'import') => void;
+  colorByCategory?: boolean;
+  showGrowth?: boolean;
+  emptyHint: string;
+}) {
+  const rows: ChartDatum[] = items.map((i) => ({
+    name: i.name,
+    short: axisLabel(i.name).join('\n'),
+    value: i.value_usd,
+    growthLabel: i.cagr_3y != null ? `${fmtPct(i.cagr_3y, 0)}/yr` : '',
+    category: i.category,
+    item: i,
+  }));
+  // Height grows with the row count so bars stay tall enough to tap on a phone,
+  // and so two-line axis labels are not clipped by their neighbours.
+  const height = Math.max(150, rows.length * 40 + 24);
+  return (
+    <div className="card">
+      <p className="card-title">{title}</p>
+      {rows.length === 0 ? (
+        <Empty title="Nothing to show" hint={emptyHint} />
+      ) : (
+        <>
+          <div style={{ height, margin: '0 -8px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                layout="vertical"
+                data={rows}
+                margin={{ top: 4, right: showGrowth ? 52 : 12, left: 4, bottom: 0 }}
+              >
+                <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" horizontal={false} />
+                <XAxis
+                  type="number"
+                  stroke={CHART.axis}
+                  tick={{ fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v: number) => fmtUsd(v).replace('$', '')}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="short"
+                  stroke={CHART.axis}
+                  tickLine={false}
+                  axisLine={false}
+                  width={132}
+                  interval={0}
+                  tick={<AxisTick />}
+                />
+                <Tooltip cursor={{ fill: CHART.brandSoft }} content={<BarTooltip />} />
+                <Bar
+                  dataKey="value"
+                  radius={[0, 3, 3, 0]}
+                  cursor="pointer"
+                  onClick={(entry) => {
+                    const item = (entry as unknown as { payload?: ChartDatum }).payload?.item;
+                    if (item?.code) onProductClick(item, flow);
+                  }}
+                >
+                  {rows.map((r, idx) => (
+                    <Cell
+                      key={idx}
+                      fill={
+                        colorByCategory
+                          ? r.category === 'non_traditional'
+                            ? CHART.up
+                            : CHART.muted
+                          : CHART.up
+                      }
+                    />
+                  ))}
+                  {showGrowth && (
+                    <LabelList
+                      dataKey="growthLabel"
+                      position="right"
+                      fill={CHART.tooltipLabel}
+                      fontSize={10}
+                    />
+                  )}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="tiny dim" style={{ margin: '8px 4px 0' }}>
+            {caption}
+          </p>
+        </>
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
 import { Chips, Empty, Skeletons } from '../components/ui';
+import { HeroScene } from '../components/Brand';
 import ProductModal, { ProductCardRow } from '../components/ProductModal';
 import { CONTINENTS, type ProductCard } from '../../shared/types';
 
@@ -54,7 +55,8 @@ export default function Home() {
 
   return (
     <>
-      <div className="hero">
+      <div className="hero with-scene">
+        <HeroScene className="hero-scene" />
         <span className="overline">Global trade intelligence</span>
         <h2>Find a product worth trading</h2>
         <p>Search a specific product to see who sells it, who buys it, and where the opening is.</p>

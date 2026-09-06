@@ -1,6 +1,8 @@
 import { Suspense, lazy } from 'react';
 import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Skeletons } from './components/ui';
+import { Logo } from './components/Brand';
+import FeedbackButton from './components/FeedbackButton';
 import { useSession } from './lib/auth';
 
 const Home = lazy(() => import('./pages/Home'));
@@ -12,6 +14,7 @@ const Registry = lazy(() => import('./pages/Registry'));
 const Admin = lazy(() => import('./pages/Admin'));
 const AdminForm = lazy(() => import('./pages/AdminForm'));
 const AdminClassifications = lazy(() => import('./pages/AdminClassifications'));
+const AdminFeedback = lazy(() => import('./pages/AdminFeedback'));
 const Auth = lazy(() => import('./pages/Auth'));
 const Network = lazy(() => import('./pages/Network'));
 const CardDetail = lazy(() => import('./pages/CardDetail'));
@@ -28,7 +31,7 @@ const TITLES: Record<string, string> = {
   '/': 'Tereflow',
   '/explore': 'Explore',
   '/countries': 'Countries',
-  '/marketplace': 'Marketplace',
+  '/marketplace': 'Products',
   '/network': 'Network',
   '/messages': 'Messages',
   '/me': 'Me',
@@ -40,10 +43,11 @@ const TITLES: Record<string, string> = {
   '/admin': 'Admin',
   '/admin/new': 'New record',
   '/admin/classifications': 'Export classification',
+  '/admin/feedback': 'Feedback',
   '/join': 'Join Tereflow',
 };
 
-const ROOTS = new Set(['/', '/explore', '/countries', '/marketplace', '/network', '/messages', '/me']);
+const ROOTS = new Set(['/', '/countries', '/network', '/me']);
 
 export default function App() {
   const location = useLocation();
@@ -58,7 +62,9 @@ export default function App() {
       <header className="topbar">
         {isRoot ? (
           <span className="brand-mark">
-            <span className="brand-dot" />
+            <span className="brand-dot">
+              <Logo size={22} />
+            </span>
           </span>
         ) : (
           <button className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
@@ -66,6 +72,14 @@ export default function App() {
           </button>
         )}
         <h1>{title}</h1>
+        {/* Messages came off the tab bar to get it down to four. It still needs
+            to be one tap away, so it lives here with its unread count. */}
+        <NavLink className="topbar-action" to="/messages" aria-label="Messages">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <path d="M21 6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3v4l5-4h6a2 2 0 0 0 2-2z" />
+          </svg>
+          {unread > 0 && <span className="tab-badge">{unread > 9 ? '9+' : unread}</span>}
+        </NavLink>
       </header>
 
       <main>
@@ -94,6 +108,7 @@ export default function App() {
             <Route path="/admin/new" element={<AdminForm />} />
             <Route path="/admin/edit/:slug" element={<AdminForm />} />
             <Route path="/admin/classifications" element={<AdminClassifications />} />
+            <Route path="/admin/feedback" element={<AdminFeedback />} />
 
             <Route
               path="*"
@@ -110,10 +125,12 @@ export default function App() {
         </Suspense>
       </main>
 
+      {/* Four tabs, not six. Marketplace merged into Home, which already
+          browses the same products, and Messages moved to the top bar. */}
       <nav className="tabbar">
         <Tab
           to="/"
-          label="Home"
+          label="Products"
           d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"
           badge={feedUnread}
         />
@@ -124,21 +141,9 @@ export default function App() {
           stroke
         />
         <Tab
-          to="/marketplace"
-          label="Marketplace"
-          d="M3 9l1.4-5h15.2L21 9M4 9v10a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9M4 9h16"
-          stroke
-        />
-        <Tab
           to="/network"
           label="Network"
           d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 13a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm0 1.5c-3 0-6 1.5-6 3.5v2h12v-2c0-2-3-3.5-6-3.5zm8-1c-.9 0-1.8.14-2.6.4 1.6.9 2.6 2.2 2.6 3.6v2h6v-2c0-2-3-4-6-4z"
-        />
-        <Tab
-          to="/messages"
-          label="Messages"
-          d="M21 6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3v4l5-4h6a2 2 0 0 0 2-2z"
-          badge={unread}
         />
         <Tab
           to="/me"
@@ -146,6 +151,8 @@ export default function App() {
           d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm0 2c-4 0-8 2-8 5v2h16v-2c0-3-4-5-8-5z"
         />
       </nav>
+
+      <FeedbackButton />
     </div>
   );
 }

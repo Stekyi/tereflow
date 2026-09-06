@@ -187,6 +187,15 @@ export default function Admin() {
         </button>
       </div>
 
+      <div className="row" style={{ gap: 8, marginBottom: 12 }}>
+        <Link className="btn ghost sm" to="/admin/feedback" style={{ flex: 1 }}>
+          Feedback inbox
+        </Link>
+        <Link className="btn ghost sm" to="/admin/classifications" style={{ flex: 1 }}>
+          Classification
+        </Link>
+      </div>
+
       <input
         type="search"
         placeholder="Search records"

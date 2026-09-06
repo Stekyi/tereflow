@@ -368,8 +368,26 @@ export interface CountrySummary {
   last_ingest_at: string | null;
 }
 
-export interface Recommendation {
-  headline: string;
+// --- feedback ---------------------------------------------------------------
+
+export type FeedbackKind = 'problem' | 'request' | 'other';
+
+export interface FeedbackInput {
+  kind: FeedbackKind;
+  message: string;
+  /** The route the sender was on, so nobody has to ask "which page?". */
+  path?: string;
+  /** Only used when the sender is not signed in. */
+  contact?: string;
+}
+
+export const FEEDBACK_KIND_LABEL: Record<FeedbackKind, string> = {
+  problem: 'Something is wrong',
+  request: 'I want something added',
+  other: 'Something else',
+};
+
+export interface Recommendation {  headline: string;
   detail: string;
   /** why an investor should care */
   angle: 'entry' | 'risk' | 'partner' | 'timing' | 'gap';

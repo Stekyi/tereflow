@@ -9,6 +9,8 @@ import type {
   EntityWithSources,
   ExploreOpportunity,
   ExportCategory,
+  FeedbackInput,
+  FeedbackKind,
   FeedItem,
   MarketHsCode,
   MarketProducts,
@@ -150,6 +152,13 @@ export const api = {
     return req<{ countries: CountrySummary[]; count: number }>(`/api/countries${s ? `?${s}` : ''}`);
   },
 
+  /** Open to signed-out visitors on purpose. See worker/routes/feedback.ts. */
+  sendFeedback: (input: FeedbackInput) =>
+    req<{ received: true }>('/api/feedback', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
   market: {
     hsCodes: (q?: string, includeTraditional?: boolean) => {
       const qs = new URLSearchParams();
@@ -204,6 +213,28 @@ export const api = {
         feedError: string | null;
         note: string;
       }>('/api/admin/runs', { method: 'POST' }),
+
+    feedback: (status?: string) =>
+      req<{
+        feedback: {
+          id: string;
+          kind: FeedbackKind;
+          message: string;
+          path: string | null;
+          contact: string | null;
+          status: string;
+          created_at: string;
+          user_name: string | null;
+          user_email: string | null;
+        }[];
+        count: number;
+      }>(`/api/feedback${status ? `?status=${status}` : ''}`),
+
+    setFeedbackStatus: (id: string, status: 'new' | 'read' | 'done') =>
+      req<{ updated: true }>(`/api/feedback/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+    }),
     runs: () =>
       req<{ runs: Record<string, unknown>[] }>('/api/admin/runs'),
     checkLinks: () =>

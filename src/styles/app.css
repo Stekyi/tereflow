@@ -1763,3 +1763,142 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* --- brand mark ------------------------------------------------------------
+   The "TF" square is replaced by the binoculars mark. The dot keeps its own
+   rules so the topbar layout is untouched, it just holds an svg now. */
+.brand-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #eaf1f7;
+}
+
+.brand-dot::before,
+.brand-dot::after {
+  content: none;
+}
+
+/* --- home banner -----------------------------------------------------------
+   The hero keeps its dark panel and gold rule; the scene sits behind the type
+   at low contrast so the words stay the thing you read first. */
+.hero.with-scene {
+  padding-top: 30px;
+  padding-bottom: 28px;
+}
+
+.hero-scene {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: auto;
+  opacity: 0.95;
+  pointer-events: none;
+}
+
+/* The scene is anchored right and the panel is darkened from the left, so the
+   headline sits on flat ink while the ship stays readable beside it. Centring
+   it put the binocular barrels directly behind the words. */
+.hero.with-scene::before {
+  background:
+    linear-gradient(
+      96deg,
+      rgba(6, 17, 27, 0.97) 0%,
+      rgba(6, 17, 27, 0.9) 34%,
+      rgba(6, 17, 27, 0.45) 62%,
+      rgba(6, 17, 27, 0.12) 100%
+    ),
+    radial-gradient(120% 90% at 92% 0%, rgba(168, 128, 44, 0.26), transparent 60%);
+}
+
+/* On a narrow screen there is no room beside the text, so the scene drops back
+   to a texture rather than competing with the headline. */
+@media (max-width: 460px) {
+  .hero-scene { opacity: 0.55; }
+  .hero.with-scene::before {
+    background:
+      linear-gradient(
+        170deg,
+        rgba(6, 17, 27, 0.9) 0%,
+        rgba(6, 17, 27, 0.82) 48%,
+        rgba(6, 17, 27, 0.6) 100%
+      ),
+      radial-gradient(120% 90% at 92% 0%, rgba(168, 128, 44, 0.24), transparent 60%);
+  }
+}
+
+/* --- floating feedback button ---------------------------------------------- */
+.fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--ink);
+  background: linear-gradient(160deg, #12456f, var(--ink));
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(14, 28, 43, 0.28), 0 12px 28px rgba(14, 28, 43, 0.18);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.fab svg { width: 22px; height: 22px; }
+
+.fab:hover { transform: translateY(-1px); box-shadow: var(--lift); }
+.fab:active { transform: translateY(0); }
+
+.fab:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* A gold pip so it reads as an invitation rather than another nav control. */
+.fab::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+/* Messages icon in the top bar, where it went when the tab bar was cut to
+   four. Pushed to the right so the title keeps the centre. */
+.topbar-action {
+  position: relative;
+  margin-left: auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  flex: none;
+}
+
+.topbar-action svg { width: 21px; height: 21px; }
+
+.topbar-action:hover { background: var(--surface-2); color: var(--text); }
+
+.topbar-action.active { color: var(--brand); }
+
+.topbar-action .tab-badge { top: 3px; right: 3px; }
+
+/* Three stat tiles side by side, matching the reference overview layout. Kept at
+   three columns on narrow screens so the exports/imports/balance trio reads as
+   one comparison rather than a stack. */
+.grid.three {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * End-to-end check of the product-first surface against a running dev server.
  *   npm run dev:worker              (terminal 1)
  *   node scripts/e2e-products.mjs   (terminal 2)
@@ -9,6 +9,7 @@
  * where a specific product is claimed.
  */
 const BASE = process.env.TF_BASE ?? 'http://127.0.0.1:8787';
+const ADMIN_TOKEN = process.env.TF_ADMIN_TOKEN ?? 'local-dev-token';
 
 let passed = 0;
 let failed = 0;
@@ -186,11 +187,93 @@ async function main() {
     );
   }
 
+  // --- feedback -----------------------------------------------------------
+  // Open to signed-out visitors by design, so the checks are about the guard
+  // rails: validation, admin-only reads, and the rate limit existing at all.
+  console.log('\nFeedback');
+
+  const send = (body) =>
+    fetch(`${BASE}/api/feedback`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+  const marker = `e2e probe ${Date.now()}`;
+  const sent = await send({ kind: 'problem', message: marker, path: '/countries' });
+  // The limiter is per hour and per source, so a run following manual testing
+  // can legitimately be over budget. That is the limiter working, not a fault,
+  // and the remaining checks say so rather than reporting a false failure.
+  const limited = sent.status === 429;
+  check(
+    'anonymous can send feedback',
+    sent.status === 200 || limited,
+    limited ? 'rate limited, which is the limiter working' : `status ${sent.status}`,
+  );
+
+  const tooShort = await send({ kind: 'problem', message: 'no' });
+  check('a message that says nothing is rejected', tooShort.status === 400 || tooShort.status === 429);
+
+  const tooLong = await send({ kind: 'problem', message: 'x'.repeat(2100) });
+  check('an oversized message is rejected', tooLong.status === 400 || tooLong.status === 429);
+
+  const oddKind = await send({ kind: 'urgent!!', message: 'kind should fall back to other' });
+  check(
+    'an unknown kind falls back rather than failing',
+    oddKind.status === 200 || oddKind.status === 429,
+    `status ${oddKind.status}`,
+  );
+
+  // Whatever happened above, sending far more than the hourly budget must be
+  // refused. Without this the tolerance added for the limiter could hide it
+  // being switched off entirely.
+  let sawLimit = limited;
+  for (let i = 0; i < 14 && !sawLimit; i++) {
+    const r = await send({ kind: 'other', message: `budget probe ${i} ${Date.now()}` });
+    if (r.status === 429) sawLimit = true;
+  }
+  check('the hourly limit is enforced', sawLimit);
+
+  const anonRead = await get('/api/feedback');
+  check('feedback is not readable without admin', anonRead.status === 401, `status ${anonRead.status}`);
+
+  const adminRead = await fetch(`${BASE}/api/feedback`, {
+    headers: { authorization: `Bearer ${ADMIN_TOKEN}`, accept: 'application/json' },
+  });
+  const adminBody = await adminRead.json().catch(() => null);
+  const sentItems = adminBody?.feedback ?? [];
+  check('admin can read feedback', adminRead.status === 200, `${sentItems.length} row(s)`);
+  // Only assertable when the send actually went through this run.
+  if (!limited) {
+    check('the message just sent is there', sentItems.some((f) => f.message === marker));
+    check(
+      'the page it was sent from is recorded',
+      sentItems.find((f) => f.message === marker)?.path === '/countries',
+    );
+  }
+
+  const reported = sentItems.find((f) => f.message === marker) ?? sentItems[0];
+  if (reported) {
+    const patched = await fetch(`${BASE}/api/feedback/${reported.id}`, {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${ADMIN_TOKEN}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'done' }),
+    });
+    check('admin can close an item', patched.status === 200);
+
+    const badStatus = await fetch(`${BASE}/api/feedback/${reported.id}`, {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${ADMIN_TOKEN}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'whatever' }),
+    });
+    check('an unknown status is rejected', badStatus.status === 400);
+  }
+
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed ? 1 : 0);
 }
-
 main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+

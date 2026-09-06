@@ -14,4 +14,6 @@ export const CHART = {
   tooltipBg: '#ffffff',
   tooltipBorder: '#ddd6c8',
   tooltipLabel: '#556273',
+  up: '#17604a',
+  muted: '#556273',
 } as const;

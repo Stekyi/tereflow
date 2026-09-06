@@ -37,6 +37,10 @@ export const LIMITS = {
   register: { max: 60, windowSeconds: 3600 },
   message: { max: 40, windowSeconds: 300 },
   checkout: { max: 10, windowSeconds: 3600 },
+  // Feedback is open to signed-out visitors, so it needs a brake. Ten an hour
+  // is more than anybody sends in good faith and low enough that the table
+  // cannot be filled from one source.
+  feedback: { max: 10, windowSeconds: 3600 },
 } satisfies Record<string, Limit>;
 
 export interface LimitResult {

@@ -36,7 +36,7 @@
  *   COMTRADE_API_KEY     optional, raises the UN Comtrade rate limit
  *   TEREFLOW_CALL_PACE_MS pause between calls within one country (default 300ms)
  */
-import { fetchComtrade, probeComtrade } from '../worker/agent/adapters/comtrade';
+import { fetchComtrade, probeComtrade, RateLimited } from '../worker/agent/adapters/comtrade';
 import { fetchWorldBank } from '../worker/agent/adapters/worldbank';
 import { analyse } from '../worker/agent/analyse';
 import type { FactRow } from '../worker/agent/types';
@@ -236,6 +236,7 @@ async function main() {
   let failed = 0;
   let skipped = 0;
   let factsTotal = 0;
+  let rateLimited: RateLimited | null = null;
   const errors: { slug: string; error: string }[] = [];
 
   for (const [i, entity] of targets.entries()) {
@@ -345,6 +346,19 @@ async function main() {
           `(${((Date.now() - t0) / 1000).toFixed(0)}s)`,
       );
     } catch (err) {
+      // Rate limiting is not this country's problem, it is the whole run's.
+      // Carrying on would write a partial fetch for every remaining country,
+      // which reads as data but is a country with most of its products
+      // missing. Stop here and leave the rest untouched so a later run can
+      // pick them up intact.
+      if (err instanceof RateLimited) {
+        rateLimited = err;
+        console.log('RATE LIMITED');
+        if (!cfg.dryRun) {
+          await api.fail(entity.slug, 'Source rate limited this address').catch(() => undefined);
+        }
+        break;
+      }
       failed++;
       const message = err instanceof Error ? err.message : String(err);
       errors.push({ slug: entity.slug, error: message });
@@ -387,7 +401,21 @@ async function main() {
     for (const e of errors) console.log(`  ${e.slug}: ${e.error.slice(0, 160)}`);
   }
 
-  process.exit(failed > 0 && ok === 0 ? 1 : 0);
+  if (rateLimited) {
+    const remaining = targets.length - ok - skipped - failed;
+    console.log(`\nStopped early: ${rateLimited.message}`);
+    console.log(
+      `${remaining} country/countries were not completed and still hold whatever data they had before this run.`,
+    );
+    if (rateLimited.retryAfterSeconds) {
+      console.log(`The source asked to be left alone for ${rateLimited.retryAfterSeconds}s.`);
+    }
+    console.log('Re-run without --force to pick up where this left off.');
+  }
+
+  // A run cut short by the source is not a success, but it is also not the
+  // same as everything failing: exit 2 so a scheduler can tell them apart.
+  process.exit(rateLimited ? 2 : failed > 0 && ok === 0 ? 1 : 0);
 }
 
 main().catch((err) => {

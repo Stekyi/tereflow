@@ -1902,3 +1902,140 @@ textarea {
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
+
+/* ---------- owner portal ---------- */
+
+.portal-head {
+  margin-bottom: 16px;
+}
+
+/* Sidebar beside the panel on desktop. Under 900px the nav becomes a horizontal
+   scroller above the panel so it still reaches every section on a phone. */
+.portal {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.portal-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 200px;
+  position: sticky;
+  top: 12px;
+}
+
+.portal-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 14.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.portal-nav-item svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+.portal-nav-item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.portal-nav-item.active {
+  background: var(--surface);
+  border-color: var(--line-soft);
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.portal-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Overview stat grid: fit as many tiles per row as fit, never below 150px. */
+.portal-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.portal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.portal-list > li {
+  padding-left: 14px;
+  position: relative;
+}
+
+.portal-list > li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+.stat .delta.up {
+  color: var(--up);
+}
+.stat .delta.down {
+  color: var(--down);
+}
+.stat .delta.gold {
+  color: var(--gold);
+}
+.stat .delta.warn {
+  color: var(--warn);
+}
+.stat .delta.dim {
+  color: var(--dim);
+}
+
+@media (max-width: 900px) {
+  .portal {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .portal-nav {
+    flex: none;
+    flex-direction: row;
+    width: 100%;
+    position: static;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .portal-nav-item {
+    width: auto;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}

@@ -451,6 +451,28 @@ function aggregatesOnly(rows: ComtradeRow[]): ComtradeRow[] {
   });
 }
 
+/**
+ * Thrown when the source refuses further requests for now.
+ *
+ * A 429 is not a failure of one call that retrying past will fix. Comtrade's
+ * keyless tier allows on the order of a hundred requests an hour, and one
+ * country costs more than that once specific products are fetched per chapter,
+ * so once it starts refusing it will keep refusing for the rest of the hour.
+ *
+ * Continuing at that point does real harm: every subsequent country records a
+ * partial fetch, which looks like data but is a country with most of its
+ * products missing. Stopping and saying so is the honest outcome.
+ */
+export class RateLimited extends Error {
+  constructor(public readonly retryAfterSeconds: number | null) {
+    super(
+      'UN Comtrade is rate limiting this address. The keyless tier allows roughly a hundred requests an hour, ' +
+        'and one country needs more than that. Add a free COMTRADE_API_KEY, or run fewer countries per hour.',
+    );
+    this.name = 'RateLimited';
+  }
+}
+
 async function call(
   env: Env,
   hasKey: boolean,
@@ -464,8 +486,9 @@ async function call(
   url.searchParams.set('motCode', '0');
   url.searchParams.set('partner2Code', '0');
 
-  // Comtrade throttles and occasionally drops a request under load. A single
-  // dropped call silently punches a hole in the trend line, so retry.
+  // Comtrade occasionally drops a request under load. A single dropped call
+  // silently punches a hole in the trend line, so transient failures retry.
+  // Rate limiting is not transient and is handled separately above.
   let lastError = 'unknown';
   for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt > 0) await sleep(600 * attempt);
@@ -477,7 +500,11 @@ async function call(
         },
         signal: AbortSignal.timeout(30_000),
       });
-      if (res.status === 429 || res.status >= 500) {
+      if (res.status === 429) {
+        const retryAfter = Number(res.headers.get('retry-after'));
+        throw new RateLimited(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null);
+      }
+      if (res.status >= 500) {
         lastError = `HTTP ${res.status}`;
         continue;
       }
@@ -486,6 +513,7 @@ async function call(
       if (body?.error) return { data: [], error: String(body.error) };
       return { data: Array.isArray(body?.data) ? body.data : [] };
     } catch (err) {
+      if (err instanceof RateLimited) throw err;
       lastError = err instanceof Error ? err.message : 'fetch failed';
     }
   }

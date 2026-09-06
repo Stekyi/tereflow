@@ -42,7 +42,12 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set('accept', 'application/json');
   if (init.body) headers.set('content-type', 'application/json');
-  if (path.startsWith('/api/admin')) {
+  // The admin bearer is attached for the admin API surface. The feedback inbox
+  // (GET and PATCH /api/feedback) is also admin gated on the worker but does not
+  // sit under /api/admin, so it is included here. The public POST to submit
+  // feedback carries the header only when the owner happens to have a token
+  // stored, which the worker ignores, so nothing changes for normal senders.
+  if (path.startsWith('/api/admin') || path.startsWith('/api/feedback')) {
     const token = getAdminToken();
     if (token) headers.set('authorization', `Bearer ${token}`);
   }
@@ -74,6 +79,156 @@ export interface HomeStats {
   facts: number;
   last_run: string | null;
 }
+
+// Portal read-side shapes. These mirror worker/routes/portal.ts one to one.
+// Kept here so the sections stay typed without re-deriving them each time.
+export interface PortalCounts {
+  countries: number;
+  countries_active: number;
+  orgs: number;
+  regional: number;
+  sources: number;
+  facts: number;
+  signals: number;
+  users: number;
+  premium_users: number;
+  cards: number;
+  messages: number;
+  ratings: number;
+  subscriptions: number;
+  playbooks: number;
+  feedback_new: number;
+}
+
+export interface PortalRun {
+  id: string;
+  trigger: string;
+  status: string;
+  started_at: string;
+  finished_at: string | null;
+  entities_total?: number;
+  entities_ok: number;
+  entities_failed: number;
+  entities_skipped: number;
+  facts_written: number | null;
+}
+
+export interface PortalOverview {
+  counts: PortalCounts;
+  last_run: PortalRun | null;
+  attention: {
+    active_never_run: number;
+    stale_over_14_days: number;
+    countries_with_errors: { slug: string; name: string; last_error: string }[];
+    dead_links: number;
+    feedback_new: number;
+  };
+  link_health: { ok: number; gated: number; dead: number; unknown: number };
+}
+
+export interface PortalCountryRow {
+  slug: string;
+  name: string;
+  iso3: string | null;
+  continent: string | null;
+  is_active: number;
+  coverage_score: number | null;
+  last_ingest_at: string | null;
+  last_checked_at: string | null;
+  last_error: string | null;
+  signals: number;
+  facts: number;
+}
+
+export interface PortalUser {
+  id: string;
+  email: string;
+  full_name: string | null;
+  country_iso3: string | null;
+  role: string;
+  tier: string;
+  tier_expires_at: string | null;
+  email_verified: number;
+  created_at: string;
+  last_seen_at: string | null;
+  cards: number;
+  follows: number;
+}
+
+export interface PortalCard {
+  id: string;
+  display_name: string;
+  company: string | null;
+  headline: string | null;
+  country_iso3: string | null;
+  is_published: number;
+  is_verified: number;
+  rating_avg: number | null;
+  rating_count: number;
+  created_at: string;
+  owner_email: string | null;
+  owner_name: string | null;
+}
+
+export interface PortalRating {
+  id: string;
+  score: number;
+  comment: string | null;
+  dealt_in: string | null;
+  created_at: string;
+  rated_headline: string | null;
+  rated_name: string | null;
+  rater_name: string | null;
+}
+
+export interface PortalBillingEvent {
+  id: string;
+  kind: string;
+  provider: string | null;
+  plan: string | null;
+  amount_minor: number | null;
+  currency: string | null;
+  period_end: string | null;
+  created_at: string;
+  user_email: string | null;
+}
+
+export interface PortalSource {
+  id: string;
+  url: string;
+  label: string | null;
+  category: string;
+  slot: number;
+  fmt: string;
+  last_status: number | null;
+  last_checked_at: string | null;
+  tls_warning: number;
+  slug: string;
+  entity_name: string;
+  kind: string;
+  is_active: number;
+}
+
+export interface PortalPlaybook {
+  slug: string;
+  title: string;
+  sector: string | null;
+  country_iso3: string | null;
+  hs_code: string | null;
+  premium_only: number;
+  reading_minutes: number | null;
+  published_at: string | null;
+  updated_at: string | null;
+  body_chars: number | null;
+}
+
+export interface PortalSetup {
+  config: { key: string; set: boolean; why: string; required: boolean }[];
+  db: { facts?: number; results?: number; migrations?: number };
+  notes: string[];
+}
+
+export type SourceHealth = 'ok' | 'gated' | 'dead' | 'unknown';
 
 export const api = {
   stats: () => req<HomeStats>('/api/stats'),
@@ -263,6 +418,39 @@ export const api = {
         `/api/admin/classifications?entity=${encodeURIComponent(entity)}&hs_code=${encodeURIComponent(hsCode)}`,
         { method: 'DELETE' },
       ),
+  },
+
+  // Read-only aggregates for the owner portal. Every path sits under
+  // /api/admin so req() attaches the admin bearer automatically.
+  portal: {
+    overview: () => req<PortalOverview>('/api/admin/portal/overview'),
+    pipeline: () =>
+      req<{ runs: PortalRun[]; countries: PortalCountryRow[] }>('/api/admin/portal/pipeline'),
+    users: (q?: string) =>
+      req<{
+        users: PortalUser[];
+        by_tier: { tier: string; n: number }[];
+        signups_by_day: { day: string; n: number }[];
+      }>(`/api/admin/portal/users${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+    network: () =>
+      req<{
+        cards: PortalCard[];
+        activity: { conversations: number; messages: number; messages_7d: number; ratings: number };
+        recent_ratings: PortalRating[];
+      }>('/api/admin/portal/network'),
+    premium: () =>
+      req<{
+        by_kind: { kind: string; n: number }[];
+        top_followed: { kind: string; value: string; label: string | null; followers: number }[];
+        feed: { items: number; unread: number; premium_items: number };
+        billing: PortalBillingEvent[];
+      }>('/api/admin/portal/premium'),
+    sources: (health?: SourceHealth) =>
+      req<{ sources: PortalSource[]; count: number }>(
+        `/api/admin/portal/sources${health ? `?health=${health}` : ''}`,
+      ),
+    content: () => req<{ playbooks: PortalPlaybook[] }>('/api/admin/portal/content'),
+    setup: () => req<PortalSetup>('/api/admin/portal/setup'),
   },
 
   auth: {

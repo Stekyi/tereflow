@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
   Area,
   AreaChart,
@@ -152,7 +152,7 @@ export default function Country() {
         <Header name={data.entity.name} iso3={data.entity.iso3} sub={data.entity.continent ?? ''} />
         <Empty
           title="Activated, but not analysed yet"
-          hint="Run the analysis from Admin, or wait for the Friday 21:00 GMT job."
+          hint="Figures appear once the pipeline has fetched this country. That runs on the operator's machine, not in the cloud, so it fills in over time rather than on demand."
         />
       </>
     );
@@ -353,6 +353,93 @@ export default function Country() {
         <Empty title="No read yet" hint="Recommendations appear after the first analysis run." />
       ) : (
         data.recommendations.map((r, i) => <Rec key={i} rec={r} />)
+      )}
+
+      {/* Premium. Kept on this page because the signals are per country: a
+          reader looking at one market is exactly who this is for. The count is
+          shown to everyone and the detail only to entitled accounts, so the
+          paywall says what is behind it rather than being a blank wall. */}
+      {(data.opportunities?.length || data.opportunities_locked > 0) && (
+        <>
+          <div className="section-head">
+            <h2>Early signals</h2>
+            <span className="badge premium">Premium</span>
+          </div>
+
+          {data.opportunities ? (
+            data.opportunities.length === 0 ? (
+              <Empty
+                title="No emerging signal detected"
+                hint="Nothing is growing fast enough outside the top products yet."
+              />
+            ) : (
+              data.opportunities.map((s) => (
+                <div className="card" key={s.id}>
+                  <div className="row between" style={{ marginBottom: 6, gap: 10 }}>
+                    <strong style={{ fontSize: 15 }}>{shortProductName(s.product_name)}</strong>
+                    <span className={`badge ${s.momentum > 0.6 ? 'strong' : 'watch'}`}>
+                      <Term k="momentum" tone="quiet">
+                        {(s.momentum * 100).toFixed(0)}% momentum
+                      </Term>
+                    </span>
+                  </div>
+                  <p className="small muted" style={{ margin: 0 }}>
+                    {s.rationale}
+                  </p>
+                  <div className="row wrap" style={{ marginTop: 12, gap: 16 }}>
+                    <span className="tiny dim">
+                      Rank now{' '}
+                      <strong style={{ color: 'var(--ink)' }}>{s.current_rank ?? 'not ranked'}</strong>
+                    </span>
+                    <span className="tiny dim">
+                      Projected in {s.horizon_years}y{' '}
+                      <strong style={{ color: 'var(--gold)' }}>
+                        {s.projected_rank ?? 'not projected'}
+                      </strong>
+                    </span>
+                    <span className="tiny dim">
+                      Confidence{' '}
+                      <strong style={{ color: 'var(--ink)' }}>
+                        {s.confidence != null ? `${(s.confidence * 100).toFixed(0)}%` : 'not scored'}
+                      </strong>
+                    </span>
+                  </div>
+                  {s.hs_code && (
+                    <button
+                      type="button"
+                      className="btn ghost sm"
+                      style={{ marginTop: 12 }}
+                      onClick={() => setWorldHs(s.hs_code)}
+                    >
+                      See this product worldwide
+                    </button>
+                  )}
+                </div>
+              ))
+            )
+          ) : (
+            <div className="locked">
+              <div style={{ fontSize: 26 }}>🔒</div>
+              <h3>
+                {data.opportunities_locked} emerging{' '}
+                {data.opportunities_locked === 1 ? 'signal' : 'signals'} detected
+              </h3>
+              <p>
+                Products growing fast enough to change this market inside four years, while they are
+                still outside the headline rankings.
+              </p>
+              {user ? (
+                <Link className="btn gold" to="/upgrade">
+                  See premium
+                </Link>
+              ) : (
+                <Link className="btn primary" to={`/join?next=/country/${slug}`}>
+                  Join free to unlock
+                </Link>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       <Ranked title="Where exports go" items={data.partners_export} />

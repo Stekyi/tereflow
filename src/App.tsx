@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Skeletons } from './components/ui';
 import { Logo } from './components/Brand';
 import FeedbackButton from './components/FeedbackButton';
@@ -11,10 +11,8 @@ const Countries = lazy(() => import('./pages/Countries'));
 const Marketplace = lazy(() => import('./pages/Marketplace'));
 const Country = lazy(() => import('./pages/Country'));
 const Registry = lazy(() => import('./pages/Registry'));
-const Admin = lazy(() => import('./pages/Admin'));
+const Portal = lazy(() => import('./pages/Portal'));
 const AdminForm = lazy(() => import('./pages/AdminForm'));
-const AdminClassifications = lazy(() => import('./pages/AdminClassifications'));
-const AdminFeedback = lazy(() => import('./pages/AdminFeedback'));
 const Auth = lazy(() => import('./pages/Auth'));
 const Network = lazy(() => import('./pages/Network'));
 const CardDetail = lazy(() => import('./pages/CardDetail'));
@@ -40,10 +38,8 @@ const TITLES: Record<string, string> = {
   '/playbooks': 'How to start',
   '/upgrade': 'Premium',
   '/registry': 'Data registry',
-  '/admin': 'Admin',
+  '/admin': 'Owner portal',
   '/admin/new': 'New record',
-  '/admin/classifications': 'Export classification',
-  '/admin/feedback': 'Feedback',
   '/join': 'Join Tereflow',
 };
 
@@ -104,11 +100,11 @@ export default function App() {
             <Route path="/playbooks/:slug" element={<PlaybookDetail />} />
             <Route path="/upgrade" element={<Upgrade />} />
 
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<Portal />} />
             <Route path="/admin/new" element={<AdminForm />} />
             <Route path="/admin/edit/:slug" element={<AdminForm />} />
-            <Route path="/admin/classifications" element={<AdminClassifications />} />
-            <Route path="/admin/feedback" element={<AdminFeedback />} />
+            <Route path="/admin/classifications" element={<Navigate to="/admin" replace />} />
+            <Route path="/admin/feedback" element={<Navigate to="/admin" replace />} />
 
             <Route
               path="*"

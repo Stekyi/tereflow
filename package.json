@@ -26,7 +26,7 @@
     "pipeline:dry": "node local/build.mjs && node local/dist/pipeline.mjs --dry-run",
     "agent:local": "node scripts/run-agent-local.mjs",
     "test:reset": "node scripts/reset-ratelimit.mjs",
-    "test:e2e": "npm run test:reset && node scripts/e2e-network.mjs && node scripts/e2e-premium.mjs && node scripts/e2e-products.mjs"
+    "test:e2e": "npm run test:reset && node scripts/e2e-network.mjs && node scripts/e2e-premium.mjs && node scripts/e2e-products.mjs && node scripts/e2e-portal.mjs"
   },
   "dependencies": {
     "hono": "^4.6.14",

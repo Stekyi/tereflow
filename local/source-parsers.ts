@@ -205,11 +205,13 @@ async function bodyToRecords(response: Response, source: EntitySource, config: S
     if (rows.length) return rows;
     return text
       .split(/\r?\n/)
-      .map((line) => line.trim())
+      .map((line: string) => line.trim())
       .filter(Boolean)
-      .map((line) => {
-        const cells = line.split(/\s{2,}/).map((cell) => cell.trim());
-        return Object.fromEntries(cells.map((cell, index) => [`column_${index}`, cell]));
+      .map((line: string) => {
+        const cells = line.split(/\s{2,}/).map((cell: string) => cell.trim());
+        return Object.fromEntries(
+          cells.map((cell: string, index: number) => [`column_${index}`, cell]),
+        );
       });
   }
   const text = await response.text();

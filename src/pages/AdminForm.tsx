@@ -8,22 +8,36 @@ import {
   ENTITY_KINDS,
   KIND_LABEL,
   SOURCE_CATEGORIES,
+  SOURCE_ENDPOINT_TYPES,
   SOURCE_FMTS,
+  SOURCE_PARSERS,
   type EntityInput,
   type EntityKind,
   type SourceCategory,
+  type SourceEndpointType,
   type SourceFmt,
+  type SourceParserKey,
 } from '../../shared/types';
 
 interface SlotState {
   url: string;
   label: string;
   fmt: SourceFmt;
+  endpoint_type: SourceEndpointType;
+  parser_key: SourceParserKey;
+  config_json: string;
 }
 
 type SourceState = Record<SourceCategory, [SlotState, SlotState, SlotState]>;
 
-const blankSlot = (): SlotState => ({ url: '', label: '', fmt: 'html' });
+const blankSlot = (): SlotState => ({
+  url: '',
+  label: '',
+  fmt: 'html',
+  endpoint_type: 'file',
+  parser_key: 'auto',
+  config_json: '{}',
+});
 const blankSources = (): SourceState => ({
   export: [blankSlot(), blankSlot(), blankSlot()],
   import: [blankSlot(), blankSlot(), blankSlot()],
@@ -75,7 +89,14 @@ export default function AdminForm() {
           for (const s of e.sources[cat]) {
             const idx = s.slot - 1;
             if (idx >= 0 && idx < 3)
-              next[cat][idx] = { url: s.url, label: s.label ?? '', fmt: s.fmt };
+              next[cat][idx] = {
+                url: s.url,
+                label: s.label ?? '',
+                fmt: s.fmt,
+                endpoint_type: s.endpoint_type ?? 'file',
+                parser_key: s.parser_key ?? 'auto',
+                config_json: s.config_json ?? '{}',
+              };
           }
         }
         setSources(next);
@@ -121,6 +142,9 @@ export default function AdminForm() {
             url: s.url.trim(),
             label: s.label.trim() || null,
             fmt: s.fmt,
+            endpoint_type: s.endpoint_type,
+            parser_key: s.parser_key,
+            config_json: s.config_json.trim() || '{}',
           })),
       ),
     };
@@ -281,6 +305,34 @@ export default function AdminForm() {
                     </option>
                   ))}
                 </select>
+                <select
+                  value={s.endpoint_type}
+                  onChange={(e) =>
+                    setSlot(cat, i, { endpoint_type: e.target.value as SourceEndpointType })
+                  }
+                >
+                  {SOURCE_ENDPOINT_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      endpoint: {type}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={s.parser_key}
+                  onChange={(e) => setSlot(cat, i, { parser_key: e.target.value as SourceParserKey })}
+                >
+                  {SOURCE_PARSERS.map((parser) => (
+                    <option key={parser} value={parser}>
+                      parser: {parser}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  value={s.config_json}
+                  onChange={(e) => setSlot(cat, i, { config_json: e.target.value })}
+                  placeholder='{"rows_path":"data","year":"year","flow":"flow","value_usd":"value_usd","hs_code":"hs_code"}'
+                  aria-label="Parser field mapping JSON"
+                />
               </div>
             ))}
           </div>

@@ -110,6 +110,9 @@ for (const file of INPUTS) {
           url: s.url.trim(),
           label: s.label ?? null,
           fmt: VALID_FMTS.has(s.fmt) ? s.fmt : 'html',
+          endpoint_type: s.endpoint_type ?? 'file',
+          parser_key: s.parser_key ?? 'auto',
+          config_json: typeof s.config_json === 'string' ? s.config_json : JSON.stringify(s.config ?? {}),
           tls: s.tls_warning ? 1 : 0,
         });
       }
@@ -163,7 +166,7 @@ for (const e of entities) {
   for (const cat of VALID_CATS) {
     e.sources[cat].forEach((s, i) => {
       lines.push(
-        `INSERT INTO entity_sources (id, entity_id, category, slot, url, label, fmt, tls_warning) VALUES (` +
+        `INSERT INTO entity_sources (id, entity_id, category, slot, url, label, fmt, endpoint_type, parser_key, config_json, tls_warning) VALUES (` +
           [
             q(`src_${e.slug}_${cat}_${i + 1}`.slice(0, 60)),
             q(e.id),
@@ -172,6 +175,9 @@ for (const e of entities) {
             q(s.url),
             q(s.label),
             q(s.fmt),
+            q(s.endpoint_type),
+            q(s.parser_key),
+            q(s.config_json),
             s.tls,
           ].join(', ') +
           ');',

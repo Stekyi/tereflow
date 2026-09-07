@@ -203,14 +203,30 @@ pub.get('/dashboard/:slug/sources', async (c) => {
   )
     .bind(entity.id)
     .all<{ source_ref: string }>();
+    const { results: attempts } = await c.env.DB.prepare(
+      `SELECT source_ref, role, status, rows_written, note, attempted_at
+         FROM source_attempts
+        WHERE entity_id = ?
+        ORDER BY attempted_at DESC
+        LIMIT 20`,
+    )
+      .bind(entity.id)
+      .all<{
+        source_ref: string;
+        role: string;
+        status: string;
+        rows_written: number;
+        note: string | null;
+        attempted_at: string;
+      }>();
 
   return json({
     official: entity.sources,
     harmonised: (contributors ?? []).map((r) => r.source_ref),
+      attempts: attempts ?? [],
     note:
-      'Official national publications are listed for citation and are health-checked weekly. ' +
-      'The comparable figures charted above come from the harmonised sources so that ' +
-      'countries can be compared on the same basis.',
+        'National statistical sources are attempted first. Comtrade and World Bank validate them ' +
+        'and are used only when the configured national source cannot produce usable rows.',
   });
 });
 

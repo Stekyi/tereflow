@@ -31,6 +31,10 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node20',
+  // These packages use Node/CommonJS internals such as `stream`. Keeping
+  // them external avoids esbuild's ESM wrapper turning their require calls
+  // into unsupported dynamic imports.
+  external: ['xlsx', 'pdf-parse'],
   // Node has fetch, AbortSignal.timeout and crypto built in; nothing external
   // is needed at run time.
   banner: {

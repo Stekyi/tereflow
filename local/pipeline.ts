@@ -41,6 +41,8 @@ import { fetchWorldBank } from '../worker/agent/adapters/worldbank';
 import { analyse } from '../worker/agent/analyse';
 import { CODE_TO_KEY, DEFAULTS, type Settings } from '../worker/lib/settings';
 import type { FactRow } from '../worker/agent/types';
+import { fetchNationalSource } from './source-parsers';
+import type { EntitySource } from '../shared/types';
 
 /**
  * Fetch the tunable thresholds the app is currently running to.
@@ -104,6 +106,18 @@ interface EntityRow {
   is_active: 0 | 1;
   last_ingest_at: string | null;
   last_fingerprint: string | null;
+  sources: Record<'export' | 'import' | 'commerce', EntitySource[]>;
+}
+
+interface SourceAttempt {
+  source_id: string | null;
+  source_ref: string;
+  role: 'primary' | 'fallback' | 'validator';
+  parser_key: string;
+  url: string;
+  status: 'ok' | 'failed' | 'partial';
+  rows_written: number;
+  note: string;
 }
 
 function readConfig(): Config {
@@ -270,6 +284,42 @@ class Api {
   }
 }
 
+async function fetchNationalPrimary(entity: EntityRow, years: number[]) {
+  const configured = Object.values(entity.sources ?? {})
+    .flat()
+    .filter((source, index, all) => all.findIndex((candidate) => candidate.id === source.id) === index)
+    .sort((a, b) => a.slot - b.slot);
+  const attempts: SourceAttempt[] = [];
+  for (const source of configured) {
+    try {
+      const result = await fetchNationalSource({ source, iso3: entity.iso3!, years });
+      attempts.push({
+        source_id: source.id,
+        source_ref: result.source_ref,
+        role: 'primary',
+        parser_key: source.parser_key,
+        url: source.url,
+        status: 'ok',
+        rows_written: result.rows.length,
+        note: result.note,
+      });
+      return { result, attempts };
+    } catch (error) {
+      attempts.push({
+        source_id: source.id,
+        source_ref: `national:${entity.iso3!.toLowerCase()}:${source.url}`,
+        role: 'primary',
+        parser_key: source.parser_key,
+        url: source.url,
+        status: 'failed',
+        rows_written: 0,
+        note: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return { result: null, attempts };
+}
+
 async function main() {
   const cfg = readConfig();
   const api = new Api(cfg);
@@ -405,22 +455,35 @@ async function main() {
         continue;
       }
 
-      // Cheap first: a latest-year-only Comtrade probe (2-4 calls) plus the
-      // already-cheap World Bank fetch, before paying for the full ~18-call
-      // Comtrade product/partner breakdown.
-      const [probe, worldbank] = await Promise.all([
-        probeComtrade({ COMTRADE_API_KEY: cfg.comtradeKey } as never, entity.iso3!, candidateYears),
+      // National publications are primary. Fetch them before touching
+      // Comtrade, so a rate-limited validator cannot block usable local data.
+      const [national, worldbank] = await Promise.all([
+        fetchNationalPrimary(entity, years),
         fetchWorldBank(entity.iso3!, years),
       ]);
+      let probe: Awaited<ReturnType<typeof probeComtrade>> | null = null;
+      let probeError: unknown = null;
+      if (!national.result) {
+        try {
+          probe = await probeComtrade(
+            { COMTRADE_API_KEY: cfg.comtradeKey } as never,
+            entity.iso3!,
+            candidateYears,
+          );
+        } catch (error) {
+          probeError = error;
+          console.log(`national source unavailable; Comtrade probe failed: ${String(error)}`);
+        }
+      }
       const fingerprint = JSON.stringify({
-        y: probe.year,
-        x: probe.export_usd,
-        m: probe.import_usd,
+        y: probe?.year ?? null,
+        x: probe?.export_usd ?? null,
+        m: probe?.import_usd ?? null,
         wb: worldbank.meta?.lastupdated ?? null,
       });
 
       const unchanged =
-        !cfg.force && !cfg.dryRun && entity.last_ingest_at != null && fingerprint === entity.last_fingerprint;
+        !national.result && !cfg.force && !cfg.dryRun && entity.last_ingest_at != null && fingerprint === entity.last_fingerprint;
 
       if (unchanged) {
         console.log('unchanged since last check, skipped');
@@ -430,18 +493,67 @@ async function main() {
         continue;
       }
 
-      const comtrade = await fetchComtrade(
-        { COMTRADE_API_KEY: cfg.comtradeKey } as never,
-        entity.iso3!,
-        years,
-        cfg.callPaceMs,
-        settings,
-      );
-
-      const rows: FactRow[] = [...comtrade.rows, ...worldbank.rows];
+      const usingNational = national.result?.ok === true;
+      if (!usingNational && probeError) {
+        throw new Error(
+          `National source produced no rows and Comtrade fallback is unavailable: ${String(probeError)}`,
+        );
+      }
+      const comtrade = usingNational
+        ? {
+            rows: [] as FactRow[],
+            ok: probe?.ok ?? false,
+            source_ref: 'un-comtrade',
+            note: probe?.ok ? 'Latest-year totals checked as validator' : 'Validator probe unavailable',
+          }
+        : await fetchComtrade(
+            { COMTRADE_API_KEY: cfg.comtradeKey } as never,
+            entity.iso3!,
+            years,
+            cfg.callPaceMs,
+            settings,
+          );
+      const rows: FactRow[] = usingNational
+        ? [...national.result!.rows, ...worldbank.rows]
+        : [...comtrade.rows, ...worldbank.rows];
       if (rows.length === 0) {
         throw new Error(`no data. ${comtrade.note} | ${worldbank.note}`);
       }
+
+      const sourceAttempts: SourceAttempt[] = [...national.attempts];
+      if (usingNational) {
+        sourceAttempts.push({
+          source_id: null,
+          source_ref: comtrade.source_ref,
+          role: 'validator',
+          parser_key: 'comtrade',
+          url: 'https://comtradeapi.un.org/data/v1/get/C/A/HS',
+          status: comtrade.ok ? 'ok' : 'failed',
+          rows_written: comtrade.rows.length,
+          note: comtrade.ok ? 'Compared with national statistical source' : comtrade.note,
+        });
+      } else {
+        sourceAttempts.push({
+          source_id: null,
+          source_ref: comtrade.source_ref,
+          role: 'fallback',
+          parser_key: 'comtrade',
+          url: 'https://comtradeapi.un.org/data/v1/get/C/A/HS',
+          status: comtrade.ok ? 'ok' : 'failed',
+          rows_written: comtrade.rows.length,
+          note: comtrade.note,
+        });
+      }
+      sourceAttempts.push({
+        source_id: null,
+        source_ref: worldbank.source_ref,
+        role: usingNational || comtrade.ok ? 'validator' : 'fallback',
+        parser_key: 'world-bank',
+        url: 'https://api.worldbank.org/v2',
+        status: worldbank.ok ? 'ok' : 'failed',
+        rows_written: worldbank.rows.length,
+        note: worldbank.note,
+      });
 
       const sourceRefs = [
         ...(comtrade.ok ? [comtrade.source_ref] : []),
@@ -457,7 +569,7 @@ async function main() {
       );
 
       const coverage =
-        (comtrade.ok ? 0.6 : 0) +
+        (usingNational ? 0.6 : comtrade.ok ? 0.6 : 0) +
         (worldbank.ok ? 0.25 : 0) +
         (bundle.yearly_trend.length >= 4 ? 0.15 : 0);
 
@@ -484,7 +596,7 @@ async function main() {
         slug: entity.slug,
         run_id: runId,
         coverage_score: coverage,
-        fingerprint: probe.ok ? fingerprint : undefined,
+          fingerprint: probe?.ok ? fingerprint : undefined,
         analysis: {
           overview: bundle.overview,
           top_exports: bundle.top_exports,
@@ -496,6 +608,7 @@ async function main() {
           recommendations: bundle.recommendations,
         },
         signals: bundle.signals,
+        source_attempts: sourceAttempts,
       });
       await api.productAnalytics(entity.slug, bundle.product_analytics);
 

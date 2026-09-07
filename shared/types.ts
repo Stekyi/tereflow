@@ -2,12 +2,48 @@ import type { ScoreBand } from './opportunity';
 export type EntityKind = 'country' | 'intl_org' | 'regional_body';
 export type SourceCategory = 'export' | 'import' | 'commerce';
 export type SourceFmt = 'html' | 'csv' | 'json' | 'api' | 'sdmx' | 'xlsx' | 'pdf';
+export type SourceEndpointType =
+  | 'file'
+  | 'rest'
+  | 'json_stat'
+  | 'sdmx'
+  | 'pxweb'
+  | 'odata'
+  | 'html_download';
+export type SourceParserKey =
+  | 'auto'
+  | 'csv'
+  | 'json'
+  | 'json-stat'
+  | 'sdmx'
+  | 'xlsx'
+  | 'pdf'
+  | 'html';
 export type Flow = 'export' | 'import';
 export type Stream = 'goods' | 'services';
 
 export const ENTITY_KINDS: EntityKind[] = ['country', 'intl_org', 'regional_body'];
 export const SOURCE_CATEGORIES: SourceCategory[] = ['export', 'import', 'commerce'];
 export const SOURCE_FMTS: SourceFmt[] = ['html', 'csv', 'json', 'api', 'sdmx', 'xlsx', 'pdf'];
+export const SOURCE_ENDPOINT_TYPES: SourceEndpointType[] = [
+  'file',
+  'rest',
+  'json_stat',
+  'sdmx',
+  'pxweb',
+  'odata',
+  'html_download',
+];
+export const SOURCE_PARSERS: SourceParserKey[] = [
+  'auto',
+  'csv',
+  'json',
+  'json-stat',
+  'sdmx',
+  'xlsx',
+  'pdf',
+  'html',
+];
 export const CONTINENTS = [
   'Africa',
   'Asia',
@@ -38,6 +74,9 @@ export interface EntitySource {
   url: string;
   label: string | null;
   fmt: SourceFmt;
+  endpoint_type: SourceEndpointType;
+  parser_key: SourceParserKey;
+  config_json: string;
   last_status: number | null;
   last_checked_at: string | null;
   tls_warning: 0 | 1;
@@ -84,6 +123,9 @@ export interface EntityInput {
     url: string;
     label?: string | null;
     fmt?: SourceFmt;
+    endpoint_type?: SourceEndpointType;
+    parser_key?: SourceParserKey;
+    config_json?: string;
   }[];
 }
 

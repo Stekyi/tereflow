@@ -1,0 +1,47 @@
+# Extraction pipeline dependencies. Open source only, no paid services.
+#
+# Pinned to major versions rather than exact ones: this runs on a machine the
+# owner controls, not in a reproducible build, and a hard pin here goes stale
+# and starts failing installs long before it prevents a real problem.
+
+# --- fetching -------------------------------------------------------------
+httpx>=0.27
+tenacity>=8.2
+
+# --- tabular --------------------------------------------------------------
+pandas>=2.2
+openpyxl>=3.1          # xlsx read
+xlrd>=2.0              # legacy .xls
+odfpy>=1.4             # OpenDocument spreadsheets
+chardet>=5.2           # encoding detection for CSVs that do not declare one
+
+# --- html -----------------------------------------------------------------
+beautifulsoup4>=4.12
+lxml>=5.2
+trafilatura>=1.9       # main-content extraction, drops nav and boilerplate
+html5lib>=1.1          # tolerant parser for pandas.read_html
+
+# --- pdf ------------------------------------------------------------------
+pdfplumber>=0.11       # text and table extraction from born-digital PDFs
+pypdf>=4.2             # page counts, metadata, splitting
+
+# --- scanned pdf ----------------------------------------------------------
+# Needs the Tesseract binary on PATH as well as these bindings. Without it the
+# OCR path reports that it is unavailable rather than returning empty text
+# that would read as "this document contained nothing".
+pytesseract>=0.3.10
+pdf2image>=1.17        # needs poppler on PATH
+Pillow>=10.3
+
+# --- sdmx -----------------------------------------------------------------
+sdmx1>=2.13            # SDMX-ML and SDMX-JSON, used by Eurostat, IMF, OECD
+
+# --- normalisation --------------------------------------------------------
+pycountry>=24.6        # ISO 3166 country codes, ISO 4217 currencies
+rapidfuzz>=3.9         # fuzzy country matching with an explicit score
+
+# --- optional: javascript-rendered pages ----------------------------------
+# Heavy, and only installed if you need it. Without it the dynamic HTML path
+# reports that rendering is unavailable instead of returning an empty page.
+#   pip install playwright && playwright install chromium
+playwright>=1.44

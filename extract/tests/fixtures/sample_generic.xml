@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenericData xmlns="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/message"
+             xmlns:g="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/data/generic">
+  <g:DataSet>
+    <g:Series>
+      <g:SeriesKey>
+        <g:Value id="REPORTER" value="US"/>
+        <g:Value id="PARTNER" value="FR"/>
+        <g:Value id="FLOW" value="EXP"/>
+      </g:SeriesKey>
+      <g:Attributes>
+        <g:Value id="CURRENCY" value="USD"/>
+      </g:Attributes>
+      <g:Obs>
+        <g:ObsDimension value="2020"/>
+        <g:ObsValue value="123.45"/>
+      </g:Obs>
+      <g:Obs>
+        <g:ObsDimension value="2021"/>
+        <g:ObsValue value="200.0"/>
+      </g:Obs>
+    </g:Series>
+  </g:DataSet>
+</GenericData>

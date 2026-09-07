@@ -15,3 +15,10 @@ local/run-pipeline.cmd
 
 # scratch output from test and pipeline runs
 .tmp-*
+
+# extraction pipeline: virtualenv, fetched bodies and run output
+extract/.venv/
+extract/.cache/
+extract/out/
+extract/**/__pycache__/
+extract/.pytest_cache/

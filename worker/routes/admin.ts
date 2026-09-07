@@ -8,7 +8,9 @@ import { loadResult } from './public';
 import {
   ENTITY_KINDS,
   SOURCE_CATEGORIES,
+  SOURCE_ENDPOINT_TYPES,
   SOURCE_FMTS,
+  SOURCE_PARSERS,
   type Entity,
   type EntityInput,
   type ExportCategory,
@@ -63,7 +65,18 @@ function validate(input: EntityInput): string | null {
     if (!SOURCE_CATEGORIES.includes(s.category)) return `Bad source category: ${s.category}`;
     if (![1, 2, 3].includes(s.slot)) return 'Source slot must be 1, 2 or 3';
     if (s.fmt && !SOURCE_FMTS.includes(s.fmt)) return `Bad source format: ${s.fmt}`;
+    if (s.endpoint_type && !SOURCE_ENDPOINT_TYPES.includes(s.endpoint_type))
+      return `Bad endpoint type: ${s.endpoint_type}`;
+    if (s.parser_key && !SOURCE_PARSERS.includes(s.parser_key))
+      return `Bad parser: ${s.parser_key}`;
     if (s.url && !/^https?:\/\//i.test(s.url)) return `Link must start with http(s): ${s.url}`;
+    if (s.config_json) {
+      try {
+        JSON.parse(s.config_json);
+      } catch {
+        return `Parser config must be valid JSON for ${s.url}`;
+      }
+    }
   }
   return null;
 }
@@ -83,10 +96,22 @@ async function writeSources(db: D1Database, entityId: string, input: EntityInput
     stmts.push(
       db
         .prepare(
-          `INSERT INTO entity_sources (id, entity_id, category, slot, url, label, fmt)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO entity_sources
+             (id, entity_id, category, slot, url, label, fmt, endpoint_type, parser_key, config_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .bind(uid('src_'), entityId, s.category, s.slot, url, s.label ?? null, s.fmt ?? 'html'),
+        .bind(
+          uid('src_'),
+          entityId,
+          s.category,
+          s.slot,
+          url,
+          s.label ?? null,
+          s.fmt ?? 'html',
+          s.endpoint_type ?? 'file',
+          s.parser_key ?? 'auto',
+          s.config_json ?? '{}',
+        ),
     );
   }
   await db.batch(stmts);
@@ -704,6 +729,16 @@ admin.post('/ingest/commit', async (c) => {
     fingerprint?: string;
     analysis: Record<string, unknown>;
     signals?: Record<string, unknown>[];
+    source_attempts?: {
+      source_id?: string | null;
+      source_ref: string;
+      role: 'primary' | 'fallback' | 'validator';
+      parser_key: string;
+      url: string;
+      status: 'ok' | 'failed' | 'partial';
+      rows_written?: number;
+      note?: string | null;
+    }[];
   };
   const entity = await resolveEntity(c, body.slug);
   if (!entity) return bad(`Unknown entity: ${body.slug}`, 404);
@@ -776,6 +811,27 @@ admin.post('/ingest/commit', async (c) => {
   const CHUNK = 20;
   for (let i = 0; i < stmts.length; i += CHUNK) {
     await c.env.DB.batch(stmts.slice(i, i + CHUNK));
+  }
+
+  for (const attempt of body.source_attempts ?? []) {
+    await c.env.DB.prepare(
+      `INSERT INTO source_attempts
+         (id, entity_id, source_id, source_ref, role, parser_key, url, status, rows_written, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        uid('attempt_'),
+        entity.id,
+        attempt.source_id ?? null,
+        attempt.source_ref,
+        attempt.role,
+        attempt.parser_key,
+        attempt.url,
+        attempt.status,
+        attempt.rows_written ?? 0,
+        attempt.note ?? null,
+      )
+      .run();
   }
 
   return json({ ok: true, results: Object.keys(body.analysis).length, signals: body.signals?.length ?? 0 });

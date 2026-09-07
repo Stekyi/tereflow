@@ -267,7 +267,12 @@ export const api = {
     req<CountryDashboard & { inactive?: boolean; message?: string }>(`/api/dashboard/${slug}`),
 
   dashboardSources: (slug: string) =>
-    req<{ official: EntityWithSources['sources']; harmonised: string[]; note: string }>(
+    req<{
+      official: EntityWithSources['sources'];
+      harmonised: string[];
+      attempts: { source_ref: string; role: string; status: string; rows_written: number; note: string | null; attempted_at: string }[];
+      note: string;
+    }>(
       `/api/dashboard/${slug}/sources`,
     ),
 

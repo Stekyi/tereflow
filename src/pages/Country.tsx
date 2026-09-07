@@ -549,6 +549,16 @@ export default function Country() {
             <p className="tiny dim" style={{ marginTop: 0 }}>
               {sources.note}
             </p>
+            {sources.attempts?.length ? (
+              <div className="tiny dim" style={{ marginTop: 10 }}>
+                <strong>Data used and validation</strong>
+                {sources.attempts.slice(0, 8).map((attempt) => (
+                  <div key={`${attempt.attempted_at}-${attempt.source_ref}`}>
+                    {attempt.role}: {attempt.source_ref} ({attempt.status}, {attempt.rows_written} rows)
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {(['export', 'import', 'commerce'] as const).map((cat) =>
               sources.official[cat]?.length ? (
                 <div key={cat} style={{ marginTop: 12 }}>

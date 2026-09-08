@@ -16,6 +16,15 @@ import {
   type ExportCategory,
   type Overview,
 } from '../../shared/types';
+import {
+  datasetSpec,
+  type DatasetCode,
+} from '../../shared/csv/schema';
+import { validate as validateCsv, type IndicatorDef } from '../../shared/csv/validate';
+import { buildReadme, buildTemplate } from '../../shared/csv/template';
+import { analyse } from '../agent/analyse';
+import { analyseCountryData, type IndicatorRow, type SectorRow } from '../agent/analyse-manual';
+import type { FactRow } from '../agent/types';
 
 export const admin = new Hono<{ Bindings: Env }>();
 
@@ -905,4 +914,829 @@ admin.post('/sources/check', async (c) => {
   const { checkAllLinks } = await import('../agent/linkcheck');
   const result = await checkAllLinks(c.env, Number(c.req.query('limit') ?? 200));
   return json(result);
+});
+
+// ===========================================================================
+// Manual data upload
+// ===========================================================================
+// The owner is loading data by hand now rather than scraping it, so these
+// routes take a CSV, tell the administrator exactly what is wrong with it, and
+// only write anything once they have confirmed. Validate writes nothing.
+// Upload records the file and its issues but no business data. Confirm is the
+// single place rows land, and it lands them through env.DB.batch() so a failure
+// leaves the target table as it was rather than half-filled.
+//
+// Trade rows go into the existing trade_facts table tagged
+// source_ref = 'upload:<id>', which is what makes revert a single DELETE.
+// Indicators and sectors go into indicator_observations and sector_observations
+// from migration 0014.
+
+interface ManualEntity {
+  id: string;
+  slug: string;
+  name: string;
+  iso3: string | null;
+}
+
+/** resolveEntity plus iso3, which the trade validator needs for expectIso3. */
+async function resolveManualEntity(env: Env, slug: string): Promise<ManualEntity | null> {
+  return env.DB.prepare('SELECT id, slug, name, iso3 FROM entities WHERE slug = ? OR id = ?')
+    .bind(slug, slug)
+    .first<ManualEntity>();
+}
+
+/** SHA-256 of the file text, hex. Used to catch a byte-identical re-upload. */
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** The indicator catalogue the validator checks codes and bounds against. */
+async function loadIndicatorDefs(env: Env): Promise<IndicatorDef[]> {
+  const rows = await env.DB.prepare(
+    'SELECT code, name, category, unit, min_value, max_value FROM indicator_definitions WHERE is_active = 1',
+  ).all<IndicatorDef>();
+  return rows.results ?? [];
+}
+
+/** Active sector codes, so an unknown sector is a warning not a silent accept. */
+async function loadSectorCodes(env: Env): Promise<string[]> {
+  const rows = await env.DB.prepare(
+    'SELECT code FROM sector_definitions WHERE is_active = 1',
+  ).all<{ code: string }>();
+  return (rows.results ?? []).map((r) => r.code);
+}
+
+/** Run the shared validator with everything it needs to judge this country. */
+async function validateForEntity(env: Env, entity: ManualEntity, dataset: DatasetCode, content: string) {
+  const [indicators, sectorCodes] = await Promise.all([
+    loadIndicatorDefs(env),
+    loadSectorCodes(env),
+  ]);
+  return validateCsv(content, dataset, {
+    expectIso3: entity.iso3 ?? undefined,
+    entitySlug: entity.slug,
+    indicators,
+    sectorCodes,
+  });
+}
+
+function asNumber(v: string | number | null | undefined): number | null {
+  return typeof v === 'number' ? v : null;
+}
+
+function asText(v: string | number | null | undefined): string | null {
+  if (v == null || v === '') return null;
+  return typeof v === 'number' ? String(v) : v;
+}
+
+/** The target table a dataset writes into, derived from its spec. */
+function targetTable(target: 'trade' | 'indicator' | 'sector'): string {
+  if (target === 'trade') return 'trade_facts';
+  if (target === 'indicator') return 'indicator_observations';
+  return 'sector_observations';
+}
+
+// --- Templates -------------------------------------------------------------
+// The readme path is registered before the bare template path on purpose:
+// Hono matches in order, and ':dataset' would otherwise swallow '/readme'.
+
+admin.get('/manual/template/:dataset/readme', (c) => {
+  const dataset = c.req.param('dataset');
+  const spec = datasetSpec(dataset);
+  if (!spec) return bad(`Unknown dataset '${dataset}'.`, 404);
+  return new Response(buildReadme(dataset as DatasetCode), {
+    headers: {
+      'content-type': 'text/markdown; charset=utf-8',
+      'content-disposition': `attachment; filename="${dataset}-README.md"`,
+    },
+  });
+});
+
+admin.get('/manual/template/:dataset', (c) => {
+  const dataset = c.req.param('dataset');
+  const spec = datasetSpec(dataset);
+  if (!spec) return bad(`Unknown dataset '${dataset}'.`, 404);
+  return new Response(buildTemplate(dataset as DatasetCode), {
+    headers: {
+      'content-type': 'text/csv; charset=utf-8',
+      'content-disposition': `attachment; filename="${dataset}-template.csv"`,
+    },
+  });
+});
+
+/** Everything the upload UI needs to render its dataset pickers and hints. */
+admin.get('/manual/datasets', async (c) => {
+  const [datasets, indicators, sectors] = await Promise.all([
+    c.env.DB.prepare(
+      'SELECT code, name, description, target, refresh_hint, sort_order FROM dataset_definitions WHERE is_active = 1 ORDER BY sort_order',
+    ).all(),
+    c.env.DB.prepare(
+      'SELECT code, name, category, unit, min_value, max_value, description FROM indicator_definitions WHERE is_active = 1 ORDER BY category, code',
+    ).all(),
+    c.env.DB.prepare(
+      'SELECT code, name, sort_order FROM sector_definitions WHERE is_active = 1 ORDER BY sort_order',
+    ).all(),
+  ]);
+  return json({
+    datasets: datasets.results ?? [],
+    indicators: indicators.results ?? [],
+    sectors: sectors.results ?? [],
+  });
+});
+
+// --- Validate: reads the file, writes nothing -------------------------------
+
+admin.post('/manual/validate', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  if (!body) return bad('Expected a JSON body.');
+  const { slug, dataset, content } = body as { slug?: string; dataset?: string; content?: string };
+  if (!slug || !dataset || typeof content !== 'string') {
+    return bad('slug, dataset and content are all required.');
+  }
+  if (!datasetSpec(dataset)) return bad(`Unknown dataset '${dataset}'.`, 404);
+  const entity = await resolveManualEntity(c.env, slug);
+  if (!entity) return bad(`Unknown country '${slug}'.`, 404);
+  const report = await validateForEntity(c.env, entity, dataset as DatasetCode, content);
+  return json({ report });
+});
+
+// --- Upload: records the file and its issues, no business data --------------
+
+admin.post('/manual/upload', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  if (!body) return bad('Expected a JSON body.');
+  const {
+    slug,
+    dataset,
+    filename,
+    content,
+    period,
+    source_name,
+    source_url,
+    import_mode,
+  } = body as {
+    slug?: string;
+    dataset?: string;
+    filename?: string;
+    content?: string;
+    period?: string;
+    source_name?: string;
+    source_url?: string;
+    import_mode?: string;
+  };
+  if (!slug || !dataset || typeof content !== 'string') {
+    return bad('slug, dataset and content are all required.');
+  }
+  const spec = datasetSpec(dataset);
+  if (!spec) return bad(`Unknown dataset '${dataset}'.`, 404);
+  // The mode is never inferred: replacing a period and appending to it are
+  // different intentions and guessing wrong deletes real data.
+  const mode = import_mode ?? 'append_period';
+  if (mode !== 'append_period' && mode !== 'replace_period') {
+    return bad("import_mode must be 'append_period' or 'replace_period'.");
+  }
+  const entity = await resolveManualEntity(c.env, slug);
+  if (!entity) return bad(`Unknown country '${slug}'.`, 404);
+
+  const hash = await sha256Hex(content);
+  const dup = await c.env.DB.prepare(
+    `SELECT id, filename, uploaded_at FROM data_uploads
+     WHERE entity_id = ? AND dataset_code = ? AND file_hash = ? AND import_status = 'imported'
+     LIMIT 1`,
+  )
+    .bind(entity.id, dataset, hash)
+    .first<{ id: string; filename: string; uploaded_at: string }>();
+  if (dup) {
+    return bad(
+      `This exact file is already imported as upload ${dup.id} (${dup.filename}, ${dup.uploaded_at}). Revert that upload first if you mean to replace it.`,
+      409,
+    );
+  }
+
+  const report = await validateForEntity(c.env, entity, dataset as DatasetCode, content);
+  const id = uid('upl_');
+  const errorReport = JSON.stringify({
+    status: report.status,
+    summary: report.summary,
+    years: report.years,
+    periods: report.periods,
+  });
+
+  await c.env.DB.prepare(
+    `INSERT INTO data_uploads
+       (id, entity_id, dataset_code, filename, file_hash, file_bytes, content, content_stored,
+        period, source_name, source_url, validation_status, import_mode,
+        row_count, valid_rows, error_count, warning_count, notice_count, error_report)
+     VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?)`,
+  )
+    .bind(
+      id,
+      entity.id,
+      dataset,
+      filename ?? `${dataset}.csv`,
+      hash,
+      new TextEncoder().encode(content).length,
+      content,
+      period ?? null,
+      source_name ?? null,
+      source_url ?? null,
+      report.status,
+      mode,
+      report.totalRows,
+      report.validRows,
+      report.errorCount,
+      report.warningCount,
+      report.noticeCount,
+      errorReport,
+    )
+    .run();
+
+  // Persist the issues so the history view can explain a rejection without
+  // re-running the validator against a file that may since have changed.
+  const issues = report.issues;
+  if (issues.length) {
+    const ISSUE_COLS = 7;
+    const perStmt = Math.floor(100 / ISSUE_COLS);
+    const statements: D1PreparedStatement[] = [];
+    for (let i = 0; i < issues.length; i += perStmt) {
+      const slice = issues.slice(i, i + perStmt);
+      const binds: (string | number | null)[] = [];
+      for (const issue of slice) {
+        binds.push(
+          id,
+          issue.severity,
+          issue.row ?? null,
+          issue.column ?? null,
+          issue.code,
+          issue.message,
+          issue.value ?? null,
+        );
+      }
+      const tuples = slice.map(() => '(?,?,?,?,?,?,?)').join(',');
+      statements.push(
+        c.env.DB.prepare(
+          `INSERT INTO upload_issues (upload_id, severity, row_number, column_name, code, message, raw_value) VALUES ${tuples}`,
+        ).bind(...binds),
+      );
+    }
+    const BATCH = 25;
+    for (let i = 0; i < statements.length; i += BATCH) {
+      await c.env.DB.batch(statements.slice(i, i + BATCH));
+    }
+  }
+
+  return json({ id, report });
+});
+
+// --- Confirm: the one place rows land, transactionally ----------------------
+
+admin.post('/manual/upload/:id/confirm', async (c) => {
+  const id = c.req.param('id');
+  const upload = await c.env.DB.prepare(
+    `SELECT u.*, e.slug AS entity_slug, e.name AS entity_name, e.iso3 AS entity_iso3
+       FROM data_uploads u JOIN entities e ON e.id = u.entity_id WHERE u.id = ?`,
+  )
+    .bind(id)
+    .first<Record<string, unknown>>();
+  if (!upload) return bad(`Unknown upload '${id}'.`, 404);
+  if (upload.import_status === 'imported') {
+    return bad('This upload is already imported. Revert it first to re-import.', 409);
+  }
+  if (upload.validation_status === 'invalid') {
+    return bad('This file failed validation and cannot be imported. Fix the errors and upload again.');
+  }
+
+  const dataset = String(upload.dataset_code);
+  const spec = datasetSpec(dataset);
+  if (!spec) return bad(`Upload references unknown dataset '${dataset}'.`, 500);
+  const entity: ManualEntity = {
+    id: String(upload.entity_id),
+    slug: String(upload.entity_slug),
+    name: String(upload.entity_name),
+    iso3: upload.entity_iso3 == null ? null : String(upload.entity_iso3),
+  };
+  const content = String(upload.content ?? '');
+  const period = upload.period == null ? null : String(upload.period);
+  const sourceName = upload.source_name == null ? null : String(upload.source_name);
+  const sourceUrl = upload.source_url == null ? null : String(upload.source_url);
+  const mode = String(upload.import_mode);
+  const sourceRef = `upload:${id}`;
+
+  // Rows are not persisted at upload time, so re-derive them from the stored
+  // file. Same validator, same normalisation the writer relies on.
+  const report = await validateForEntity(c.env, entity, dataset as DatasetCode, content);
+  if (report.errorCount > 0) {
+    return bad('The stored file no longer validates cleanly and will not be imported.');
+  }
+  const rows = report.rows;
+  const years = [...new Set(rows.map((r) => asNumber(r.values.year)).filter((y): y is number => y != null))];
+
+  const indicatorDefs = spec.target === 'indicator' ? await loadIndicatorDefs(c.env) : [];
+  const indicatorByCode = new Map(indicatorDefs.map((d) => [d.code, d]));
+
+  const table = targetTable(spec.target);
+  const statements: D1PreparedStatement[] = [];
+  let heldBackNoUsd = 0;
+
+  // Count what replace_period will remove before removing it, so the
+  // confirmation can state it honestly. append_period removes nothing.
+  let rowsReplaced = 0;
+  if (mode === 'replace_period' && years.length) {
+    const yearList = years.join(',');
+    if (spec.target === 'trade') {
+      const flow = spec.fixedFlow;
+      const countRow = await c.env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM trade_facts WHERE entity_id = ? AND flow = ? AND year IN (${yearList})`,
+      )
+        .bind(entity.id, flow)
+        .first<{ n: number }>();
+      rowsReplaced = countRow?.n ?? 0;
+      statements.push(
+        c.env.DB.prepare(
+          `DELETE FROM trade_facts WHERE entity_id = ? AND flow = ? AND year IN (${yearList})`,
+        ).bind(entity.id, flow),
+      );
+    } else if (spec.target === 'indicator') {
+      const codes = [...new Set(rows.map((r) => asText(r.values.indicator_code)).filter((v): v is string => !!v))];
+      if (codes.length) {
+        const placeholders = codes.map(() => '?').join(',');
+        const countRow = await c.env.DB.prepare(
+          `SELECT COUNT(*) AS n FROM indicator_observations WHERE entity_id = ? AND year IN (${yearList}) AND indicator_code IN (${placeholders})`,
+        )
+          .bind(entity.id, ...codes)
+          .first<{ n: number }>();
+        rowsReplaced = countRow?.n ?? 0;
+        statements.push(
+          c.env.DB.prepare(
+            `DELETE FROM indicator_observations WHERE entity_id = ? AND year IN (${yearList}) AND indicator_code IN (${placeholders})`,
+          ).bind(entity.id, ...codes),
+        );
+      }
+    } else {
+      const codes = [...new Set(rows.map((r) => asText(r.values.sector_code)).filter((v): v is string => !!v))];
+      if (codes.length) {
+        const placeholders = codes.map(() => '?').join(',');
+        const countRow = await c.env.DB.prepare(
+          `SELECT COUNT(*) AS n FROM sector_observations WHERE entity_id = ? AND year IN (${yearList}) AND sector_code IN (${placeholders})`,
+        )
+          .bind(entity.id, ...codes)
+          .first<{ n: number }>();
+        rowsReplaced = countRow?.n ?? 0;
+        statements.push(
+          c.env.DB.prepare(
+            `DELETE FROM sector_observations WHERE entity_id = ? AND year IN (${yearList}) AND sector_code IN (${placeholders})`,
+          ).bind(entity.id, ...codes),
+        );
+      }
+    }
+  }
+
+  // Build the insert statements per target, packing rows to stay under D1's
+  // 100 bound parameters per statement.
+  let rowsWritten = 0;
+  if (spec.target === 'trade') {
+    const flow = spec.fixedFlow;
+    const facts = rows
+      .map((r) => r.values)
+      .filter((v) => {
+        // trade_facts.value_usd is NOT NULL. A row validated with only a local
+        // value and currency has no USD figure, so it is held back rather than
+        // stored as zero, which would be a fabricated number.
+        if (asNumber(v.value_usd) == null) {
+          heldBackNoUsd += 1;
+          return false;
+        }
+        return true;
+      });
+    const COLS = 13;
+    const perStmt = Math.floor(100 / COLS);
+    for (let i = 0; i < facts.length; i += perStmt) {
+      const slice = facts.slice(i, i + perStmt);
+      const binds: (string | number | null)[] = [];
+      for (const v of slice) {
+        binds.push(
+          entity.id,
+          asNumber(v.year),
+          flow ?? asText(v.flow),
+          asText(v.stream) ?? 'goods',
+          asText(v.partner_iso3),
+          asText(v.partner_name),
+          asText(v.hs_code),
+          asText(v.product_name),
+          asText(v.sector_code) ?? asText(v.sector_name),
+          asNumber(v.value_usd),
+          asNumber(v.quantity),
+          asText(v.quantity_unit),
+          sourceRef,
+        );
+      }
+      const tuples = slice.map(() => '(?,?,?,?,?,?,?,?,?,?,?,?,?)').join(',');
+      statements.push(
+        c.env.DB.prepare(
+          `INSERT INTO trade_facts
+             (entity_id, year, flow, stream, partner_iso3, partner_name, hs_code, product_name, sector, value_usd, qty, qty_unit, source_ref)
+           VALUES ${tuples}`,
+        ).bind(...binds),
+      );
+      rowsWritten += slice.length;
+    }
+  } else if (spec.target === 'indicator') {
+    const COLS = 21;
+    const perStmt = Math.floor(100 / COLS);
+    const list = rows.map((r) => r.values);
+    for (let i = 0; i < list.length; i += perStmt) {
+      const slice = list.slice(i, i + perStmt);
+      const binds: (string | number | null)[] = [];
+      for (const v of slice) {
+        const code = asText(v.indicator_code);
+        const def = code ? indicatorByCode.get(code) : undefined;
+        binds.push(
+          entity.id,
+          code,
+          asText(v.indicator_name) ?? def?.name ?? null,
+          asText(v.category) ?? def?.category ?? null,
+          asNumber(v.year),
+          asText(v.period) ?? period,
+          asNumber(v.value),
+          asText(v.unit) ?? def?.unit ?? null,
+          asText(v.currency),
+          asText(v.price_basis),
+          asText(v.sex),
+          asText(v.age_group),
+          asText(v.region),
+          asText(v.urban_rural),
+          asText(v.income_group),
+          asText(v.source_name) ?? sourceName,
+          asText(v.source_url) ?? sourceUrl,
+          asNumber(v.confidence),
+          asText(v.notes),
+          id,
+          sourceRef,
+        );
+      }
+      const tuple = `(${new Array(COLS).fill('?').join(',')})`;
+      const tuples = slice.map(() => tuple).join(',');
+      statements.push(
+        c.env.DB.prepare(
+          `INSERT INTO indicator_observations
+             (entity_id, indicator_code, indicator_name, category, year, period, value, unit, currency, price_basis,
+              sex, age_group, region, urban_rural, income_group, source_name, source_url, confidence, notes, upload_id, source_ref)
+           VALUES ${tuples}`,
+        ).bind(...binds),
+      );
+      rowsWritten += slice.length;
+    }
+  } else {
+    const COLS = 20;
+    const perStmt = Math.floor(100 / COLS);
+    const list = rows.map((r) => r.values);
+    for (let i = 0; i < list.length; i += perStmt) {
+      const slice = list.slice(i, i + perStmt);
+      const binds: (string | number | null)[] = [];
+      for (const v of slice) {
+        binds.push(
+          entity.id,
+          asText(v.sector_code),
+          asText(v.sector_name),
+          asText(v.subsector_code),
+          asText(v.subsector_name),
+          asNumber(v.year),
+          asNumber(v.value),
+          asText(v.unit),
+          asText(v.currency),
+          asNumber(v.share_of_gdp),
+          asNumber(v.growth_rate),
+          asNumber(v.employment),
+          asNumber(v.employment_share),
+          asNumber(v.exports_value),
+          asNumber(v.imports_value),
+          asText(v.source_name) ?? sourceName,
+          asText(v.source_url) ?? sourceUrl,
+          asText(v.notes),
+          id,
+          sourceRef,
+        );
+      }
+      const tuple = `(${new Array(COLS).fill('?').join(',')})`;
+      const tuples = slice.map(() => tuple).join(',');
+      statements.push(
+        c.env.DB.prepare(
+          `INSERT INTO sector_observations
+             (entity_id, sector_code, sector_name, subsector_code, subsector_name, year, value, unit, currency,
+              share_of_gdp, growth_rate, employment, employment_share, exports_value, imports_value, source_name, source_url, notes, upload_id, source_ref)
+           VALUES ${tuples}`,
+        ).bind(...binds),
+      );
+      rowsWritten += slice.length;
+    }
+  }
+
+  await c.env.DB.prepare("UPDATE data_uploads SET import_status = 'importing' WHERE id = ?").bind(id).run();
+
+  // env.DB.batch() is atomic per call but not across calls, so if a later
+  // batch throws we clean up by source_ref rather than trusting a rollback
+  // that only covers the batch that failed.
+  const BATCH = 25;
+  try {
+    for (let i = 0; i < statements.length; i += BATCH) {
+      await c.env.DB.batch(statements.slice(i, i + BATCH));
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await c.env.DB.prepare(`DELETE FROM ${table} WHERE source_ref = ?`).bind(sourceRef).run();
+    await c.env.DB.prepare(
+      "UPDATE data_uploads SET import_status = 'failed', note = ? WHERE id = ?",
+    )
+      .bind(`Import failed after writing 0 rows (cleaned up). ${message}`.slice(0, 2000), id)
+      .run();
+    return bad(`Import failed and was rolled back: ${message}`, 500);
+  }
+
+  const noteParts: string[] = [];
+  if (heldBackNoUsd > 0) {
+    noteParts.push(
+      `${heldBackNoUsd} trade row(s) had no USD value and were held back rather than stored as zero.`,
+    );
+  }
+  const note = noteParts.length ? noteParts.join(' ') : null;
+
+  try {
+    await c.env.DB.prepare(
+      `UPDATE data_uploads
+         SET import_status = 'imported', imported_at = datetime('now'),
+             rows_written = ?, rows_replaced = ?, note = ?
+       WHERE id = ?`,
+    )
+      .bind(rowsWritten, rowsReplaced, note, id)
+      .run();
+  } catch (err) {
+    // The partial unique index on (entity, dataset, hash) WHERE imported can
+    // only trip here if an identical file was imported between upload and
+    // confirm. Undo the rows and name the earlier upload.
+    await c.env.DB.prepare(`DELETE FROM ${table} WHERE source_ref = ?`).bind(sourceRef).run();
+    await c.env.DB.prepare("UPDATE data_uploads SET import_status = 'failed', note = ? WHERE id = ?")
+      .bind('An identical file was already imported. This upload was rolled back.', id)
+      .run();
+    const other = await c.env.DB.prepare(
+      `SELECT id, filename FROM data_uploads
+       WHERE entity_id = ? AND dataset_code = ? AND file_hash = ? AND import_status = 'imported' LIMIT 1`,
+    )
+      .bind(entity.id, dataset, String(upload.file_hash))
+      .first<{ id: string; filename: string }>();
+    return bad(
+      other
+        ? `This exact file is already imported as upload ${other.id} (${other.filename}). Nothing was written.`
+        : 'This file duplicates an already-imported upload. Nothing was written.',
+      409,
+    );
+  }
+
+  return json({ id, rows_written: rowsWritten, rows_replaced: rowsReplaced, held_back_no_usd: heldBackNoUsd });
+});
+
+// --- Upload history and retrieval -------------------------------------------
+
+admin.get('/manual/uploads', async (c) => {
+  const slug = c.req.query('slug');
+  if (!slug) return bad('slug is required.');
+  const entity = await resolveManualEntity(c.env, slug);
+  if (!entity) return bad(`Unknown country '${slug}'.`, 404);
+  const rows = await c.env.DB.prepare(
+    `SELECT id, dataset_code, filename, period, source_name, uploaded_at, validation_status,
+            import_status, import_mode, row_count, valid_rows, error_count, warning_count,
+            notice_count, rows_written, rows_replaced, imported_at, reverted_at, note
+       FROM data_uploads WHERE entity_id = ? ORDER BY uploaded_at DESC`,
+  )
+    .bind(entity.id)
+    .all();
+  return json({ entity: { slug: entity.slug, name: entity.name }, uploads: rows.results ?? [] });
+});
+
+admin.get('/manual/upload/:id/download', async (c) => {
+  const id = c.req.param('id');
+  const upload = await c.env.DB.prepare(
+    'SELECT filename, content FROM data_uploads WHERE id = ?',
+  )
+    .bind(id)
+    .first<{ filename: string; content: string | null }>();
+  if (!upload || upload.content == null) return bad(`No stored file for upload '${id}'.`, 404);
+  return new Response(upload.content, {
+    headers: {
+      'content-type': 'text/csv; charset=utf-8',
+      'content-disposition': `attachment; filename="${upload.filename}"`,
+    },
+  });
+});
+
+admin.get('/manual/upload/:id', async (c) => {
+  const id = c.req.param('id');
+  const upload = await c.env.DB.prepare(
+    `SELECT id, entity_id, dataset_code, filename, file_bytes, period, source_name, source_url,
+            uploaded_at, validation_status, import_status, import_mode, row_count, valid_rows,
+            error_count, warning_count, notice_count, rows_written, rows_replaced, imported_at,
+            reverted_at, note FROM data_uploads WHERE id = ?`,
+  )
+    .bind(id)
+    .first();
+  if (!upload) return bad(`Unknown upload '${id}'.`, 404);
+  const issues = await c.env.DB.prepare(
+    'SELECT severity, row_number, column_name, code, message, raw_value FROM upload_issues WHERE upload_id = ? ORDER BY id',
+  )
+    .bind(id)
+    .all();
+  return json({ upload, issues: issues.results ?? [] });
+});
+
+// --- Revert: undo one upload's rows -----------------------------------------
+
+admin.post('/manual/upload/:id/revert', async (c) => {
+  const id = c.req.param('id');
+  const upload = await c.env.DB.prepare(
+    'SELECT id, dataset_code, import_status FROM data_uploads WHERE id = ?',
+  )
+    .bind(id)
+    .first<{ id: string; dataset_code: string; import_status: string }>();
+  if (!upload) return bad(`Unknown upload '${id}'.`, 404);
+  if (upload.import_status !== 'imported') {
+    return bad(`Only an imported upload can be reverted (this one is '${upload.import_status}').`);
+  }
+  const spec = datasetSpec(upload.dataset_code);
+  if (!spec) return bad(`Upload references unknown dataset '${upload.dataset_code}'.`, 500);
+  const table = targetTable(spec.target);
+  const result = await c.env.DB.prepare(`DELETE FROM ${table} WHERE source_ref = ?`)
+    .bind(`upload:${id}`)
+    .run();
+  const removed = result.meta?.changes ?? 0;
+  await c.env.DB.prepare(
+    "UPDATE data_uploads SET import_status = 'reverted', reverted_at = datetime('now') WHERE id = ?",
+  )
+    .bind(id)
+    .run();
+  return json({ id, rows_removed: removed });
+});
+
+// --- Analyse stored data ----------------------------------------------------
+
+admin.post('/manual/analyse', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const slug = body?.slug as string | undefined;
+  if (!slug) return bad('slug is required.');
+  const entity = await resolveManualEntity(c.env, slug);
+  if (!entity) return bad(`Unknown country '${slug}'.`, 404);
+  const settings = await loadSettings(c.env);
+
+  const tradeRows = await c.env.DB.prepare(
+    `SELECT year, flow, stream, partner_iso3, partner_name, hs_code, product_name, sector, value_usd, qty, qty_unit, source_ref
+       FROM trade_facts WHERE entity_id = ?`,
+  )
+    .bind(entity.id)
+    .all<FactRow>();
+  const facts = tradeRows.results ?? [];
+
+  // No World Bank fetch. This phase is human uploads only, so trade is analysed
+  // on what is stored with an empty external context.
+  let tradeBundle = null;
+  if (facts.length) {
+    tradeBundle = analyse(
+      entity.name,
+      facts,
+      {
+        gdp_by_year: {},
+        services_export_by_year: {},
+        services_import_by_year: {},
+        gns_export_by_year: {},
+        gns_import_by_year: {},
+      },
+      ['manual-upload'],
+      [],
+      settings,
+    );
+  }
+
+  const indRows = await c.env.DB.prepare(
+    `SELECT indicator_code, indicator_name, category, year, value, unit, currency, price_basis, confidence
+       FROM indicator_observations WHERE entity_id = ?`,
+  )
+    .bind(entity.id)
+    .all<IndicatorRow>();
+  const secRows = await c.env.DB.prepare(
+    `SELECT sector_code, sector_name, year, value, unit, currency, share_of_gdp, growth_rate, employment, employment_share, exports_value, imports_value
+       FROM sector_observations WHERE entity_id = ?`,
+  )
+    .bind(entity.id)
+    .all<SectorRow>();
+
+  const manual = analyseCountryData({
+    entityName: entity.name,
+    indicators: indRows.results ?? [],
+    sectors: secRows.results ?? [],
+    tradeBundle,
+    settings,
+  });
+
+  // Record a manual run so the write has a lineage the dashboards can show.
+  const runId = uid('run_');
+  await c.env.DB.prepare(
+    "INSERT INTO analysis_runs (id, trigger, status, started_at, finished_at) VALUES (?, 'manual', 'ok', datetime('now'), datetime('now'))",
+  )
+    .bind(runId)
+    .run();
+
+  const written: string[] = [];
+  const writeKind = async (kind: string, payload: unknown) => {
+    await c.env.DB.prepare(
+      `INSERT INTO analysis_results (id, entity_id, kind, payload, run_id, computed_at)
+       VALUES (?,?,?,?,?, datetime('now'))
+       ON CONFLICT (entity_id, kind) DO UPDATE SET payload = excluded.payload, run_id = excluded.run_id, computed_at = excluded.computed_at`,
+    )
+      .bind(uid('res_'), entity.id, kind, JSON.stringify(payload), runId)
+      .run();
+    written.push(kind);
+  };
+
+  await writeKind('manual_analysis', manual);
+  if (tradeBundle) {
+    await writeKind('overview', tradeBundle.overview);
+    await writeKind('top_exports', tradeBundle.top_exports);
+    await writeKind('top_imports', tradeBundle.top_imports);
+    await writeKind('partners_export', tradeBundle.partners_export);
+    await writeKind('partners_import', tradeBundle.partners_import);
+    await writeKind('yearly_trend', tradeBundle.yearly_trend);
+    await writeKind('recommendations', tradeBundle.recommendations);
+  }
+
+  return json({ entity: { slug: entity.slug, name: entity.name }, run_id: runId, kinds_written: written, manual });
+});
+
+// --- Status: what is loaded, per dataset ------------------------------------
+
+admin.get('/manual/status', async (c) => {
+  const slug = c.req.query('slug');
+  if (!slug) return bad('slug is required.');
+  const entity = await resolveManualEntity(c.env, slug);
+  if (!entity) return bad(`Unknown country '${slug}'.`, 404);
+
+  const defs = await c.env.DB.prepare(
+    'SELECT code, name, target, refresh_hint FROM dataset_definitions WHERE is_active = 1 ORDER BY sort_order',
+  ).all<{ code: string; name: string; target: string; refresh_hint: string | null }>();
+
+  const status = [];
+  for (const def of defs.results ?? []) {
+    const spec = datasetSpec(def.code);
+    let rowCount = 0;
+    let latestYear: number | null = null;
+    if (spec?.target === 'trade') {
+      const flow = spec.fixedFlow;
+      const r = await c.env.DB.prepare(
+        'SELECT COUNT(*) AS n, MAX(year) AS y FROM trade_facts WHERE entity_id = ? AND flow = ?',
+      )
+        .bind(entity.id, flow)
+        .first<{ n: number; y: number | null }>();
+      rowCount = r?.n ?? 0;
+      latestYear = r?.y ?? null;
+    } else if (spec?.target === 'indicator') {
+      // Indicator datasets share a table, so scope the count to the categories
+      // that dataset writes would carry is not reliable. Report the upload-based
+      // count instead: rows this dataset has imported for this country.
+      const r = await c.env.DB.prepare(
+        `SELECT COUNT(*) AS n, MAX(io.year) AS y FROM indicator_observations io
+           JOIN data_uploads u ON u.id = io.upload_id
+         WHERE io.entity_id = ? AND u.dataset_code = ?`,
+      )
+        .bind(entity.id, def.code)
+        .first<{ n: number; y: number | null }>();
+      rowCount = r?.n ?? 0;
+      latestYear = r?.y ?? null;
+    } else {
+      const r = await c.env.DB.prepare(
+        'SELECT COUNT(*) AS n, MAX(year) AS y FROM sector_observations WHERE entity_id = ?',
+      )
+        .bind(entity.id)
+        .first<{ n: number; y: number | null }>();
+      rowCount = r?.n ?? 0;
+      latestYear = r?.y ?? null;
+    }
+
+    const lastUpload = await c.env.DB.prepare(
+      `SELECT id, filename, uploaded_at, import_status, imported_at, rows_written
+         FROM data_uploads WHERE entity_id = ? AND dataset_code = ?
+       ORDER BY uploaded_at DESC LIMIT 1`,
+    )
+      .bind(entity.id, def.code)
+      .first();
+
+    status.push({
+      dataset: def.code,
+      name: def.name,
+      target: def.target,
+      refresh_hint: def.refresh_hint,
+      row_count: rowCount,
+      latest_year: latestYear,
+      loaded: rowCount > 0,
+      last_upload: lastUpload ?? null,
+    });
+  }
+
+  return json({ entity: { slug: entity.slug, name: entity.name }, status });
 });

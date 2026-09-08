@@ -1,0 +1,3 @@
+country_iso3,year,indicator_code,indicator_name,value,unit,sex,age_group,region,urban_rural,source_name,source_url,notes
+GHA,2024,POP_TOTAL,Total population,34121985,persons,,,,,Ghana Statistical Service,https://statsghana.gov.gh/trade-2024,
+GHA,2024,POP_URBAN_SHARE,Urban share of population,58.7,percent,,,,,Ghana Statistical Service,https://statsghana.gov.gh/census-2021,

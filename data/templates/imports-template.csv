@@ -1,0 +1,3 @@
+country_iso3,year,period,flow,stream,partner_iso3,partner_name,hs_code,product_name,sector_code,sector_name,value,currency,value_usd,exchange_rate,quantity,quantity_unit,source_name,source_url
+GHA,2024,,import,goods,NLD,Netherlands,180100,"Cocoa beans, whole or broken",,,,,412300000,,365048000,kg,Ghana Statistical Service,https://statsghana.gov.gh/trade-2024
+GHA,2023,,import,goods,,,,,,,,,15870000000,,,,Ghana Statistical Service,https://statsghana.gov.gh/trade-2023

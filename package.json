@@ -24,8 +24,14 @@
     "pipeline:build": "node local/build.mjs",
     "pipeline": "node local/build.mjs && node local/dist/pipeline.mjs",
     "pipeline:dry": "node local/build.mjs && node local/dist/pipeline.mjs --dry-run",
+    "data:templates": "node local/build.mjs && node local/dist/manual-data.mjs templates",
+    "data:validate": "node local/build.mjs && node local/dist/manual-data.mjs validate",
+    "data:import": "node local/build.mjs && node local/dist/manual-data.mjs import",
+    "data:analyse": "node local/build.mjs && node local/dist/manual-data.mjs analyse",
+    "report:country": "node local/build.mjs && node local/dist/manual-data.mjs report",
     "test:reset": "node scripts/reset-ratelimit.mjs",
-    "test:e2e": "npm run test:reset && node scripts/e2e-network.mjs && node scripts/e2e-premium.mjs && node scripts/e2e-products.mjs && node scripts/e2e-portal.mjs && node scripts/e2e-insight.mjs"
+    "test:e2e": "node scripts/test-csv.mjs && npm run test:reset && node scripts/e2e-network.mjs && node scripts/e2e-premium.mjs && node scripts/e2e-products.mjs && node scripts/e2e-portal.mjs && node scripts/e2e-insight.mjs",
+    "test:csv": "node scripts/test-csv.mjs"
   },
   "dependencies": {
     "hono": "^4.6.14",

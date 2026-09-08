@@ -1,0 +1,3 @@
+country_iso3,year,indicator_code,indicator_name,value,unit,currency,price_basis,income_group,region,source_name,source_url,notes
+GHA,2024,POP_TOTAL,Total population,34121985,persons,GHS,nominal,,,Ghana Statistical Service,https://statsghana.gov.gh/trade-2024,
+GHA,2024,GDP_PER_CAPITA,GDP per capita,2350,currency,USD,nominal,,,Bank of Ghana,https://www.bog.gov.gh/statistics,

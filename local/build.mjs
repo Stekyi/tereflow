@@ -24,9 +24,10 @@ export function loadEnv(path = 'local/.env') {
   }
 }
 
-await build({
-  entryPoints: ['local/pipeline.ts'],
-  outfile: 'local/dist/pipeline.mjs',
+// One config for every local entry point, so the manual-data CLI is bundled
+// exactly the way the pipeline is: same target, same env loader, same
+// externals.
+const common = {
   bundle: true,
   platform: 'node',
   format: 'esm',
@@ -43,6 +44,14 @@ await build({
       "import { existsSync as __ex, readFileSync as __rf } from 'node:fs';\n" +
       'if (__ex("local/.env")) { for (const l of __rf("local/.env","utf8").split("\\n")) { const t=l.trim(); if(!t||t.startsWith("#"))continue; const i=t.indexOf("="); if(i<0)continue; const k=t.slice(0,i).trim(); const v=t.slice(i+1).trim().replace(/^["\']|["\']$/g,""); if(!(k in process.env)) process.env[k]=v; } }\n',
   },
-});
+};
 
-console.log('Built local/dist/pipeline.mjs');
+const entries = [
+  { entryPoints: ['local/pipeline.ts'], outfile: 'local/dist/pipeline.mjs' },
+  { entryPoints: ['local/manual-data.ts'], outfile: 'local/dist/manual-data.mjs' },
+];
+
+for (const entry of entries) {
+  await build({ ...common, ...entry });
+  console.log(`Built ${entry.outfile}`);
+}

@@ -1,0 +1,3 @@
+country_iso3,year,indicator_code,indicator_name,value,unit,category,currency,source_name,source_url,confidence,notes
+GHA,2024,POP_TOTAL,Total population,34121985,persons,infrastructure,,Ghana Statistical Service,https://statsghana.gov.gh/trade-2024,0.8,
+GHA,2024,ELECTRICITY_ACCESS,Access to electricity,86.3,percent,infrastructure,,Ghana Energy Commission,https://www.energycom.gov.gh,0.7,

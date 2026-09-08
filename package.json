@@ -30,17 +30,18 @@
     "data:analyse": "node local/build.mjs && node local/dist/manual-data.mjs analyse",
     "report:country": "node local/build.mjs && node local/dist/manual-data.mjs report",
     "test:reset": "node scripts/reset-ratelimit.mjs",
-    "test:e2e": "node scripts/test-csv.mjs && npm run test:reset && node scripts/e2e-network.mjs && node scripts/e2e-premium.mjs && node scripts/e2e-products.mjs && node scripts/e2e-portal.mjs && node scripts/e2e-insight.mjs",
-    "test:csv": "node scripts/test-csv.mjs"
+    "test:e2e": "node scripts/test-csv.mjs && node scripts/test-xlsx.mjs && npm run test:reset && node scripts/e2e-network.mjs && node scripts/e2e-premium.mjs && node scripts/e2e-products.mjs && node scripts/e2e-portal.mjs && node scripts/e2e-insight.mjs",
+    "test:csv": "node scripts/test-csv.mjs",
+    "test:xlsx": "node scripts/test-xlsx.mjs"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "hono": "^4.6.14",
     "pdf-parse": "^2.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.1",
-    "recharts": "^2.15.0",
-    "xlsx": "^0.18.5"
+    "recharts": "^2.15.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241230.0",
@@ -57,5 +58,8 @@
     "esbuild@0.17.19": true,
     "sharp@0.33.5": true,
     "workerd@1.20250718.0": true
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }

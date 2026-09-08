@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { PDFParse } from 'pdf-parse';
 import type { EntitySource, Flow, Stream } from '../shared/types';
 import type { AdapterResult, FactRow } from '../worker/agent/types';
@@ -191,9 +191,7 @@ async function bodyToRecords(response: Response, source: EntitySource, config: S
           : source.fmt
     : source.parser_key;
   if (parser === 'xlsx') {
-    const workbook = XLSX.read(await response.arrayBuffer(), { type: 'array' });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    return XLSX.utils.sheet_to_json<RawRecord>(sheet, { range: config.header_row ?? 0, defval: '' });
+    return await readSpreadsheet(await response.arrayBuffer(), config.header_row ?? 0, source.url);
   }
   if (parser === 'pdf') {
     const pdf = new PDFParse({ data: new Uint8Array(await response.arrayBuffer()) });
@@ -221,6 +219,89 @@ async function bodyToRecords(response: Response, source: EntitySource, config: S
   if (parser === 'json-stat' || source.endpoint_type === 'json_stat' || source.endpoint_type === 'pxweb') return parseJsonStat(body, config);
   if (parser === 'sdmx' || source.endpoint_type === 'sdmx') return parseSdmx(text, config);
   return recordsFromJson(body, config);
+}
+
+/**
+ * Read the first sheet of a workbook into records keyed by the header row.
+ *
+ * Uses exceljs rather than SheetJS. The npm `xlsx` package is the abandoned
+ * mirror of SheetJS and carries a prototype pollution advisory with no fix,
+ * which is a poor thing to point at arbitrary government URLs from a process
+ * holding an admin token. The cost is old binary .xls, which exceljs cannot
+ * read: none of the 600 registered sources is one, so nothing real is lost. A
+ * discovered .xls now fails with a message saying so rather than a stack.
+ */
+export async function readSpreadsheet(
+  bytes: ArrayBuffer,
+  headerRow: number,
+  url: string,
+): Promise<RawRecord[]> {
+  const workbook = new ExcelJS.Workbook();
+  try {
+    await workbook.xlsx.load(bytes);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Could not read ${url} as a spreadsheet. Old .xls files are not supported; save as .xlsx or point at a CSV. (${message})`,
+    );
+  }
+
+  const sheet = workbook.worksheets[0];
+  if (!sheet) return [];
+
+  // exceljs numbers rows from 1. headerRow is a zero-based offset, matching the
+  // config that was written against SheetJS.
+  const headerLine = sheet.getRow(headerRow + 1);
+  const headers: string[] = [];
+  headerLine.eachCell({ includeEmpty: true }, (cell, col) => {
+    headers[col] = cellText(cell);
+  });
+  if (!headers.some((h) => h)) return [];
+
+  const records: RawRecord[] = [];
+  sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber <= headerRow + 1) return;
+    const record: RawRecord = {};
+    let any = false;
+    for (let col = 1; col < headers.length; col++) {
+      const name = headers[col];
+      if (!name) continue;
+      const text = cellText(row.getCell(col));
+      if (text) any = true;
+      record[name] = text;
+    }
+    // A wholly blank row is spacing, not data. Keeping it would add a record of
+    // empty strings that later reads as a real row with every field missing.
+    if (any) records.push(record);
+  });
+  return records;
+}
+
+/**
+ * One cell as text.
+ *
+ * Formula cells carry both the formula and its last cached result; the result
+ * is the number that was on screen, and taking the formula instead would put
+ * "=B2*C2" where a value belongs. Dates arrive as Date objects and would
+ * otherwise stringify to a locale-dependent form that no year parser reads.
+ */
+function cellText(cell: ExcelJS.Cell | undefined): string {
+  if (!cell) return '';
+  const v = cell.value;
+  if (v == null) return '';
+  if (typeof v === 'string') return v.trim();
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v === 'object') {
+    if ('result' in v && v.result != null) return String(v.result).trim();
+    if ('text' in v && typeof v.text === 'string') return v.text.trim();
+    if ('richText' in v && Array.isArray(v.richText)) {
+      return v.richText.map((r) => r.text).join('').trim();
+    }
+    if ('error' in v) return '';
+    if ('hyperlink' in v && typeof v.hyperlink === 'string') return v.hyperlink;
+  }
+  return String(v).trim();
 }
 
 function discoveredDownload(html: string, pageUrl: string): { url: string; parser: string } | null {

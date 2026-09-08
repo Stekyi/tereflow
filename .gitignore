@@ -22,3 +22,7 @@ extract/.cache/
 extract/out/
 extract/**/__pycache__/
 extract/.pytest_cache/.manual-verification/
+.q.sql
+.qout.txt
+.audit-*.txt
+.audit-frontend/

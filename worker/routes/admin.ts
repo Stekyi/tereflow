@@ -1611,6 +1611,7 @@ admin.post('/manual/analyse', async (c) => {
       ['manual-upload'],
       [],
       settings,
+      entity.iso3 ?? null,
     );
   }
 

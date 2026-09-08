@@ -79,6 +79,12 @@ pub.get('/stats', async (c) => {
     `SELECT
        (SELECT COUNT(*) FROM entities WHERE kind='country')            AS countries,
        (SELECT COUNT(*) FROM entities WHERE kind='country' AND is_active=1) AS countries_active,
+       -- Activation is a statement of intent: it marks a country as one we mean
+       -- to cover. It is not coverage. Reporting only countries_active reads as
+       -- 90 countries of data when 11 have any, so both numbers are published
+       -- and the caller can show the honest one.
+       (SELECT COUNT(DISTINCT f.entity_id) FROM trade_facts f
+          JOIN entities e ON e.id = f.entity_id AND e.kind='country') AS countries_with_data,
        (SELECT COUNT(*) FROM entities WHERE kind='intl_org')           AS orgs,
        (SELECT COUNT(*) FROM entities WHERE kind='regional_body')      AS regional,
        (SELECT COUNT(*) FROM entity_sources)                           AS sources,
@@ -858,6 +864,13 @@ pub.get('/opportunities', async (c) => {
        LEFT JOIN trade_facts previous ON previous.entity_id = f.entity_id
          AND previous.flow = f.flow AND previous.stream = 'services'
          AND previous.year = f.year - 3
+         -- Match the same service line, not just the same country and year.
+         -- Every country currently reports one services line, so without this
+         -- the join happens to be right; the moment a second line exists it
+         -- would compare each service against an unrelated one and return the
+         -- same row several times over with different growth each time.
+         AND IFNULL(previous.product_name, '') = IFNULL(f.product_name, '')
+         AND IFNULL(previous.sector, '') = IFNULL(f.sector, '')
       WHERE e.is_active = 1 AND f.stream = 'services'
         AND f.year = (SELECT MAX(f2.year) FROM trade_facts f2
                       WHERE f2.entity_id = f.entity_id AND f2.flow = f.flow

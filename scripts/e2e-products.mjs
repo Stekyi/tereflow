@@ -13,6 +13,19 @@ const ADMIN_TOKEN = process.env.TF_ADMIN_TOKEN ?? 'local-dev-token';
 
 let passed = 0;
 let failed = 0;
+let skipped = 0;
+
+/**
+ * A check that could not run, said out loud.
+ *
+ * Without this the suite prints "47 passed, 0 failed" whether it ran 47 checks
+ * or 49, and two protections quietly not running looks exactly like two
+ * protections passing.
+ */
+function skip(label, why) {
+  skipped++;
+  console.log(`  SKIP  ${label} - ${why}`);
+}
 
 function check(label, condition, detail = '') {
   if (condition) {
@@ -333,6 +346,9 @@ async function main() {
       'the page it was sent from is recorded',
       sentItems.find((f) => f.message === marker)?.path === '/countries',
     );
+  } else {
+    skip('the message just sent is there', 'the hourly feedback limit was already reached this run');
+    skip('the page it was sent from is recorded', 'the hourly feedback limit was already reached this run');
   }
 
   const reported = sentItems.find((f) => f.message === marker) ?? sentItems[0];
@@ -352,7 +368,9 @@ async function main() {
     check('an unknown status is rejected', badStatus.status === 400);
   }
 
-  console.log(`\n${passed} passed, ${failed} failed\n`);
+  console.log(
+    `\n${passed} passed, ${failed} failed${skipped ? `, ${skipped} skipped` : ''}\n`,
+  );
   process.exit(failed ? 1 : 0);
 }
 main().catch((err) => {

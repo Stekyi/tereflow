@@ -134,6 +134,15 @@ export function analyse(
   truncatedYears: number[] = [],
   /** Thresholds from code_setup. Falls back to what the code shipped with. */
   settings: Settings = DEFAULTS,
+  /**
+   * The reporting country's own ISO3, so it can be kept out of its own partner
+   * ranking. Comtrade really does report a country trading with itself, from
+   * re-imports and processing trade, and China's own $117bn showed up as its
+   * seventh largest import partner. It is real data and a nonsense partner.
+   * Optional because a caller that does not know the code is better served by
+   * a ranking with one odd row than by no ranking at all.
+   */
+  reporterIso3: string | null = null,
 ): AnalysisBundle {
   active = settings;
 
@@ -180,8 +189,8 @@ export function analyse(
   const truncated = new Set(truncatedYears);
   const topExports = rankProducts(rows, 'export', productYear, productYears, truncated);
   const topImports = rankProducts(rows, 'import', productYear, productYears, truncated);
-  const partnersExport = rankPartners(rows, 'export', latest, years);
-  const partnersImport = rankPartners(rows, 'import', latest, years);
+  const partnersExport = rankPartners(rows, 'export', latest, years, reporterIso3);
+  const partnersImport = rankPartners(rows, 'import', latest, years, reporterIso3);
   const services = rankServices(context, latest);
 
   const exportTotal = latestPoint?.export_usd ?? 0;
@@ -216,8 +225,8 @@ export function analyse(
   };
 
   const signals = [
-    ...detectSignals(rows, 'export', productYears, topExports, truncated),
-    ...detectSignals(rows, 'import', productYears, topImports, truncated),
+    ...detectSignals(rows, 'export', productYears, topExports, truncated, reporterIso3),
+    ...detectSignals(rows, 'import', productYears, topImports, truncated, reporterIso3),
   ]
     .sort((a, b) => b.momentum - a.momentum)
     .slice(0, active.signalsPerCountry);
@@ -488,9 +497,19 @@ function rankPartners(
   flow: 'export' | 'import',
   latest: number,
   years: number[],
+  reporterIso3: string | null = null,
 ): RankedItem[] {
+  const self = reporterIso3?.toUpperCase() ?? null;
   const current = rows.filter(
-    (r) => r.year === latest && r.flow === flow && r.stream === 'goods' && r.partner_iso3,
+    (r) =>
+      r.year === latest &&
+      r.flow === flow &&
+      r.stream === 'goods' &&
+      r.partner_iso3 &&
+      // Dropped from the ranking and from the total behind it. Leaving it in
+      // the total while hiding the row would make every share slightly small
+      // for a reason nothing on the page could explain.
+      (self === null || r.partner_iso3.toUpperCase() !== self),
   );
   const total = current.reduce((s, r) => s + r.value_usd, 0);
   if (total <= 0) return [];
@@ -681,6 +700,7 @@ function detectSignals(
   years: number[],
   currentTop: RankedItem[],
   truncatedYears: Set<number>,
+  reporterIso3: string | null = null,
 ): SignalDraft[] {
   if (years.length < 3) return [];
   const latest = years[years.length - 1];
@@ -760,7 +780,7 @@ function detectSignals(
 
     const rank = rankOf.get(r.hs_code) ?? null;
     const projected = rank ? Math.max(1, Math.round(rank * (1 - clamp01(growth / 100)))) : null;
-    const bestMarket = topPartnerFor(rows, flow, latest, r.hs_code);
+    const bestMarket = topPartnerFor(rows, flow, latest, r.hs_code, reporterIso3);
 
     drafts.push({
       hs_code: r.hs_code,
@@ -841,9 +861,16 @@ function topPartnerFor(
   flow: 'export' | 'import',
   year: number,
   hs: string | null,
+  reporterIso3: string | null = null,
 ): { name: string; iso3: string | null; value_usd: number; product_specific: boolean } | null {
+  const self = reporterIso3?.toUpperCase() ?? null;
   const partners = rows.filter(
-    (r) => r.year === year && r.flow === flow && r.stream === 'goods' && r.partner_iso3 !== null,
+    (r) =>
+      r.year === year &&
+      r.flow === flow &&
+      r.stream === 'goods' &&
+      r.partner_iso3 !== null &&
+      (self === null || r.partner_iso3.toUpperCase() !== self),
   );
   if (!partners.length) return null;
 

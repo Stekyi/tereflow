@@ -414,6 +414,7 @@ async function main() {
           // real guard.
           [],
           settings,
+          entity.iso3 ?? null,
         );
 
         if (cfg.dryRun) {
@@ -566,6 +567,7 @@ async function main() {
         sourceRefs,
         comtrade.truncated_years ?? [],
         settings,
+        entity.iso3 ?? null,
       );
 
       const coverage =

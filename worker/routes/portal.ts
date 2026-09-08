@@ -67,6 +67,11 @@ portal.get('/overview', async (c) => {
     `SELECT
        (SELECT COUNT(*) FROM entities WHERE kind='country')                    AS countries,
        (SELECT COUNT(*) FROM entities WHERE kind='country' AND is_active=1)    AS countries_active,
+       -- Countries actually holding trade rows. Activation is intent, not
+       -- coverage, and the admin portal should be the last place that confuses
+       -- the two.
+       (SELECT COUNT(DISTINCT f.entity_id) FROM trade_facts f
+          JOIN entities e ON e.id = f.entity_id AND e.kind='country')          AS countries_with_data,
        (SELECT COUNT(*) FROM entities WHERE kind='intl_org')                   AS orgs,
        (SELECT COUNT(*) FROM entities WHERE kind='regional_body')              AS regional,
        (SELECT COUNT(*) FROM entity_sources)                                   AS sources,

@@ -1,5 +1,13 @@
 # National source parsers
 
+> **Not the active path for this phase.** Country data now arrives through
+> reviewed CSV uploads. See `docs/manual-data.md`. Automated collection is not
+> being extended and no scheduled job runs it. This document describes a system
+> that still works and is still wired into `local/pipeline.ts`, kept because the
+> trade data already in the database came from it and because the phase after
+> this one may turn it back on. Nothing here should be read as the current
+> route for getting numbers into Tereflow.
+
 National statistical services are the primary input. Comtrade and World Bank remain the validation/fallback sources.
 
 Configure each country's source in Admin. The source URL may be a statistical-service landing page: the pipeline fetches the HTML, discovers the best PDF/XLSX/CSV/JSON/SDMX download link, downloads it in memory, parses it, and releases the bytes after the run. Direct file or API URLs are also supported. Select the physical format, endpoint type, parser, and provide a JSON field mapping when the column names are not standard.

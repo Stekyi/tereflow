@@ -862,6 +862,72 @@ textarea {
   border: 1px solid var(--gold-line);
 }
 
+/* Validation severities. Error borrows the loss red so a blocked import reads
+   as a stop, warning the amber caution, notice a quiet neutral. */
+.badge.error {
+  background: var(--down-soft);
+  color: var(--down);
+}
+.badge.warning {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.badge.notice {
+  background: var(--bg-2);
+  color: var(--muted);
+}
+
+/* ---------- manual data admin ---------- */
+
+/* Tonal callouts so a held-back count can sit at the same visual weight as a
+   success line rather than reading as fine print. */
+.callout {
+  padding: 10px 13px;
+  border-radius: var(--r);
+  border: 1px solid var(--line-soft);
+  background: var(--surface-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.callout + .callout {
+  margin-top: 8px;
+}
+.callout .callout-title {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.callout.ok {
+  background: var(--up-soft);
+  border-color: transparent;
+  color: var(--up);
+}
+.callout.warn {
+  background: var(--warn-soft);
+  border-color: transparent;
+  color: var(--warn);
+}
+.callout.bad {
+  background: var(--down-soft);
+  border-color: transparent;
+  color: var(--down);
+}
+
+/* A colour on the leading edge lets the three dataset states read at a glance:
+   loaded and current, loaded but stale, and nothing loaded at all. */
+.ds-card {
+  border-left: 3px solid var(--line);
+}
+.ds-card.current {
+  border-left-color: var(--up);
+}
+.ds-card.stale {
+  border-left-color: var(--warn);
+}
+.ds-card.missing {
+  border-left-color: var(--down);
+  background: var(--surface-2);
+}
+
 .scroll-x {
   display: flex;
   gap: 8px;

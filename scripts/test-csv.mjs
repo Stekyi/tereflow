@@ -438,6 +438,11 @@ console.log('----------------------------------------');
   );
   const s = r.summary.join(' ');
   check('the no-USD warning says the row will not be imported', /will not be imported/i.test(r.issues.find((i) => i.code === 'no_usd')?.message ?? ''), r.issues.find((i) => i.code === 'no_usd')?.message ?? '');
+  // The advice must be something that actually works. Nothing derives USD from
+  // value and exchange_rate, so telling someone to supply those two would send
+  // them round the loop again to the same silent hold-back.
+  const noUsd = r.issues.find((i) => i.code === 'no_usd')?.message ?? '';
+  check('and tells them to convert it themselves, which is what works', /convert the value yourself/i.test(noUsd), noUsd);
   check('the summary promises only what will land', /1 row ready/i.test(s), s);
   check('and says how many are held back and why', /2 more have no US dollar figure/i.test(s), s);
 }

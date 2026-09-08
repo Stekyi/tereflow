@@ -1,5 +1,13 @@
 # Extraction pipeline
 
+> **Not the active path for this phase.** Country data now arrives through
+> reviewed CSV uploads. See `docs/manual-data.md`. This pipeline is standalone:
+> nothing imports it, no scheduled job runs it, and it writes nothing to the
+> database on its own. It is kept because the work is sound and the phase after
+> this one may need it, and because its normalisation rules were the source of
+> the number handling the CSV validator now uses. Do not extend it without
+> deciding first that automated collection is wanted again.
+
 Reads trade statistics out of whatever a source happens to publish, and refuses
 to invent the parts it cannot read.
 

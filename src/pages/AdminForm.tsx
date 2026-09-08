@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { Skeletons, Toggle, useToast } from '../components/ui';
+import { ManualData } from '../components/ManualData';
 import {
   CATEGORY_LABEL,
   CONTINENTS,
@@ -364,6 +365,8 @@ export default function AdminForm() {
           <Toggle checked={isActive} onChange={setIsActive} />
         </div>
       </div>
+
+      {editing && slug && <ManualData slug={slug} />}
 
       <div className="row" style={{ gap: 8 }}>
         <button className="btn primary" onClick={save} disabled={saving} style={{ flex: 1 }}>

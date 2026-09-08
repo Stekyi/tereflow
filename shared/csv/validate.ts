@@ -324,7 +324,7 @@ export function validate(
           column: 'value_usd',
           code: 'no_usd',
           message:
-            'No US dollar figure, so this row will not be imported. Trade is stored in dollars, and storing a zero or guessing a rate would invent a number. Fill value_usd, or give currency and exchange_rate.',
+            'No US dollar figure, so this row will not be imported. Trade is stored in dollars, and storing a zero or guessing a rate would invent a number. Convert the value yourself and put the result in value_usd, recording the rate you used in exchange_rate so the conversion can be checked.',
         });
         tally.noUsdRows++;
       }

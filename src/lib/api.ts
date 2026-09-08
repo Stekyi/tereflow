@@ -29,6 +29,8 @@ import type {
   Subscription,
   SubscriptionKind,
 } from '../../shared/types';
+import type { Severity, ValidationReport } from '../../shared/csv/validate';
+import type { DatasetCode } from '../../shared/csv/schema';
 
 const ADMIN_TOKEN_KEY = 'tf_admin_token';
 
@@ -70,6 +72,232 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new Error(msg);
   }
   return body as T;
+}
+
+// The manual data endpoints serve CSV templates, markdown readmes, and the
+// original uploaded files as plain responses rather than JSON, so they need a
+// fetch that keeps the raw body. Both reuse getAdminToken() so there is one
+// source of truth for the bearer, not a second token system.
+async function adminBlob(path: string): Promise<{ blob: Blob; filename: string }> {
+  const headers = new Headers({ accept: '*/*' });
+  const token = getAdminToken();
+  if (token) headers.set('authorization', `Bearer ${token}`);
+  const res = await fetch(path, { headers, credentials: 'same-origin' });
+  if (!res.ok) {
+    let msg = `Request failed (${res.status})`;
+    try {
+      const b: unknown = await res.json();
+      if (b && typeof b === 'object' && 'error' in b) msg = String((b as { error: unknown }).error);
+    } catch {
+      /* body was not JSON, keep the status message */
+    }
+    throw new Error(msg);
+  }
+  const disp = res.headers.get('content-disposition') ?? '';
+  const match = /filename="?([^"]+)"?/.exec(disp);
+  const filename = match ? match[1] : 'download';
+  return { blob: await res.blob(), filename };
+}
+
+async function adminText(path: string): Promise<string> {
+  const headers = new Headers({ accept: 'text/plain, text/markdown, */*' });
+  const token = getAdminToken();
+  if (token) headers.set('authorization', `Bearer ${token}`);
+  const res = await fetch(path, { headers, credentials: 'same-origin' });
+  const text = await res.text();
+  if (!res.ok) {
+    let msg = `Request failed (${res.status})`;
+    try {
+      const b: unknown = JSON.parse(text);
+      if (b && typeof b === 'object' && 'error' in b) msg = String((b as { error: unknown }).error);
+    } catch {
+      /* body was not JSON, keep the status message */
+    }
+    throw new Error(msg);
+  }
+  return text;
+}
+
+// --- Manual data upload types -----------------------------------------------
+// Shapes mirror worker/routes/admin.ts exactly. ValidationReport, Issue and
+// Severity come from shared/csv, DatasetCode from shared/csv/schema, so nothing
+// here restates a type the backend already owns.
+
+export type ManualImportMode = 'append_period' | 'replace_period';
+
+export interface ManualDatasetDef {
+  code: DatasetCode;
+  name: string;
+  description: string | null;
+  target: string;
+  refresh_hint: string | null;
+  sort_order: number;
+}
+
+export interface ManualIndicatorDef {
+  code: string;
+  name: string;
+  category: string | null;
+  unit: string | null;
+  min_value: number | null;
+  max_value: number | null;
+  description: string | null;
+}
+
+export interface ManualSectorDef {
+  code: string;
+  name: string;
+  sort_order: number;
+}
+
+export interface ManualDatasetsResponse {
+  datasets: ManualDatasetDef[];
+  indicators: ManualIndicatorDef[];
+  sectors: ManualSectorDef[];
+}
+
+export interface ManualLastUpload {
+  id: string;
+  filename: string;
+  uploaded_at: string;
+  import_status: string;
+  imported_at: string | null;
+  rows_written: number;
+}
+
+export interface ManualStatusRow {
+  dataset: DatasetCode;
+  name: string;
+  target: string;
+  refresh_hint: string | null;
+  row_count: number;
+  latest_year: number | null;
+  loaded: boolean;
+  last_upload: ManualLastUpload | null;
+}
+
+export interface ManualStatusResponse {
+  entity: { slug: string; name: string };
+  status: ManualStatusRow[];
+}
+
+export interface ManualUploadRow {
+  id: string;
+  dataset_code: DatasetCode;
+  filename: string;
+  period: string | null;
+  source_name: string | null;
+  uploaded_at: string;
+  validation_status: string;
+  import_status: string;
+  import_mode: string;
+  row_count: number;
+  valid_rows: number;
+  error_count: number;
+  warning_count: number;
+  notice_count: number;
+  rows_written: number;
+  rows_replaced: number;
+  imported_at: string | null;
+  reverted_at: string | null;
+  note: string | null;
+}
+
+export interface ManualUploadsResponse {
+  entity: { slug: string; name: string };
+  uploads: ManualUploadRow[];
+}
+
+export interface ManualIssueRow {
+  severity: Severity;
+  row_number: number | null;
+  column_name: string | null;
+  code: string;
+  message: string;
+  raw_value: string | null;
+}
+
+export interface ManualUploadDetail {
+  upload: ManualUploadRow;
+  issues: ManualIssueRow[];
+}
+
+export interface ManualValidateResponse {
+  report: ValidationReport;
+}
+
+export interface ManualStageResponse {
+  id: string;
+  report: ValidationReport;
+}
+
+export interface ManualConfirmResult {
+  id: string;
+  rows_written: number;
+  rows_replaced: number;
+  held_back_no_usd: number;
+}
+
+export interface ManualRevertResult {
+  id: string;
+  rows_removed: number;
+}
+
+export interface ManualMetric {
+  value: number | null;
+  unit: string | null;
+  year: number | null;
+  method: string;
+  basedOn: string[];
+  missing: string[];
+  confidence: 'high' | 'medium' | 'low' | 'none';
+  notes: string[];
+}
+
+export interface ManualSectorOpportunity {
+  sector_code: string;
+  sector_name: string | null;
+  year: number;
+  score: number | null;
+  band: string;
+  reasons: string[];
+  basedOn: string[];
+  missing: string[];
+}
+
+export interface ManualAnalysisPayload {
+  entity: string;
+  generated_at: string;
+  consumer_market: ManualMetric;
+  income_opportunity: ManualMetric;
+  labour_availability: ManualMetric;
+  infrastructure_readiness: ManualMetric;
+  macro_stability: ManualMetric;
+  investment_risk: ManualMetric;
+  data_confidence: ManualMetric;
+  sector_opportunities: ManualSectorOpportunity[];
+  trade_summary: {
+    present: boolean;
+    top_export: string | null;
+    top_import: string | null;
+    latest_year: number | null;
+  };
+  missing_data_warnings: string[];
+  freshness: {
+    latest_indicator_year: number | null;
+    latest_sector_year: number | null;
+    reference_year: number;
+    indicator_age_years: number | null;
+    sector_age_years: number | null;
+    note: string;
+  };
+}
+
+export interface ManualAnalyseResult {
+  entity: { slug: string; name: string };
+  run_id: string;
+  kinds_written: string[];
+  manual: ManualAnalysisPayload;
 }
 
 export interface HomeStats {
@@ -465,6 +693,56 @@ export const api = {
         `/api/admin/classifications?entity=${encodeURIComponent(entity)}&hs_code=${encodeURIComponent(hsCode)}`,
         { method: 'DELETE' },
       ),
+
+    // Manual CSV upload workflow. Order matters on the worker: validate (writes
+    // nothing) -> stage (POST /upload, stages only) -> confirm (writes rows).
+    manual: {
+      status: (slug: string) =>
+        req<ManualStatusResponse>(`/api/admin/manual/status?slug=${encodeURIComponent(slug)}`),
+      datasets: () => req<ManualDatasetsResponse>('/api/admin/manual/datasets'),
+      uploads: (slug: string) =>
+        req<ManualUploadsResponse>(`/api/admin/manual/uploads?slug=${encodeURIComponent(slug)}`),
+      upload: (id: string) =>
+        req<ManualUploadDetail>(`/api/admin/manual/upload/${encodeURIComponent(id)}`),
+      validate: (input: { slug: string; dataset: DatasetCode; content: string }) =>
+        req<ManualValidateResponse>('/api/admin/manual/validate', {
+          method: 'POST',
+          body: JSON.stringify(input),
+        }),
+      stage: (input: {
+        slug: string;
+        dataset: DatasetCode;
+        filename?: string;
+        content: string;
+        period?: string;
+        source_name?: string;
+        source_url?: string;
+        import_mode: ManualImportMode;
+      }) =>
+        req<ManualStageResponse>('/api/admin/manual/upload', {
+          method: 'POST',
+          body: JSON.stringify(input),
+        }),
+      confirm: (id: string) =>
+        req<ManualConfirmResult>(`/api/admin/manual/upload/${encodeURIComponent(id)}/confirm`, {
+          method: 'POST',
+        }),
+      revert: (id: string) =>
+        req<ManualRevertResult>(`/api/admin/manual/upload/${encodeURIComponent(id)}/revert`, {
+          method: 'POST',
+        }),
+      analyse: (slug: string) =>
+        req<ManualAnalyseResult>('/api/admin/manual/analyse', {
+          method: 'POST',
+          body: JSON.stringify({ slug }),
+        }),
+      templateBlob: (dataset: DatasetCode) =>
+        adminBlob(`/api/admin/manual/template/${encodeURIComponent(dataset)}`),
+      readme: (dataset: DatasetCode) =>
+        adminText(`/api/admin/manual/template/${encodeURIComponent(dataset)}/readme`),
+      fileBlob: (id: string) =>
+        adminBlob(`/api/admin/manual/upload/${encodeURIComponent(id)}/download`),
+    },
   },
 
   // Read-only aggregates for the owner portal. Every path sits under

@@ -279,6 +279,12 @@ auth.post('/tier', async (c) => {
     return bad('Tier cannot be changed from the client', 403);
   }
 
+  // Counted per account, not per address. This route hands out entitlement, and
+  // a route that hands out entitlement should not be the one route nobody is
+  // counting, even behind two other gates.
+  const limited = await rateLimit(c.env, 'tierSwitch', `tier:${user.id}`);
+  if (!limited.ok) return tooMany(limited);
+
   const body = (await c.req.json().catch(() => null)) as { tier: 'free' | 'premium' } | null;
   if (!body || !['free', 'premium'].includes(body.tier)) return bad('tier must be free or premium');
 

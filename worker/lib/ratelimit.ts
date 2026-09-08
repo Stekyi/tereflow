@@ -41,6 +41,15 @@ export const LIMITS = {
   // is more than anybody sends in good faith and low enough that the table
   // cannot be filled from one source.
   feedback: { max: 10, windowSeconds: 3600 },
+  // Changing your own tier is a development convenience that grants premium.
+  // The route is already gated on ALLOW_DEV_TIER_SWITCH and on there being no
+  // payment provider, so this is a third line rather than the only one. It is
+  // here because a route that hands out entitlement should never also be the
+  // one route nobody is counting.
+  tierSwitch: { max: 10, windowSeconds: 3600 },
+  // Rating somebody is how reputation is built, so it is worth something to
+  // spam. A person rates a handful of counterparties a day, not dozens.
+  rating: { max: 20, windowSeconds: 3600 },
 } satisfies Record<string, Limit>;
 
 export interface LimitResult {

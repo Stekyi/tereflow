@@ -261,5 +261,21 @@ check('subscription removed', r.json?.subscriptions?.length === 1);
 r = await kojo.del(`/api/premium/subscriptions/${subId}`);
 check('unfollowing twice is a clean 404', r.status === 404);
 
+// Teardown. Every run used to leave two accounts behind for good; over a couple
+// of days that is dozens of people who never existed sitting in the users
+// table. Closing them here also covers the close path from a premium account,
+// which is the case where an entitlement has to be cleaned up too.
+console.log('\nTeardown');
+await kojo.post('/api/auth/login', { email: `kojo${stamp}@example.com`, password: 'cocoafutures2026' });
+let gone = await kojo.post('/api/auth/close', { password: 'cocoafutures2026' });
+check("Kojo's account closes", gone.status === 200, gone.json?.error ?? 'closed');
+
+await bystander.post('/api/auth/login', {
+  email: `bystander${stamp}@example.com`,
+  password: 'legitimate2026',
+});
+gone = await bystander.post('/api/auth/close', { password: 'legitimate2026' });
+check("the bystander's account closes", gone.status === 200, gone.json?.error ?? 'closed');
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

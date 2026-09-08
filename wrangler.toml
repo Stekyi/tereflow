@@ -34,8 +34,19 @@ id = "00000000000000000000000000000000"
 
 [vars]
 APP_NAME = "Tereflow"
-# Comma-separated emails allowed into /admin. Override per environment.
-ADMIN_EMAILS = "danieltekyi@microsoft.com"
+# Comma-separated emails allowed into /admin. Set per environment with
+# `wrangler secret put` or a per-environment [vars] block. Deliberately empty
+# here: a real address in version control is somebody's personal data sitting
+# in every clone and fork of this repository.
+ADMIN_EMAILS = ""
+
+# Granting premium to whoever calls /api/auth/tier is a development convenience
+# and nothing else. Declared here, false, so the deployed configuration always
+# carries an explicit safe value rather than relying on the setting being
+# absent. local/.dev.vars overrides it for local work, and .dev.vars is never
+# deployed. Turning this on in a real environment takes a deliberate act, which
+# is the point.
+ALLOW_DEV_TIER_SWITCH = "false"
 
 # Secrets (set with: wrangler secret put NAME)
 #   ADMIN_TOKEN        - shared secret for the admin console

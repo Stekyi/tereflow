@@ -1047,6 +1047,29 @@ admin.get('/manual/datasets', async (c) => {
 
 // --- Validate: reads the file, writes nothing -------------------------------
 
+/**
+ * Largest CSV the manual routes will read.
+ *
+ * These files are typed or exported by a person from a published table. A
+ * country's full annual trade at HS6 is a few thousand rows and well under a
+ * megabyte, so two is generous. Without a cap a 5 MB body validated in under
+ * three seconds and would have been stored whole in a single D1 column, which
+ * is a slow way to fill a database and an easy one to do by accident with a
+ * spreadsheet that has a million empty rows below the data.
+ */
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+
+/** Bytes, not characters: a UTF-8 accent costs two and the limit is storage. */
+function tooLarge(content: string): string | null {
+  const bytes = new TextEncoder().encode(content).length;
+  if (bytes <= MAX_UPLOAD_BYTES) return null;
+  return (
+    `That file is ${(bytes / 1024 / 1024).toFixed(1)} MB and the limit is ` +
+    `${MAX_UPLOAD_BYTES / 1024 / 1024} MB. If it is genuinely that large, split it by year and ` +
+    `upload each separately. If it is not, the file probably has empty rows below the data.`
+  );
+}
+
 admin.post('/manual/validate', async (c) => {
   const body = await c.req.json().catch(() => null);
   if (!body) return bad('Expected a JSON body.');
@@ -1054,6 +1077,8 @@ admin.post('/manual/validate', async (c) => {
   if (!slug || !dataset || typeof content !== 'string') {
     return bad('slug, dataset and content are all required.');
   }
+  const oversize = tooLarge(content);
+  if (oversize) return bad(oversize, 413);
   if (!datasetSpec(dataset)) return bad(`Unknown dataset '${dataset}'.`, 404);
   const entity = await resolveManualEntity(c.env, slug);
   if (!entity) return bad(`Unknown country '${slug}'.`, 404);
@@ -1088,6 +1113,8 @@ admin.post('/manual/upload', async (c) => {
   if (!slug || !dataset || typeof content !== 'string') {
     return bad('slug, dataset and content are all required.');
   }
+  const oversizeUpload = tooLarge(content);
+  if (oversizeUpload) return bad(oversizeUpload, 413);
   const spec = datasetSpec(dataset);
   if (!spec) return bad(`Unknown dataset '${dataset}'.`, 404);
   // The mode is never inferred: replacing a period and appending to it are

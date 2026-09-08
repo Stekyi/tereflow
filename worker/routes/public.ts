@@ -737,28 +737,56 @@ pub.get('/countries', async (c) => {
   // Opportunity counts for every listed country in one query. D1 caps bound
   // parameters at 100, so the id list is chunked rather than inlined.
   const counts = new Map<string, number>();
+  // Years of product detail per country, which decides whether a count of zero
+  // means anything. Signal detection needs three years to see a trend, so a
+  // country with one year cannot produce a signal however good its trade is.
+  // Reporting that as "0 opportunities" reads as "we looked and there are
+  // none", and it sits in a list beside countries where we really did look.
+  const productYears = new Map<string, number>();
   for (let i = 0; i < ids.length; i += 90) {
     const chunk = ids.slice(i, i + 90);
     if (!chunk.length) continue;
+    const placeholders = chunk.map(() => '?').join(',');
     const { results } = await c.env.DB.prepare(
       `SELECT entity_id, COUNT(*) AS n FROM opportunity_signals
-        WHERE entity_id IN (${chunk.map(() => '?').join(',')})
+        WHERE entity_id IN (${placeholders})
         GROUP BY entity_id`,
     )
       .bind(...chunk)
       .all<{ entity_id: string; n: number }>();
     for (const r of results ?? []) counts.set(r.entity_id, r.n);
+
+    const { results: yearRows } = await c.env.DB.prepare(
+      `SELECT entity_id, COUNT(DISTINCT year) AS n FROM trade_facts
+        WHERE entity_id IN (${placeholders}) AND hs_code IS NOT NULL
+        GROUP BY entity_id`,
+    )
+      .bind(...chunk)
+      .all<{ entity_id: string; n: number }>();
+    for (const r of yearRows ?? []) productYears.set(r.entity_id, r.n);
   }
+
+  /** Three years of product detail is the floor detectSignals works from. */
+  const MIN_YEARS_FOR_SIGNALS = 3;
 
   const summaries = await Promise.all(
     rows.map(async (r): Promise<CountrySummary> => {
+      const years = productYears.get(r.id) ?? 0;
+      const assessable = years >= MIN_YEARS_FOR_SIGNALS;
       const base = {
         slug: r.slug,
         name: r.name,
         iso3: r.iso3,
         continent: r.continent,
         is_active: r.is_active === 1,
-        opportunities: counts.get(r.id) ?? 0,
+        // Null where the question could not be asked, so a reader is never
+        // shown a zero that was never counted.
+        opportunities: assessable ? (counts.get(r.id) ?? 0) : null,
+        opportunities_note: assessable
+          ? null
+          : years === 0
+            ? 'No product detail loaded yet.'
+            : `Only ${years} year${years === 1 ? '' : 's'} of product detail. Trends need ${MIN_YEARS_FOR_SIGNALS}.`,
         last_ingest_at: r.last_ingest_at,
       };
       if (r.is_active !== 1) {

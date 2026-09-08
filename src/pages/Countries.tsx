@@ -89,7 +89,14 @@ function CountryRow({ c }: { c: CountrySummary }) {
           <Fig label="Imports" value={fmtUsd(c.import_usd)} />
           <Fig label="Balance" value={fmtUsd(c.balance_usd)} />
           <Fig label="Top partner" value={c.top_partner ?? 'Not on record'} />
-          <Fig label="Openings" value={String(c.opportunities)} />
+          <Fig
+            label="Openings"
+            // Null means the search could not run, not that it ran and found
+            // nothing. Those read identically as "0" and they are not the same
+            // thing to somebody choosing which country to look into.
+            value={c.opportunities == null ? 'Not assessed' : String(c.opportunities)}
+            hint={c.opportunities_note ?? undefined}
+          />
         </div>
       )}
     </>
@@ -110,9 +117,9 @@ function CountryRow({ c }: { c: CountrySummary }) {
   );
 }
 
-function Fig({ label, value }: { label: string; value: string }) {
+function Fig({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="country-fig">
+    <div className="country-fig" title={hint}>
       <span className="tiny dim">{label}</span>
       <span className="num" style={{ fontWeight: 620 }}>
         {value}

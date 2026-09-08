@@ -433,6 +433,12 @@ network.post('/ratings', async (c) => {
   const user = await currentUser(c.req.raw, c.env);
   if (!user) return bad('Sign in first', 401);
 
+  // Reputation is the thing on this platform worth faking, so the route that
+  // writes it gets a brake. Twenty an hour is far more than anybody rates in
+  // good faith and low enough that a score cannot be moved in one sitting.
+  const rateLimited = await rateLimit(c.env, 'rating', `rating:${user.id}`);
+  if (!rateLimited.ok) return tooMany(rateLimited);
+
   const body = (await c.req.json().catch(() => null)) as {
     subject_id: string;
     score: number;

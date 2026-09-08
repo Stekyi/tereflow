@@ -435,8 +435,17 @@ export interface CountrySummary {
   balance_usd: number | null;
   top_export: string | null;
   top_partner: string | null;
-  /** How many non-traditional openings are on record for this country. */
-  opportunities: number;
+  /**
+   * How many non-traditional openings are on record.
+   *
+   * Null when the question could not be asked: signal detection needs three
+   * years of product detail, and a country with fewer cannot produce one
+   * however good its trade is. Showing that as 0 puts it in a list beside
+   * countries where the search really did run and really did find nothing.
+   */
+  opportunities: number | null;
+  /** Why opportunities is null. Null when it is a real count. */
+  opportunities_note: string | null;
   last_ingest_at: string | null;
 }
 
@@ -820,11 +829,15 @@ export function fmtMoney(minor: number, currency: string): string {
 export function fmtUsd(v: number | null | undefined): string {
   if (v == null || !isFinite(v)) return '—';
   const abs = Math.abs(v);
-  if (abs >= 1e12) return `$${(v / 1e12).toFixed(2)}T`;
-  if (abs >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
-  if (abs >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-  if (abs >= 1e3) return `$${(v / 1e3).toFixed(1)}K`;
-  return `$${v.toFixed(0)}`;
+  // The sign goes outside the currency symbol. "$-3.33B" reads as a dollar
+  // amount that happens to start with a minus; "-$3.33B" reads as a deficit,
+  // which is what a negative trade balance is.
+  const sign = v < 0 ? '-' : '';
+  if (abs >= 1e12) return `${sign}$${(abs / 1e12).toFixed(2)}T`;
+  if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(1)}M`;
+  if (abs >= 1e3) return `${sign}$${(abs / 1e3).toFixed(1)}K`;
+  return `${sign}$${abs.toFixed(0)}`;
 }
 
 export function fmtPct(v: number | null | undefined, digits = 1): string {

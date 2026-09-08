@@ -65,6 +65,29 @@ app.route('/api', pub);
 app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404));
 
 /**
+ * A body that is not JSON is a bad request, not a server fault.
+ *
+ * Most handlers call `c.req.json()` without catching, so a non-JSON body threw
+ * and came back as a bare 500 "Internal Server Error". That is the wrong status
+ * and the wrong story: it reads as the server being broken when the request was
+ * malformed, and it is the one error a caller can actually fix. Handled once
+ * here so it holds for routes nobody has written yet.
+ *
+ * Anything else is still a 500, and still says nothing about internals.
+ */
+app.onError((err, c) => {
+  const message = err instanceof Error ? err.message : String(err);
+  const isBadJson =
+    err instanceof SyntaxError ||
+    /JSON|Unexpected token|Unexpected end of/i.test(message);
+  if (isBadJson && c.req.path.startsWith('/api/')) {
+    return c.json({ error: 'Expected a JSON body.' }, 400);
+  }
+  console.error('Unhandled error', c.req.method, c.req.path, message);
+  return c.json({ error: 'Internal Server Error' }, 500);
+});
+
+/**
  * Hashed build assets must 404 when they are missing.
  *
  * The SPA fallback otherwise returns index.html for any unknown path, so a tab

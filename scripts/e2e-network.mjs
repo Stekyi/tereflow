@@ -326,5 +326,30 @@ await kwesi.post('/api/auth/logout');
 r = await kwesi.get('/api/auth/me');
 check('logout ends the session', r.json?.user === null);
 
+// 9. teardown -----------------------------------------------------------------
+//
+// Every run used to leave two accounts and two cards behind, and they went
+// straight into the public directory. After forty-odd runs the network page
+// showed the same two people stacked twenty times each, which reads as a
+// broken product rather than as test residue. Closing the accounts here also
+// exercises the close path, which nothing else covered.
+console.log('\n9. Teardown');
+await kwesi.post('/api/auth/login', { email: `kwesi${stamp}@example.com`, password: 'importer2026' });
+let closed = await kwesi.post('/api/auth/close', { password: 'importer2026' });
+check("Kwesi's account closes", closed.status === 200, closed.json?.error ?? 'closed');
+
+closed = await ama.post('/api/auth/close', { password: 'moringa2026' });
+check("Ama's account closes", closed.status === 200, closed.json?.error ?? 'closed');
+
+await yaw.post('/api/auth/login', { email: `yaw${stamp}@example.com`, password: 'logistics2026' });
+closed = await yaw.post('/api/auth/close', { password: 'logistics2026' });
+check("Yaw's account closes", closed.status === 200, closed.json?.error ?? 'closed');
+
+const leftover = await anon.get('/api/network/cards');
+const stillThere = (leftover.json?.cards ?? []).filter(
+  (card) => card.display_name === 'Ama Boateng' || card.display_name === 'Kwesi Mensah',
+);
+check('no test cards left in the public directory', stillThere.length === 0, `${stillThere.length} left`);
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

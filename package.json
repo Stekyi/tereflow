@@ -47,14 +47,14 @@
     "recharts": "^2.15.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20241230.0",
+    "@cloudflare/workers-types": "^5.20260902.1",
     "@types/node": "^26.4.0",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.7.2",
     "vite": "^6.0.7",
-    "wrangler": "^3.99.0"
+    "wrangler": "^4.128.0"
   },
   "allowScripts": {
     "esbuild@0.25.12": true,
@@ -63,6 +63,7 @@
     "workerd@1.20250718.0": true
   },
   "overrides": {
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "sharp": "^0.35.4"
   }
 }

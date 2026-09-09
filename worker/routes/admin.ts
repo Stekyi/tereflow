@@ -25,6 +25,7 @@ import { buildReadme, buildTemplate } from '../../shared/csv/template';
 import { analyse } from '../agent/analyse';
 import { analyseCountryData, type IndicatorRow, type SectorRow } from '../agent/analyse-manual';
 import type { FactRow } from '../agent/types';
+import { buildSocialPost, isPublishableLink, type SignalWithMarket } from '../agent/social';
 
 export const admin = new Hono<{ Bindings: Env }>();
 
@@ -1785,4 +1786,157 @@ admin.get('/manual/status', async (c) => {
   }
 
   return json({ entity: { slug: entity.slug, name: entity.name }, status });
+});
+
+// --- Social posts -----------------------------------------------------------
+//
+// Tereflow does not talk to Facebook, Instagram, Threads or LinkedIn. Ananse
+// News already holds those tokens, already handles their quirks, and already
+// staggers what it sends. Building a second publisher here would mean a second
+// set of credentials to keep alive and a second thing to blame when a post does
+// not appear. This composes a post and hands it over.
+
+/** Signals with the market columns the shared type does not carry. */
+async function loadSignals(env: Env, entityId: string): Promise<SignalWithMarket[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT id, hs_code, product_name, flow, cagr_3y, momentum,
+            current_rank, projected_rank, horizon_years, confidence, rationale,
+            value_usd, share, year, best_market, best_market_iso3,
+            best_market_product_specific
+       FROM opportunity_signals
+      WHERE entity_id = ?
+      ORDER BY momentum DESC
+      LIMIT 40`,
+  )
+    .bind(entityId)
+    .all<Record<string, unknown>>();
+  return (results ?? []).map((r) => ({
+    ...r,
+    // SQLite has no boolean. Left as 0 or 1 this is truthy either way, and the
+    // whole point of the flag is that a 0 must stop a sentence being written.
+    best_market_product_specific: r.best_market_product_specific === 1,
+  })) as unknown as SignalWithMarket[];
+}
+
+function siteBase(c: { req: { url: string } }, env: Env): string {
+  return env.PUBLIC_SITE_URL ?? new URL(c.req.url).origin;
+}
+
+/**
+ * What would go out, without sending it.
+ *
+ * Separate from publishing on purpose. These posts carry claims about somebody
+ * else's economy under somebody else's masthead, so there has to be a way to
+ * read one, and its evidence, before it leaves.
+ */
+admin.get('/social/preview', async (c) => {
+  const slug = c.req.query('slug');
+  if (!slug) return bad('slug is required.');
+  const entity = await getEntityBySlug(c.env.DB, slug);
+  if (!entity) return bad(`Unknown country '${slug}'.`, 404);
+
+  const signals = await loadSignals(c.env, entity.id);
+  const post = buildSocialPost({
+    countryName: entity.name,
+    countrySlug: entity.slug,
+    signals,
+    siteBase: siteBase(c, c.env),
+    year: null,
+  });
+
+  if (!post) {
+    return json({
+      entity: { slug: entity.slug, name: entity.name },
+      post: null,
+      // Say which test it failed. "Nothing to post" with no reason is the kind
+      // of answer that gets read as a broken feature.
+      reason:
+        signals.length === 0
+          ? 'No opportunity signals stored for this country. Run the analysis first.'
+          : 'Signals exist but none clears the bar for a public post: too small, too uncertain, or a growth figure that reads as an error.',
+      signals_considered: signals.length,
+    });
+  }
+  return json({ entity: { slug: entity.slug, name: entity.name }, post, signals_considered: signals.length });
+});
+
+/**
+ * Hand the post to Ananse News, which owns the platform tokens.
+ *
+ * Refuses rather than half-works when it is not configured. A publish endpoint
+ * that quietly does nothing is worse than one that is plainly switched off,
+ * because the schedule keeps running and nobody finds out for a week.
+ */
+admin.post('/social/publish', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  if (!body) return bad('Expected a JSON body.');
+  const { slug, platforms, dry_run } = body as {
+    slug?: string;
+    platforms?: string[];
+    dry_run?: boolean;
+  };
+  if (!slug) return bad('slug is required.');
+
+  const entity = await getEntityBySlug(c.env.DB, slug);
+  if (!entity) return bad(`Unknown country '${slug}'.`, 404);
+
+  const signals = await loadSignals(c.env, entity.id);
+  const post = buildSocialPost({
+    countryName: entity.name,
+    countrySlug: entity.slug,
+    signals,
+    siteBase: siteBase(c, c.env),
+    year: null,
+  });
+  if (!post) return bad('Nothing worth posting for this country this week.', 422);
+
+  // Checked before the dry-run branch so a preview surfaces the problem too. A
+  // link nobody outside this machine can open is not a post, it is an
+  // embarrassment that cannot be recalled.
+  const linkOk = isPublishableLink(post.link);
+  if (!linkOk.ok) {
+    return bad(`Refusing to publish: ${linkOk.reason}`, 422);
+  }
+
+  if (dry_run) return json({ dry_run: true, post });
+
+  const endpoint = c.env.ANANSE_ENDPOINT;
+  const key = c.env.ANANSE_KEY;
+  if (!endpoint || !key) {
+    return bad(
+      'Social publishing is not configured. Set ANANSE_ENDPOINT and ANANSE_KEY before calling this.',
+      503,
+    );
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${endpoint.replace(/\/+$/, '')}/api/wire/partner-post`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-ananse-key': key },
+      body: JSON.stringify({
+        partner: 'tereflow',
+        title: post.title,
+        caption: post.caption,
+        link: post.link,
+        platforms: platforms ?? undefined,
+        dedupe_key: post.dedupeKey,
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (err) {
+    return bad(`Could not reach Ananse News: ${err instanceof Error ? err.message : String(err)}`, 502);
+  }
+
+  const text = await res.text();
+  let payload: unknown = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = { raw: text.slice(0, 400) };
+  }
+  if (!res.ok) {
+    return json({ ok: false, status: res.status, response: payload, post }, res.status === 401 ? 502 : 502);
+  }
+  return json({ ok: true, post, response: payload });
 });

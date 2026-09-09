@@ -23,6 +23,21 @@ export interface Env {
    * has not configured billing yet does not give premium away.
    */
   ALLOW_DEV_TIER_SWITCH?: string;
+  /**
+   * Where a reader lands from a social post.
+   *
+   * Falls back to the request origin, which is right in development and wrong
+   * behind a proxy or a custom domain, so production sets it explicitly rather
+   * than publishing a workers.dev link to strangers.
+   */
+  PUBLIC_SITE_URL?: string;
+  /**
+   * Ananse News, which owns the social platform tokens and does the posting.
+   * Both must be set for publishing to work; absent means the feature is off
+   * and says so rather than failing quietly on a schedule.
+   */
+  ANANSE_ENDPOINT?: string;
+  ANANSE_KEY?: string;
 }
 
 export function uid(prefix = ''): string {

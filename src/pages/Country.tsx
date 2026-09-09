@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
+import { usePageTitle } from '../lib/pageTitle';
 import { CHART } from '../lib/theme';
 import { Term } from '../components/Term';
 import { shortProductName } from '../../shared/product-name';
@@ -106,6 +107,7 @@ export default function Country() {
   const [modal, setModal] = useState<{ hs: string; slug?: string; flow?: 'export' | 'import' } | null>(
     null,
   );
+  usePageTitle(data?.entity.name);
   // ISO3 -> slug for countries we actually have a page for, so partner names
   // only become links when the destination exists (no dead links to untracked
   // partners).

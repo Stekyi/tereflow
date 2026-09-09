@@ -34,6 +34,16 @@ admin.use('*', async (c, next) => {
   await next();
 });
 
+/**
+ * D1 refuses a statement carrying more than this many bound parameters.
+ *
+ * Named because the number decides how many rows fit in one insert and how many
+ * codes fit in one delete, and those calculations were repeating the literal in
+ * several places. Exceeding it fails the whole batch, so anything building a
+ * variable-length parameter list has to divide by it rather than hope.
+ */
+const D1_MAX_BOUND_PARAMS = 100;
+
 /** Everything, including inactive records, for the admin table. */
 admin.get('/entities', async (c) => {
   const kind = c.req.query('kind');
@@ -687,7 +697,7 @@ admin.post('/ingest/facts', async (c) => {
    * seven rows per statement. Values are bound, never interpolated.
    */
   const COLS = 13;
-  const ROWS_PER_STATEMENT = Math.floor(100 / COLS); // 7
+  const ROWS_PER_STATEMENT = Math.floor(D1_MAX_BOUND_PARAMS / COLS); // 7
   const tuple = `(${Array(COLS).fill('?').join(',')})`;
 
   const statements: D1PreparedStatement[] = [];
@@ -1184,7 +1194,7 @@ admin.post('/manual/upload', async (c) => {
   const issues = report.issues;
   if (issues.length) {
     const ISSUE_COLS = 7;
-    const perStmt = Math.floor(100 / ISSUE_COLS);
+    const perStmt = Math.floor(D1_MAX_BOUND_PARAMS / ISSUE_COLS);
     const statements: D1PreparedStatement[] = [];
     for (let i = 0; i < issues.length; i += perStmt) {
       const slice = issues.slice(i, i + perStmt);
@@ -1268,52 +1278,60 @@ admin.post('/manual/upload/:id/confirm', async (c) => {
 
   // Count what replace_period will remove before removing it, so the
   // confirmation can state it honestly. append_period removes nothing.
+  //
+  // Years and codes are bound rather than pasted into the SQL. They are already
+  // coerced upstream (asNumber for years, a validated column for codes) so this
+  // is not currently exploitable, but a value's safety should be visible where
+  // it is used rather than depending on a coercion three functions away that a
+  // later refactor could quietly drop.
+  //
+  // D1 allows 100 bound parameters per statement. Years are bounded by a file's
+  // span, but a demographics upload can carry ninety-odd indicator codes, so
+  // the code list is chunked to stay under the ceiling.
   let rowsReplaced = 0;
   if (mode === 'replace_period' && years.length) {
-    const yearList = years.join(',');
+    const yearHoles = years.map(() => '?').join(',');
     if (spec.target === 'trade') {
       const flow = spec.fixedFlow;
       const countRow = await c.env.DB.prepare(
-        `SELECT COUNT(*) AS n FROM trade_facts WHERE entity_id = ? AND flow = ? AND year IN (${yearList})`,
+        `SELECT COUNT(*) AS n FROM trade_facts WHERE entity_id = ? AND flow = ? AND year IN (${yearHoles})`,
       )
-        .bind(entity.id, flow)
+        .bind(entity.id, flow, ...years)
         .first<{ n: number }>();
       rowsReplaced = countRow?.n ?? 0;
       statements.push(
         c.env.DB.prepare(
-          `DELETE FROM trade_facts WHERE entity_id = ? AND flow = ? AND year IN (${yearList})`,
-        ).bind(entity.id, flow),
+          `DELETE FROM trade_facts WHERE entity_id = ? AND flow = ? AND year IN (${yearHoles})`,
+        ).bind(entity.id, flow, ...years),
       );
-    } else if (spec.target === 'indicator') {
-      const codes = [...new Set(rows.map((r) => asText(r.values.indicator_code)).filter((v): v is string => !!v))];
-      if (codes.length) {
-        const placeholders = codes.map(() => '?').join(',');
-        const countRow = await c.env.DB.prepare(
-          `SELECT COUNT(*) AS n FROM indicator_observations WHERE entity_id = ? AND year IN (${yearList}) AND indicator_code IN (${placeholders})`,
-        )
-          .bind(entity.id, ...codes)
-          .first<{ n: number }>();
-        rowsReplaced = countRow?.n ?? 0;
-        statements.push(
-          c.env.DB.prepare(
-            `DELETE FROM indicator_observations WHERE entity_id = ? AND year IN (${yearList}) AND indicator_code IN (${placeholders})`,
-          ).bind(entity.id, ...codes),
-        );
-      }
     } else {
-      const codes = [...new Set(rows.map((r) => asText(r.values.sector_code)).filter((v): v is string => !!v))];
-      if (codes.length) {
-        const placeholders = codes.map(() => '?').join(',');
+      const isIndicator = spec.target === 'indicator';
+      const codeColumn = isIndicator ? 'indicator_code' : 'sector_code';
+      const targetName = isIndicator ? 'indicator_observations' : 'sector_observations';
+      const field = isIndicator ? 'indicator_code' : 'sector_code';
+      const codes = [
+        ...new Set(rows.map((r) => asText(r.values[field])).filter((v): v is string => !!v)),
+      ];
+      // entity id, plus the years, plus this chunk of codes.
+      const perChunk = Math.max(1, D1_MAX_BOUND_PARAMS - 1 - years.length);
+      for (let i = 0; i < codes.length; i += perChunk) {
+        const chunk = codes.slice(i, i + perChunk);
+        const codeHoles = chunk.map(() => '?').join(',');
+        const where = `entity_id = ? AND year IN (${yearHoles}) AND ${codeColumn} IN (${codeHoles})`;
         const countRow = await c.env.DB.prepare(
-          `SELECT COUNT(*) AS n FROM sector_observations WHERE entity_id = ? AND year IN (${yearList}) AND sector_code IN (${placeholders})`,
+          `SELECT COUNT(*) AS n FROM ${targetName} WHERE ${where}`,
         )
-          .bind(entity.id, ...codes)
+          .bind(entity.id, ...years, ...chunk)
           .first<{ n: number }>();
-        rowsReplaced = countRow?.n ?? 0;
+        // Accumulated across chunks: each chunk counts a different set of codes,
+        // so these add rather than replace.
+        rowsReplaced += countRow?.n ?? 0;
         statements.push(
-          c.env.DB.prepare(
-            `DELETE FROM sector_observations WHERE entity_id = ? AND year IN (${yearList}) AND sector_code IN (${placeholders})`,
-          ).bind(entity.id, ...codes),
+          c.env.DB.prepare(`DELETE FROM ${targetName} WHERE ${where}`).bind(
+            entity.id,
+            ...years,
+            ...chunk,
+          ),
         );
       }
     }
@@ -1337,7 +1355,7 @@ admin.post('/manual/upload/:id/confirm', async (c) => {
         return true;
       });
     const COLS = 13;
-    const perStmt = Math.floor(100 / COLS);
+    const perStmt = Math.floor(D1_MAX_BOUND_PARAMS / COLS);
     for (let i = 0; i < facts.length; i += perStmt) {
       const slice = facts.slice(i, i + perStmt);
       const binds: (string | number | null)[] = [];
@@ -1370,7 +1388,7 @@ admin.post('/manual/upload/:id/confirm', async (c) => {
     }
   } else if (spec.target === 'indicator') {
     const COLS = 21;
-    const perStmt = Math.floor(100 / COLS);
+    const perStmt = Math.floor(D1_MAX_BOUND_PARAMS / COLS);
     const list = rows.map((r) => r.values);
     for (let i = 0; i < list.length; i += perStmt) {
       const slice = list.slice(i, i + perStmt);
@@ -1416,7 +1434,7 @@ admin.post('/manual/upload/:id/confirm', async (c) => {
     }
   } else {
     const COLS = 20;
-    const perStmt = Math.floor(100 / COLS);
+    const perStmt = Math.floor(D1_MAX_BOUND_PARAMS / COLS);
     const list = rows.map((r) => r.values);
     for (let i = 0; i < list.length; i += perStmt) {
       const slice = list.slice(i, i + perStmt);

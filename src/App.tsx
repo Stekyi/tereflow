@@ -1,9 +1,10 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Skeletons } from './components/ui';
 import { Logo } from './components/Brand';
 import FeedbackButton from './components/FeedbackButton';
 import { useSession } from './lib/auth';
+import { PageTitleContext } from './lib/pageTitle';
 
 const Home = lazy(() => import('./pages/Home'));
 const Countries = lazy(() => import('./pages/Countries'));
@@ -45,11 +46,16 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const { unread, feedUnread } = useSession();
+  // Detail pages report their real entity name through this state. A route
+  // change unmounts the old page, whose cleanup clears the name, so a page that
+  // reports nothing falls back to its static label below.
+  const [pageTitle, setPageTitle] = useState<string | null>(null);
 
   const isRoot = ROOTS.has(location.pathname);
-  const title = TITLES[location.pathname] ?? 'Tereflow';
+  const title = pageTitle ?? TITLES[location.pathname] ?? 'Tereflow';
 
   return (
+    <PageTitleContext.Provider value={setPageTitle}>
     <div className="app">
       <header className="topbar">
         {isRoot ? (
@@ -144,6 +150,7 @@ export default function App() {
 
       <FeedbackButton />
     </div>
+    </PageTitleContext.Provider>
   );
 }
 

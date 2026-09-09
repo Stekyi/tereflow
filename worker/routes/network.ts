@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { bad, json, uid } from '../lib/db';
 import { currentUser } from '../lib/session';
-import { rateLimit, tooMany } from '../lib/ratelimit';
+import { clientKey, rateLimit, tooMany } from '../lib/ratelimit';
 import { INTENTS, type BusinessCard, type BusinessCardInput, type Intent } from '../../shared/types';
 
 export const network = new Hono<{ Bindings: Env }>();
@@ -40,9 +40,20 @@ function parseList(raw: string | null): string[] {
   }
 }
 
-function toCard(r: CardRow): BusinessCard {
+/**
+ * A stored card as the API returns it.
+ *
+ * `user_id` is the address you message or rate somebody at, so a signed-in
+ * caller genuinely needs it. A signed-out one cannot do either, so it is
+ * withheld: publishing an internal identifier to anybody who asks lets a
+ * scraper correlate the same person across cards, ratings and threads, and
+ * nothing is gained by it.
+ */
+function toCard(r: CardRow, viewerSignedIn: boolean): BusinessCard {
+  const { user_id, ...rest } = r;
   return {
-    ...r,
+    ...rest,
+    user_id: viewerSignedIn ? user_id : null,
     intents: parseList(r.intents) as Intent[],
     sectors: parseList(r.sectors),
     hs_codes: parseList(r.hs_codes),
@@ -58,7 +69,7 @@ network.get('/cards/me', async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM business_cards WHERE user_id = ?')
     .bind(user.id)
     .first<CardRow>();
-  return json({ card: row ? toCard(row) : null });
+  return json({ card: row ? toCard(row, true) : null });
 });
 
 /**
@@ -147,7 +158,7 @@ network.put('/cards/me', async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM business_cards WHERE id = ?')
     .bind(id)
     .first<CardRow>();
-  return json({ card: row ? toCard(row) : null });
+  return json({ card: row ? toCard(row, true) : null });
 });
 
 /** Keep the FTS table in step. Manual because fts5 here is not external-content. */
@@ -176,11 +187,17 @@ async function reindexCard(env: Env, cardId: string) {
 // --- discovery --------------------------------------------------------------
 
 network.get('/cards', async (c) => {
+  const viewer = await currentUser(c.req.raw, c.env);
   const q = (c.req.query('q') ?? '').trim();
   const intent = c.req.query('intent');
   const sector = c.req.query('sector');
   const country = c.req.query('country');
   const limit = Math.min(Number(c.req.query('limit') ?? 40), 100);
+
+  // The directory is public and the search hits an FTS index, so it is the
+  // most expensive thing an unauthenticated caller can ask for repeatedly.
+  const limited = await rateLimit(c.env, 'directory', clientKey(c.req.raw));
+  if (!limited.ok) return tooMany(limited);
 
   // Filters are kept separate from the text search so the fallback path can
   // reuse them without fragile index arithmetic.
@@ -242,10 +259,11 @@ network.get('/cards', async (c) => {
     results = r.results ?? [];
   }
 
-  return json({ cards: results.map(toCard), count: results.length });
+  return json({ cards: results.map((r) => toCard(r, !!viewer)), count: results.length });
 });
 
 network.get('/cards/:id', async (c) => {
+  const viewer = await currentUser(c.req.raw, c.env);
   const row = await c.env.DB.prepare(
     'SELECT * FROM business_cards WHERE (id = ? OR user_id = ?) AND is_published = 1',
   )
@@ -253,8 +271,12 @@ network.get('/cards/:id', async (c) => {
     .first<CardRow>();
   if (!row) return bad('Not found', 404);
 
+  // rater_id is deliberately not selected. The list already carries rater_name,
+  // which is what a reader needs, and nothing in the app consumes the id.
+  // Returning it would tie a stated opinion to an internal account identifier
+  // for anybody who asks.
   const { results: ratings } = await c.env.DB.prepare(
-    `SELECT r.id, r.rater_id, r.score, r.dealt_in, r.comment, r.created_at,
+    `SELECT r.id, r.score, r.dealt_in, r.comment, r.created_at,
             COALESCE(bc.display_name, u.full_name) AS rater_name
        FROM ratings r
        JOIN users u ON u.id = r.rater_id
@@ -266,7 +288,7 @@ network.get('/cards/:id', async (c) => {
     .bind(row.user_id)
     .all();
 
-  return json({ card: toCard(row), ratings: ratings ?? [] });
+  return json({ card: toCard(row, !!viewer), ratings: ratings ?? [] });
 });
 
 // --- conversations ----------------------------------------------------------

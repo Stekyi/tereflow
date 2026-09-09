@@ -178,6 +178,11 @@ auth.post('/close', async (c) => {
   const user = await currentUser(c.req.raw, c.env);
   if (!user) return bad('Sign in first', 401);
 
+  // Counted per account. This route takes a password and destroys data on a
+  // correct one, which makes it a password oracle if nobody is counting.
+  const limited = await rateLimit(c.env, 'closeAccount', `close:${user.id}`);
+  if (!limited.ok) return tooMany(limited);
+
   const body = (await c.req.json().catch(() => null)) as { password?: string } | null;
   if (!body?.password) return bad('Confirm your password to close the account');
 

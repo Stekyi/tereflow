@@ -664,7 +664,11 @@ export interface SessionUser {
 
 export interface BusinessCard {
   id: string;
-  user_id: string;
+  /**
+   * Who to message or rate. Null for a signed-out reader, who can do neither,
+   * and who has no reason to be handed an internal account identifier.
+   */
+  user_id: string | null;
   display_name: string;
   company: string | null;
   headline: string | null;

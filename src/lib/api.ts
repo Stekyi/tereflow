@@ -34,12 +34,45 @@ import type { DatasetCode } from '../../shared/csv/schema';
 
 const ADMIN_TOKEN_KEY = 'tf_admin_token';
 
+/**
+ * Where the admin bearer lives.
+ *
+ * sessionStorage, not localStorage: the token dies with the tab instead of
+ * persisting on the machine indefinitely. That shortens the window in which a
+ * stolen token is useful, and it means a shared or forgotten browser does not
+ * keep admin access alive for weeks.
+ *
+ * It does NOT make the token safe from cross-site scripting. Script running on
+ * this origin can still read sessionStorage. The reason it stays in web storage
+ * rather than moving to an httpOnly cookie is that the API deliberately accepts
+ * this only as an Authorization header and requireAdmin rejects cookies
+ * outright, which is what makes the admin surface immune to cross-site request
+ * forgery. Moving to a cookie would trade a scripting risk for a forgery risk
+ * and would need CSRF tokens added to every admin write to get back to level.
+ * The real defence against the scripting risk is the content security policy in
+ * worker/index.ts, which does not allow inline or third-party script.
+ */
 export function getAdminToken(): string {
-  return localStorage.getItem(ADMIN_TOKEN_KEY) ?? '';
+  const fromSession = sessionStorage.getItem(ADMIN_TOKEN_KEY);
+  if (fromSession) return fromSession;
+
+  // Carry over a token saved before this moved, so an admin mid-task is not
+  // silently signed out, then drop the long-lived copy.
+  const legacy = localStorage.getItem(ADMIN_TOKEN_KEY);
+  if (legacy) {
+    sessionStorage.setItem(ADMIN_TOKEN_KEY, legacy);
+    localStorage.removeItem(ADMIN_TOKEN_KEY);
+    return legacy;
+  }
+  return '';
 }
+
 export function setAdminToken(token: string) {
-  if (token) localStorage.setItem(ADMIN_TOKEN_KEY, token);
-  else localStorage.removeItem(ADMIN_TOKEN_KEY);
+  // Clear both. Without removing the legacy key as well, signing out would
+  // leave a working token behind in the place it was meant to leave.
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
+  if (token) sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+  else sessionStorage.removeItem(ADMIN_TOKEN_KEY);
 }
 
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -314,7 +347,10 @@ export interface HomeStats {
 // Kept here so the sections stay typed without re-deriving them each time.
 export interface PortalCounts {
   countries: number;
+  /** Switched on. This is intent to cover, not evidence of coverage. */
   countries_active: number;
+  /** Holding at least one trade row. This is the real coverage number. */
+  countries_with_data: number;
   orgs: number;
   regional: number;
   sources: number;

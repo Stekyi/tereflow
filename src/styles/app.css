@@ -821,6 +821,16 @@ textarea {
   background: var(--brand-hover);
 }
 
+/* Related-product chips carry full product names, which can be wider than a
+   phone. Left unwrapped they push the modal past the viewport and create a
+   horizontal scrollbar on the dialog itself. Cap them to the container and let
+   the label wrap so the modal stays within its width and the name stays whole. */
+.related-chips .chip {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;

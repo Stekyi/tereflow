@@ -30,6 +30,11 @@ premium.post('/subscriptions', async (c) => {
   const user = await currentUser(c.req.raw, c.env);
   if (!user) return bad('Sign in first', 401);
 
+  // Following is cheap for a person and cheap to automate, and each one writes
+  // a row that later drives a feed.
+  const limited = await rateLimit(c.env, 'subscription', `sub:${user.id}`);
+  if (!limited.ok) return tooMany(limited);
+
   const body = (await c.req.json().catch(() => null)) as {
     kind: SubKind;
     value: string;

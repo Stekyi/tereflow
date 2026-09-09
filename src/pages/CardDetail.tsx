@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
+import { usePageTitle } from '../lib/pageTitle';
 import { Empty, Skeletons, useToast } from '../components/ui';
 import { INTENT_LABEL, type BusinessCard, type Rating } from '../../shared/types';
 
@@ -20,6 +21,7 @@ export default function CardDetail() {
   const [score, setScore] = useState(5);
   const [dealtIn, setDealtIn] = useState('');
   const [comment, setComment] = useState('');
+  usePageTitle(card?.display_name);
 
   useEffect(() => {
     api.network
@@ -30,7 +32,29 @@ export default function CardDetail() {
       })
       .catch(() => setCard(null))
       .finally(() => setLoading(false));
-  }, [id]);
+    // Refetch when the viewer signs in. A card fetched while signed out comes
+    // back without user_id, and messaging or rating needs it. Without this the
+    // buttons would be there and would fail for somebody who signed in after
+    // opening the page.
+  }, [id, user?.id]);
+
+  /**
+   * The person behind this card, refetched if the card was loaded signed out.
+   *
+   * Returns null only when the card genuinely cannot be acted on, so callers
+   * can say something true rather than sending an undefined id to the server.
+   */
+  async function subjectId(): Promise<string | null> {
+    if (card?.user_id) return card.user_id;
+    try {
+      const r = await api.network.card(id);
+      setCard(r.card);
+      setRatings(r.ratings);
+      return r.card?.user_id ?? null;
+    } catch {
+      return null;
+    }
+  }
 
   async function contact() {
     if (!user) return navigate(`/join?next=/network/${id}`);
@@ -38,8 +62,10 @@ export default function CardDetail() {
     if (!message.trim()) return t.err('Write a short message first');
     setSending(true);
     try {
+      const to = await subjectId();
+      if (!to) return t.err('That card cannot be messaged. Try reloading the page.');
       const r = await api.network.startConversation({
-        to_user_id: card.user_id,
+        to_user_id: to,
         body: message,
       });
       navigate(`/messages/${r.conversation_id}`);
@@ -53,8 +79,10 @@ export default function CardDetail() {
   async function submitRating() {
     if (!card) return;
     try {
+      const subject = await subjectId();
+      if (!subject) return t.err('That card cannot be rated. Try reloading the page.');
       await api.network.rate({
-        subject_id: card.user_id,
+        subject_id: subject,
         score,
         dealt_in: dealtIn || undefined,
         comment: comment || undefined,

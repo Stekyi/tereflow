@@ -277,7 +277,14 @@ function Overview({ onError }: { onError: OnError }) {
   return (
     <>
       <div className="portal-tiles">
-        <Stat label="Countries" value={num(c.countries)} sub={`${num(c.countries_active)} active`} />
+        <Stat
+          label="Countries"
+          value={num(c.countries)}
+          // Active means switched on, which is intent. What an owner needs to
+          // see is how many actually hold data, because that is the gap between
+          // what the app claims to cover and what it can show.
+          sub={`${num(c.countries_with_data)} with data, ${num(c.countries_active)} active`}
+        />
         <Stat label="Facts stored" value={num(c.facts)} />
         <Stat label="Signals" value={num(c.signals)} />
         <Stat label="Sources" value={num(c.sources)} />

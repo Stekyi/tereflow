@@ -795,7 +795,7 @@ export default function ProductModal({
                 {insight.related.length > 0 && (
                   <div className="card">
                     <p className="card-title">Related products</p>
-                    <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    <div className="row related-chips" style={{ gap: 8, flexWrap: 'wrap' }}>
                       {insight.related.map((r) => (
                         <button
                           type="button"

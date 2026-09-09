@@ -50,6 +50,22 @@ export const LIMITS = {
   // Rating somebody is how reputation is built, so it is worth something to
   // spam. A person rates a handful of counterparties a day, not dozens.
   rating: { max: 20, windowSeconds: 3600 },
+  // The public directory search hits an FTS index and needs no account, so it
+  // is the most expensive thing an anonymous caller can ask for on repeat.
+  //
+  // Deliberately loose. A person typing into the search box fires a request per
+  // keystroke, and several people behind one office address share this bucket
+  // because it is keyed on the client IP. The job here is to stop a scraper
+  // pulling the whole directory in a loop, not to ration browsing, so the
+  // ceiling sits far above anything real use produces. The first attempt at 120
+  // in five minutes throttled the test suite, which is a fair impression of an
+  // enthusiastic user.
+  directory: { max: 600, windowSeconds: 300 },
+  // Closing an account is destructive and takes a password, so this is a brake
+  // on guessing that password, not on people leaving.
+  closeAccount: { max: 5, windowSeconds: 900 },
+  // Following a product or market is cheap, but it writes a row each time.
+  subscription: { max: 60, windowSeconds: 3600 },
 } satisfies Record<string, Limit>;
 
 export interface LimitResult {

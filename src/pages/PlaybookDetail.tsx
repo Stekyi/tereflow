@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { Empty, Skeletons } from '../components/ui';
 import { Markdown } from '../components/Markdown';
+import { usePageTitle } from '../lib/pageTitle';
 import type { Playbook } from '../../shared/types';
 
 export default function PlaybookDetail() {
@@ -17,6 +18,8 @@ export default function PlaybookDetail() {
       .catch(() => setBook(null))
       .finally(() => setLoading(false));
   }, [slug]);
+
+  usePageTitle(book?.title);
 
   if (loading) return <Skeletons n={5} />;
   if (!book) return <Empty title="That playbook is not available" />;

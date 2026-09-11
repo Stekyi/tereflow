@@ -151,7 +151,10 @@ function assertType(type: string | undefined): DatasetCode {
 function requireFlag(value: string | undefined, name: string): string {
   if (!value) {
     console.error(`--${name} is required.`);
-    process.exit(1);
+    // Throwing rather than exiting here. process.exit does not narrow the type,
+    // so the compiler still saw value as possibly undefined below, and the
+    // caller catches this and prints it the same way as any other failure.
+    throw new Error(`--${name} is required.`);
   }
   return value;
 }

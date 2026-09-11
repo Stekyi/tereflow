@@ -35,7 +35,8 @@
     "test:xlsx": "node scripts/test-xlsx.mjs",
     "test:analyse": "node scripts/test-analyse.mjs",
     "test:social": "node scripts/test-social.mjs",
-    "social:weekly": "node local/social.mjs"
+    "social:weekly": "node local/social.mjs",
+    "test:ghana": "node scripts/test-ghana-provider.mjs"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

@@ -30,7 +30,7 @@
     "data:analyse": "node local/build.mjs && node local/dist/manual-data.mjs analyse",
     "report:country": "node local/build.mjs && node local/dist/manual-data.mjs report",
     "test:reset": "node scripts/reset-ratelimit.mjs",
-    "test:e2e": "node scripts/test-csv.mjs && node scripts/test-xlsx.mjs && node scripts/test-analyse.mjs && node scripts/test-social.mjs && node scripts/test-analytics.mjs && npm run test:reset && node scripts/e2e-network.mjs && node scripts/e2e-premium.mjs && node scripts/e2e-products.mjs && node scripts/e2e-portal.mjs && node scripts/e2e-insight.mjs",
+    "test:e2e": "node scripts/test-csv.mjs && node scripts/test-xlsx.mjs && node scripts/test-analyse.mjs && node scripts/test-social.mjs && node scripts/test-analytics.mjs && node scripts/test-ghana-pipeline.mjs && npm run test:reset && node scripts/e2e-network.mjs && node scripts/e2e-premium.mjs && node scripts/e2e-products.mjs && node scripts/e2e-portal.mjs && node scripts/e2e-insight.mjs",
     "test:csv": "node scripts/test-csv.mjs",
     "test:xlsx": "node scripts/test-xlsx.mjs",
     "test:analyse": "node scripts/test-analyse.mjs",
@@ -38,7 +38,8 @@
     "social:weekly": "node local/social.mjs",
     "test:ghana": "node scripts/test-ghana-provider.mjs",
     "ghana": "node local/ghana.mjs",
-    "test:analytics": "node scripts/test-analytics.mjs"
+    "test:analytics": "node scripts/test-analytics.mjs",
+    "test:pipeline": "node scripts/test-ghana-pipeline.mjs"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

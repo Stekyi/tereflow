@@ -289,6 +289,33 @@ console.log('------------------------------------------------');
   }
 }
 
+console.log('\nMarket size has to mean something');
+console.log('---------------------------------');
+
+{
+  // The bug the first full Ghana run exposed: on a log scale a $0.1m market
+  // scored 0.53 against a $3.2bn ceiling, so silk at half a million dollars
+  // outranked a two billion dollar machinery market.
+  const rows = [
+    ...series([3.0e9, 3.1e9, 3.2e9, 3.2e9, 3.2e9], { product_code: '87', product_description: 'Vehicles' }),
+    ...series([60_000, 70_000, 80_000, 90_000, 100_000], { product_code: '43', product_description: 'Furskins' }),
+  ];
+  const opps = buildOpportunities(computeMetrics(rows), GHANA);
+  const vehicles = opps.find((o) => o.product_code === '87');
+  const furs = opps.find((o) => o.product_code === '43');
+
+  check('a tiny market does not score near a huge one',
+    vehicles.score_breakdown.market_size - furs.score_breakdown.market_size > 0.5,
+    `vehicles ${vehicles.score_breakdown.market_size.toFixed(2)} vs furs ${furs.score_breakdown.market_size.toFixed(2)}`);
+
+  check('a market too small to build a business on is excluded',
+    furs.is_excluded === true, String(furs.is_excluded));
+  check('and the reason says how small', /too small/i.test(furs.excluded_reason ?? ''), furs.excluded_reason ?? '');
+  check('the real market is not excluded', vehicles.is_excluded === false);
+  check('and leads the filtered ranking',
+    opps.filter((o) => !o.is_excluded)[0].product_code === '87');
+}
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 rmSync(OUT, { force: true });
 process.exitCode = failed === 0 ? 0 : 1;

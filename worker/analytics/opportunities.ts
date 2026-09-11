@@ -74,18 +74,35 @@ export function exclusionFor(
 }
 
 /**
- * Normalise a value onto 0..1 using a logarithmic curve.
+ * Normalise a value onto 0..1 relative to the largest product in the run.
  *
- * Trade values span six orders of magnitude, so a linear scale would give every
- * product except the largest two a score near zero. Log keeps the ordering and
- * spreads the middle, which is where the interesting products are.
+ * A log scale was tried first and it flattered small markets badly: against a
+ * 3.2 billion dollar ceiling, a 100,000 dollar market scored 0.53 while the
+ * ceiling itself scored 1.0. A market thirty thousand times larger was not
+ * twice as good, and the result was silk at half a million dollars outranking
+ * a two billion dollar machinery market.
+ *
+ * The share of the ceiling under a root keeps the ordering, gives the middle of
+ * the range room to breathe, and puts a tiny market where it belongs. The
+ * exponent is a judgement about how much to reward scale and is kept here as a
+ * named constant rather than buried in the expression.
  */
-function logScore(value: number, ceiling: number): number {
-  if (!Number.isFinite(value) || value <= 0) return 0;
-  const v = Math.log10(value + 1);
-  const c = Math.log10(ceiling + 1);
-  return Math.max(0, Math.min(1, v / c));
+const SIZE_CURVE = 0.35;
+
+function sizeScore(value: number, ceiling: number): number {
+  if (!Number.isFinite(value) || value <= 0 || ceiling <= 0) return 0;
+  return Math.max(0, Math.min(1, Math.pow(value / ceiling, SIZE_CURVE)));
 }
+
+/**
+ * Below this a market is too small to be worth an entrepreneur's attention,
+ * whatever its growth rate looks like as a percentage.
+ *
+ * Ghana's furskin imports are about a hundred thousand dollars a year across
+ * the whole country. Nothing built on that is a business, and a ranking that
+ * puts it above machinery is not describing the world.
+ */
+const MIN_MARKET_USD = 1_000_000;
 
 /** Map growth onto 0..1, where flat is a half and 50% a year is full marks. */
 function growthScore(pct: number | null): number {
@@ -131,7 +148,7 @@ function concentrationScore(hhi: number | null): number {
  * opportunity so the reader knows what this leg of the score is and is not.
  */
 function importDependencyScore(m: ProductMetrics, ceiling: number): number {
-  const size = logScore(m.import_value_usd, ceiling);
+  const size = sizeScore(m.import_value_usd, ceiling);
   const growing = m.trend === 'growing' ? 1 : m.trend === 'stable' ? 0.6 : 0.3;
   return size * 0.6 + growing * 0.4;
 }
@@ -142,7 +159,7 @@ export function scoreOne(
   context: { valueCeiling: number },
 ): { score: number; breakdown: ScoreBreakdown } {
   const breakdown: ScoreBreakdown = {
-    market_size: logScore(m.import_value_usd, context.valueCeiling),
+    market_size: sizeScore(m.import_value_usd, context.valueCeiling),
     // Prefer the three year rate over one year: a single year's jump is often
     // a restock or a one-off shipment.
     growth: growthScore(m.cagr_3y_pct ?? m.yoy_value_pct),
@@ -321,13 +338,24 @@ export function buildOpportunities(
       const signal = classifySignal(m);
       const { level, reasons } = confidenceFor(m);
       const { text, evidence } = explain(m, signal);
-      const excluded = exclusionFor(m.product_code, m.product_description, config.filters.excluded);
 
       const limitations = [...m.limitations];
       if (m.trade_flow === 'import') {
         limitations.push(
           'Domestic production is not in this dataset, so the gap between local supply and demand cannot be established.',
         );
+      }
+
+      // A market below the floor is excluded by the same mechanism as a
+      // traditional commodity: kept, marked, and explained. Ghana imports about
+      // a hundred thousand dollars of furskins a year across the whole country,
+      // and a percentage growth rate on that is arithmetic rather than an
+      // opportunity.
+      let excluded = exclusionFor(m.product_code, m.product_description, config.filters.excluded);
+      if (!excluded && m.import_value_usd < MIN_MARKET_USD) {
+        excluded =
+          `The whole national market is ${usd(m.import_value_usd)} a year, which is too small ` +
+          'to support a business however fast it is growing.';
       }
 
       return {

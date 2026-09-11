@@ -8,6 +8,7 @@ import { PageTitleContext } from './lib/pageTitle';
 
 const Home = lazy(() => import('./pages/Home'));
 const Countries = lazy(() => import('./pages/Countries'));
+const Opportunities = lazy(() => import('./pages/Opportunities'));
 const Country = lazy(() => import('./pages/Country'));
 const Registry = lazy(() => import('./pages/Registry'));
 const Portal = lazy(() => import('./pages/Portal'));
@@ -85,6 +86,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/countries" element={<Countries />} />
+          <Route path="/opportunities" element={<Opportunities />} />
             <Route path="/country/:slug" element={<Country />} />
             <Route path="/registry" element={<Registry />} />
 

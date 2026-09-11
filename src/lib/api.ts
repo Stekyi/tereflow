@@ -515,8 +515,72 @@ export interface PortalConfig {
 
 export type SourceHealth = 'ok' | 'gated' | 'dead' | 'unknown';
 
+
+/** One scored opportunity, as the backend computes and stores it. */
+export interface TradeOpportunity {
+  product_code: string;
+  product_name: string;
+  classification: string;
+  trade_flow: string;
+  latest_year: number;
+  years_available: number;
+  latest_import_value: number;
+  latest_import_volume: number | null;
+  unit_value_usd_per_kg: number | null;
+  yoy_value_pct: number | null;
+  three_year_cagr: number | null;
+  five_year_cagr: number | null;
+  trend: string;
+  top_partner: string | null;
+  top_partner_share_pct: number | null;
+  supplier_concentration_hhi: number | null;
+  partner_count: number;
+  partner_shares: Array<{ partner: string; iso3: string | null; value_usd: number; share_pct: number }>;
+  opportunity_score: number;
+  score_breakdown: Record<string, number> | null;
+  signal_type: string;
+  /** Kept separate from the score on purpose: a high score on thin evidence
+   *  is a real thing and the reader should see both numbers. */
+  confidence: 'high' | 'medium' | 'low';
+  confidence_reasons: string[];
+  explanation: string;
+  evidence: string[];
+  data_limitations: string[];
+  is_excluded: boolean;
+  excluded_reason: string | null;
+  source: string;
+}
+
+export interface OpportunityFeed {
+  country: string;
+  flow: string;
+  source: string;
+  source_endpoint: string;
+  classification: string;
+  last_successful_run: { id: string; completed_at: string; records_processed: number } | null;
+  last_attempt: { id: string; status: string; started_at: string; completed_at: string | null; error_message: string | null } | null;
+  /** True when the newest attempt failed, so the page can say these are the
+   *  last good figures rather than implying they are fresh. */
+  serving_stale: boolean;
+  count: number;
+  opportunities: TradeOpportunity[];
+}
+
 export const api = {
   stats: () => req<HomeStats>('/api/stats'),
+
+  // Ghana opportunities, read from precomputed rows. Opening the page never
+  // calls StatBank: the ingest job runs separately and this serves what it
+  // stored, which is what keeps the page fast and somebody else's government
+  // API unbothered.
+  ghanaOpportunities: (params: { flow?: string; limit?: number; includeExcluded?: boolean } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.flow) qs.set('flow', params.flow);
+    if (params.limit) qs.set('limit', String(params.limit));
+    if (params.includeExcluded) qs.set('include_excluded', 'true');
+    const s = qs.toString();
+    return req<OpportunityFeed>('/api/ghana/opportunities' + (s ? '?' + s : ''));
+  },
 
   entities: (params: Record<string, string | undefined> = {}) => {
     const qs = new URLSearchParams();

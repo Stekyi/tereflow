@@ -7,6 +7,7 @@ import { network } from './routes/network';
 import { premium } from './routes/premium';
 import { feedback } from './routes/feedback';
 import { portal } from './routes/portal';
+import { ghana } from './routes/ghana';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -54,6 +55,8 @@ app.get('/api/health', (c) =>
 
 // Mounted before /api/admin so the more specific prefix is matched first and
 // route resolution does not depend on the admin router having no catch-all.
+app.route('/api/ghana', ghana);
+app.route('/api/admin/ghana', ghana);
 app.route('/api/admin/portal', portal);
 app.route('/api/admin', admin);
 app.route('/api/auth', auth);

@@ -1,5 +1,11 @@
 -- Backfill ISO 3166-1 alpha-2 codes.
 --
+-- Also run by `npm run seed:local` and `npm run seed:remote`, immediately after
+-- the seed. The seed inserts entities without an iso2 column, so seeding a
+-- database that had already been migrated put every country back to null and
+-- silently disabled anything joining an entity to its analysis. Migrations run
+-- once; the seed can run at any time; so the seed has to carry this with it.
+--
 -- Every country row carried an alpha-3 code and none carried alpha-2, while the
 -- analysis pipeline keys its output on alpha-2 (Ghana is stored as "GH"). Any
 -- feature joining an entity to its analysis therefore matched nothing, silently,

@@ -3,6 +3,13 @@ main = "worker/index.ts"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Pinned because wrangler guessed wrong. With an OAuth login it resolved an
+# account id that is not the one the login belongs to, and every remote command
+# failed with "Authentication error [code: 10000]" while `wrangler whoami`
+# cheerfully reported d1 (write). The error names authentication, so the hour
+# goes on tokens and scopes rather than on the account being addressed.
+account_id = "959613069119a4056537a3f89f8d91ac"
+
 # Serve the built React SPA straight from the Worker.
 [assets]
 directory = "./dist"
@@ -25,12 +32,12 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "tereflow"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "7d803dfa-5dc6-4ca1-b399-228466bc0a24"
 migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "CACHE"
-id = "00000000000000000000000000000000"
+id = "4a22ccdf4f0f414787313c49f900ebb8"
 
 [vars]
 APP_NAME = "Tereflow"

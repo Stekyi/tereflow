@@ -8,7 +8,12 @@ dist/
 .DS_Store
 
 # Local pipeline: secrets, build output and run logs stay on the machine.
+# Every local env file, not just the default one. local/.env alone left
+# local/.env.production untracked but not ignored, which is one git add -A
+# away from committing a live admin token.
 local/.env
+local/.env.*
+!local/.env.example
 local/dist/
 local/logs/
 local/run-pipeline.cmd

@@ -30,6 +30,7 @@ import {
   fmtUsd,
   linkHealth,
   LINK_HEALTH_LABEL,
+  type BlueOcean,
   type CountryDashboard,
   type CountrySummary,
   type ExportCategory,
@@ -238,6 +239,7 @@ export default function Country() {
     { id: 'balance', label: 'Trade balance' },
     { id: 'read', label: 'What this means' },
     ...(hasSignals ? [{ id: 'signals', label: 'Early signals' }] : []),
+    ...(data.blue_oceans?.length ? [{ id: 'blue-oceans', label: 'Blue oceans' }] : []),
     ...(hasPartners ? [{ id: 'partners', label: 'Partners' }] : []),
     ...(sources ? [{ id: 'sources', label: 'Sources' }] : []),
   ];
@@ -260,7 +262,7 @@ export default function Country() {
       />
       <p className="tiny dim" style={{ margin: '-6px 0 14px' }}>
         Trade figures for {o.year}
-        {o.coverage_note ? ` · ${o.coverage_note}` : ''}
+        {o.coverage_note ? ` Â· ${o.coverage_note}` : ''}
       </p>
       {t.node}
       {modal && (
@@ -510,7 +512,7 @@ export default function Country() {
             )
           ) : (
             <div className="locked">
-              <div style={{ fontSize: 26 }}>🔒</div>
+              <div style={{ fontSize: 26 }}>ðŸ”’</div>
               <h3>
                 {data.opportunities_locked} emerging{' '}
                 {data.opportunities_locked === 1 ? 'signal' : 'signals'} detected
@@ -533,6 +535,8 @@ export default function Country() {
         </>
       )}
       </section>
+
+      <BlueOceans data={data} slug={slug ?? ''} signedIn={Boolean(user)} />
 
       <section id="partners" className="section-anchor" aria-label="Trading partners">
       <div className="section-head">
@@ -698,7 +702,7 @@ function Ranked({
               {i.share_pct.toFixed(1)}% share
               {i.cagr_3y != null && (
                 <>
-                  {' · '}
+                  {' Â· '}
                   <span className={i.cagr_3y >= 0 ? 'up' : 'down'}>
                     <Term k="cagr" tone="quiet">
                       {fmtPct(i.cagr_3y, 0)}/yr
@@ -708,7 +712,7 @@ function Ranked({
               )}
               {partnerDest && (
                 <>
-                  {' · '}
+                  {' Â· '}
                   <span className="u">View market {'\u203a'}</span>
                 </>
               )}
@@ -739,7 +743,7 @@ function Rec({ rec }: { rec: Recommendation }) {
       {rec.evidence.length > 0 && (
         <div className="evidence">
           {rec.evidence.map((e, i) => (
-            <div key={i}>• {e}</div>
+            <div key={i}>â€¢ {e}</div>
           ))}
         </div>
       )}
@@ -800,7 +804,6 @@ function axisLabel(short: string): string[] {
 
 /** Characters per axis line. Two of these is the budget. */
 const AXIS_CHARS = 22;
-
 /**
  * The line carrying what distinguishes one product from its neighbours gets a
  * wider budget than the shared name above it, because it is the only part of
@@ -1015,6 +1018,137 @@ function ProductBarChart({
             {caption}
           </p>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Blue oceans: the lines where the data shows room.
+ *
+ * Three states, and they say different things:
+ *   null + a reason   the reader is not allowed to see this, and why
+ *   an empty array    the analysis ran and found nothing uncontested
+ *   rows              here they are, with the caveats attached to each
+ *
+ * The section is not rendered at all when a country was never published,
+ * because a locked box on every country would advertise a feature that mostly
+ * does not exist yet. Where the analysis does exist and the reader simply has
+ * not signed in or paid, the lock is shown, because then it is a real thing
+ * being withheld rather than an empty promise.
+ */
+function BlueOceans({
+  data,
+  slug,
+  signedIn,
+}: {
+  data: CountryDashboard;
+  slug: string;
+  signedIn: boolean;
+}) {
+  const rows = data.blue_oceans;
+
+  if (data.blue_ocean_visibility === 'hidden') return null;
+
+  if (rows === null) {
+    return (
+      <section id="blue-oceans" className="section-anchor" aria-label="Blue oceans">
+        <div className="section-head">
+          <h2>Blue oceans</h2>
+          <span className="badge premium">
+            {data.blue_ocean_visibility === 'premium' ? 'Premium' : 'Members'}
+          </span>
+        </div>
+        <div className="card upsell">
+          <h3>Where the data shows room</h3>
+          <p>
+            {data.blue_ocean_withheld_reason ??
+              'This analysis is not available on your account.'}
+          </p>
+          {!signedIn ? (
+            <Link className="btn primary" to={`/join?next=/country/${slug}`}>
+              Join free
+            </Link>
+          ) : (
+            <Link className="btn gold" to="/upgrade">
+              See premium
+            </Link>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section id="blue-oceans" className="section-anchor" aria-label="Blue oceans">
+      <div className="section-head">
+        <h2>Blue oceans</h2>
+        <span className="badge premium">
+          {data.blue_ocean_visibility === 'premium' ? 'Premium' : 'Members'}
+        </span>
+      </div>
+
+      {rows.length === 0 ? (
+        <Empty
+          title="Nothing uncontested found"
+          hint="Every line with a strong enough case already has competition or established supply. That is a finding, not a gap in the data."
+        />
+      ) : (
+        <>
+          <p className="tiny dim" style={{ margin: '0 0 10px' }}>
+            Lines where supply sits with one or two partners, or where demand is growing and this
+            country is not the one meeting it. Each says what the finding rests on.
+          </p>
+          {rows.map((o) => (
+            <BlueOceanCard key={`${o.trade_flow}-${o.product_code}`} o={o} />
+          ))}
+        </>
+      )}
+    </section>
+  );
+}
+
+/** One blue ocean, with its reasoning open and its caveats attached. */
+function BlueOceanCard({ o }: { o: BlueOcean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card">
+      <div className="row between" style={{ alignItems: 'flex-start', gap: 10 }}>
+        <div>
+          <strong style={{ fontSize: 15 }}>{shortProductName(o.product_name)}</strong>
+          <div className="tiny dim" style={{ marginTop: 2 }}>
+            {o.kind === 'concentrated_supply' ? 'Supply held by few' : 'Growing and unserved'} ·{' '}
+            {o.trade_flow} · HS {o.product_code}
+          </div>
+        </div>
+        <span className="badge">{Math.round(o.opportunity_score)}/100</span>
+      </div>
+
+      <p style={{ marginBottom: 6 }}>{o.reason}</p>
+
+      <button className="btn ghost tiny" onClick={() => setOpen((v) => !v)}>
+        {open ? 'Hide the working' : 'Show the working'}
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          <p className="tiny dim" style={{ margin: '0 0 4px', fontWeight: 600 }}>
+            What this rests on
+          </p>
+          <ul className="tiny" style={{ margin: '0 0 10px', paddingLeft: 18 }}>
+            {o.evidence.map((e, i) => (
+              <li key={i}>{e}</li>
+            ))}
+          </ul>
+          <p className="tiny dim" style={{ margin: '0 0 4px', fontWeight: 600 }}>
+            What it does not cover
+          </p>
+          <ul className="tiny dim" style={{ margin: 0, paddingLeft: 18 }}>
+            {o.limitations.map((l, i) => (
+              <li key={i}>{l}</li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

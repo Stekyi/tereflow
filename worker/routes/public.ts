@@ -7,6 +7,7 @@ import { shortProductName } from '../../shared/product-name';
 import { opportunityScore, scoreBand } from '../../shared/opportunity';
 import { budgetFit } from '../../shared/budget';
 import { buildProductInsight } from '../lib/product-insight';
+import { loadBlueOceans, type BlueOceanVisibility, type ViewerTier } from '../lib/blue-oceans';
 import { loadSettings, type Settings } from '../lib/settings';
 import {
   classify,
@@ -161,6 +162,23 @@ pub.get('/dashboard/:slug', async (c) => {
     .bind(entity.id)
     .first<{ at: string | null }>();
 
+  // Blue oceans are gated twice: by what the admin published for this country,
+  // and by who is asking. Anonymous readers never see them under either
+  // setting, so the tier is resolved from the session rather than assumed.
+  const viewerTier: ViewerTier = !viewer ? 'anonymous' : isPremium ? 'premium' : 'registered';
+  const blueOceans = entity.iso2
+    ? await loadBlueOceans(
+        c.env.DB,
+        entity.iso2,
+        (entity.blue_ocean_visibility ?? 'hidden') as BlueOceanVisibility,
+        viewerTier,
+      )
+    : {
+        blue_oceans: null,
+        visibility: (entity.blue_ocean_visibility ?? 'hidden') as BlueOceanVisibility,
+        withheld_reason: 'This country has no ISO code recorded, so its analysis cannot be located.',
+      };
+
   // Traditional vs non-traditional: tag each product row so the UI can badge
   // cocoa/gold-style bulk commodities differently from what an SME could
   // actually enter. Partner rows have no HS code and are left untagged.
@@ -182,6 +200,9 @@ pub.get('/dashboard/:slug', async (c) => {
     recommendations: recs ?? [],
     opportunities: isPremium ? (signals ?? []) : null,
     opportunities_locked: isPremium ? 0 : (signals?.length ?? 0),
+    blue_oceans: blueOceans.blue_oceans,
+    blue_ocean_visibility: blueOceans.visibility,
+    blue_ocean_withheld_reason: blueOceans.withheld_reason,
     computed_at: computed?.at ?? null,
   };
 

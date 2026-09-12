@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { Skeletons, Toggle, useToast } from '../components/ui';
 import { ManualData } from '../components/ManualData';
 import {
+  BLUE_OCEAN_VISIBILITIES,
   CATEGORY_LABEL,
   CONTINENTS,
   ENTITY_KINDS,
@@ -12,6 +13,7 @@ import {
   SOURCE_ENDPOINT_TYPES,
   SOURCE_FMTS,
   SOURCE_PARSERS,
+  type BlueOceanVisibility,
   type EntityInput,
   type EntityKind,
   type SourceCategory,
@@ -19,6 +21,119 @@ import {
   type SourceFmt,
   type SourceParserKey,
 } from '../../shared/types';
+
+/** What each setting means, in the terms an admin is deciding between. */
+const BLUE_OCEAN_COPY: Record<BlueOceanVisibility, { title: string; detail: string }> = {
+  hidden: {
+    title: 'Not published',
+    detail: 'Nobody sees it, including premium accounts. Use this until the analysis has been checked.',
+  },
+  premium: {
+    title: 'Premium accounts',
+    detail: 'Only paying accounts see it. Signed-in free accounts see that it exists and what it costs.',
+  },
+  registered: {
+    title: 'Any signed-in account',
+    detail: 'Free and premium accounts both see it. Signed-out visitors never do, under any setting.',
+  },
+};
+
+/**
+ * Who may see this country's blue oceans.
+ *
+ * Saves on its own rather than with the rest of the form. This is an access
+ * decision, and burying it in a general save means an admin editing a homepage
+ * URL could change who can read the analysis without meaning to.
+ */
+function BlueOceanControl({ slug }: { slug: string }) {
+  const t = useToast();
+  const [value, setValue] = useState<BlueOceanVisibility>('hidden');
+  const [setBy, setSetBy] = useState<string | null>(null);
+  const [setAt, setSetAt] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    api.admin
+      .get(slug)
+      .then((e) => {
+        if (!live) return;
+        setValue(e.blue_ocean_visibility ?? 'hidden');
+        setSetBy(e.blue_ocean_set_by ?? null);
+        setSetAt(e.blue_ocean_set_at ?? null);
+        setLoaded(true);
+      })
+      .catch(() => live && setLoaded(true));
+    return () => {
+      live = false;
+    };
+  }, [slug]);
+
+  async function choose(next: BlueOceanVisibility) {
+    if (next === value) return;
+    const previous = value;
+    setBusy(true);
+    setValue(next);
+    try {
+      await api.admin.setBlueOcean(slug, next);
+      t.ok(`Blue oceans: ${BLUE_OCEAN_COPY[next].title.toLowerCase()}`);
+      setSetAt(new Date().toISOString());
+    } catch (e) {
+      // Put the control back to what the server still holds, so the screen
+      // never shows a permission that was not actually granted.
+      setValue(previous);
+      t.err(e instanceof Error ? e.message : 'Could not change it');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card">
+      <div style={{ fontWeight: 650 }}>Blue oceans</div>
+      <div className="tiny dim" style={{ maxWidth: 460, marginBottom: 10 }}>
+        The lines where the data shows room: supply held by one or two partners, or demand growing
+        that this country is not meeting. Room in the data is not room in the market, and the
+        analysis says so on every row.
+      </div>
+
+      {!loaded ? (
+        <Skeletons n={1} />
+      ) : (
+        <div style={{ display: 'grid', gap: 6 }}>
+          {BLUE_OCEAN_VISIBILITIES.map((v) => (
+            <label
+              key={v}
+              className={`pick-row${value === v ? ' picked' : ''}`}
+              style={{ opacity: busy ? 0.6 : 1 }}
+            >
+              <input
+                type="radio"
+                name={`blue-ocean-${slug}`}
+                checked={value === v}
+                disabled={busy}
+                onChange={() => choose(v)}
+              />
+              <span>
+                <span style={{ fontWeight: 600 }}>{BLUE_OCEAN_COPY[v].title}</span>
+                <span className="tiny dim" style={{ display: 'block' }}>
+                  {BLUE_OCEAN_COPY[v].detail}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+
+      {setAt && (
+        <div className="tiny dim" style={{ marginTop: 8 }}>
+          Last changed by {setBy ?? 'someone unrecorded'} on {new Date(setAt).toLocaleString()}.
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface SlotState {
   url: string;
@@ -365,6 +480,8 @@ export default function AdminForm() {
           <Toggle checked={isActive} onChange={setIsActive} />
         </div>
       </div>
+
+      {editing && slug && <BlueOceanControl slug={slug} />}
 
       {editing && slug && <ManualData slug={slug} />}
 

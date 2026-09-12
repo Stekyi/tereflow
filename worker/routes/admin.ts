@@ -2,15 +2,18 @@ import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { attachSources, bad, getEntityBySlug, json, slugify, uid } from '../lib/db';
 import { requireAdmin } from '../lib/auth';
+import { currentUser } from '../lib/session';
 import { loadSettings } from '../lib/settings';
 import { dominantCodes, loadClassifications, resolveAll } from '../lib/classify';
 import { loadResult } from './public';
 import {
+  BLUE_OCEAN_VISIBILITIES,
   ENTITY_KINDS,
   SOURCE_CATEGORIES,
   SOURCE_ENDPOINT_TYPES,
   SOURCE_FMTS,
   SOURCE_PARSERS,
+  type BlueOceanVisibility,
   type Entity,
   type EntityInput,
   type ExportCategory,
@@ -240,6 +243,44 @@ admin.post('/entities/activation/bulk', async (c) => {
     updated += res.meta.changes ?? 0;
   }
   return json({ updated, is_active: body.is_active });
+});
+
+/**
+ * Who may see a country's blue ocean analysis.
+ *
+ * Its own endpoint rather than a field on the entity form, because this is an
+ * access decision and not a description of the country. Mixing it into the
+ * general save would mean an admin editing a homepage URL could change who can
+ * read the analysis without noticing.
+ *
+ * The author and time are recorded. A permission change nobody can trace is one
+ * nobody can question later.
+ */
+admin.patch('/entities/:slug/blue-ocean', async (c) => {
+  const body = (await c.req.json()) as { visibility?: string };
+  const visibility = body.visibility;
+  if (!visibility || !BLUE_OCEAN_VISIBILITIES.includes(visibility as BlueOceanVisibility)) {
+    return bad(`visibility must be one of: ${BLUE_OCEAN_VISIBILITIES.join(', ')}`);
+  }
+
+  const actor = await currentUser(c.req.raw, c.env);
+  const res = await c.env.DB.prepare(
+    `UPDATE entities
+        SET blue_ocean_visibility = ?,
+            blue_ocean_set_by = ?,
+            blue_ocean_set_at = datetime('now'),
+            updated_at = datetime('now')
+      WHERE slug = ? OR id = ?`,
+  )
+    .bind(
+      visibility,
+      actor?.email ?? 'unknown',
+      c.req.param('slug'),
+      c.req.param('slug'),
+    )
+    .run();
+  if (!res.meta.changes) return bad('Not found', 404);
+  return json({ slug: c.req.param('slug'), blue_ocean_visibility: visibility });
 });
 
 admin.delete('/entities/:slug', async (c) => {

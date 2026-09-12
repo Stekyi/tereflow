@@ -1,4 +1,5 @@
 import type {
+  BlueOceanVisibility,
   BusinessCard,
   BusinessCardInput,
   ConversationSummary,
@@ -726,6 +727,14 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ is_active }),
       }),
+    /** Who may read this country's blue oceans. Separate from setActive because
+     *  activation is about whether we analyse a country at all, and this is
+     *  about who is allowed to see one part of the result. */
+    setBlueOcean: (slug: string, visibility: BlueOceanVisibility) =>
+      req<{ slug: string; blue_ocean_visibility: BlueOceanVisibility }>(
+        `/api/admin/entities/${slug}/blue-ocean`,
+        { method: 'PATCH', body: JSON.stringify({ visibility }) },
+      ),
     bulkActive: (slugs: string[], is_active: boolean) =>
       req<{ updated: number }>('/api/admin/entities/activation/bulk', {
         method: 'POST',

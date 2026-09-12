@@ -2571,3 +2571,20 @@ textarea {
 .insight-tile.tile-button:hover {
   border-color: var(--brand);
 }
+
+/* A row of exclusive choices where each needs a line of explanation. Reads as
+   a list of decisions rather than as a form control, because what is being
+   chosen is who can see something. */
+.pick-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 11px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--surface);
+}
+.pick-row:hover { border-color: var(--brand); }
+.pick-row.picked { border-color: var(--brand); background: var(--brand-soft); }
+.pick-row input { margin-top: 3px; flex: none; }

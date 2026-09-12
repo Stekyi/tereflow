@@ -99,6 +99,40 @@ export interface Entity {
   last_error: string | null;
   created_at: string;
   updated_at: string;
+  /** Who may see this country's blue ocean analysis. Defaults to nobody. */
+  blue_ocean_visibility?: BlueOceanVisibility;
+  blue_ocean_set_by?: string | null;
+  blue_ocean_set_at?: string | null;
+}
+
+/**
+ * Three states, not a boolean. A country whose analysis is still being checked
+ * can be shown to paying users without being published to the open web.
+ */
+export type BlueOceanVisibility = 'hidden' | 'premium' | 'registered';
+
+export const BLUE_OCEAN_VISIBILITIES: BlueOceanVisibility[] = ['hidden', 'premium', 'registered'];
+
+export type BlueOceanKind = 'concentrated_supply' | 'growing_unserved';
+
+/** One uncontested line, with the reasoning and the caveats attached. */
+export interface BlueOcean {
+  product_code: string;
+  product_name: string;
+  trade_flow: string;
+  opportunity_score: number;
+  kind: BlueOceanKind;
+  /** Why this counts as uncontested, in the terms that were measured. */
+  reason: string;
+  evidence: string[];
+  /** What the figures do not cover. Never separated from the row. */
+  limitations: string[];
+  top_partner: string | null;
+  top_partner_share_pct: number | null;
+  supplier_hhi: number | null;
+  value_usd: number | null;
+  cagr_pct: number | null;
+  data_confidence: number | null;
 }
 
 export interface EntityWithSources extends Entity {
@@ -671,6 +705,14 @@ export interface CountryDashboard {
   /** premium: withheld for free users, count still shown as a teaser */
   opportunities: OpportunitySignal[] | null;
   opportunities_locked: number;
+  /**
+   * Null when the viewer may not see them. An empty array means the analysis
+   * ran and found nothing uncontested, which is a different claim.
+   */
+  blue_oceans: BlueOcean[] | null;
+  blue_ocean_visibility: BlueOceanVisibility;
+  /** Set when blue_oceans is null, saying which rule withheld them. */
+  blue_ocean_withheld_reason: string | null;
   computed_at: string | null;
 }
 

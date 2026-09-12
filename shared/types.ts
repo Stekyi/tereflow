@@ -578,6 +578,53 @@ export interface ProductInsight {
    * buyer and seller lists are country totals, not country-to-country flows.
    */
   partner_detail_available: boolean;
+  /**
+   * The four weighted terms that produced the score.
+   *
+   * A bare number out of 100 asks to be trusted and gives nobody a way to
+   * disagree with it. Null when no score was given, which is not the same as a
+   * score of zero.
+   */
+  score_breakdown: {
+    score: number;
+    components: Array<{
+      label: string;
+      meaning: string;
+      input: string;
+      normalised: number;
+      weight: number;
+      points: number;
+      note: string | null;
+    }>;
+  } | null;
+  /**
+   * Who this country actually trades the product with, when the source gives
+   * partner and product together. Null on sources that cannot, which is most
+   * of them, and the difference matters: these are flows to and from one
+   * country, not the world totals shown elsewhere in the same modal.
+   */
+  partner_flows: {
+    country_code: string;
+    country_name: string;
+    product_code: string;
+    classification_level: string;
+    trade_flow: 'import' | 'export';
+    year: number;
+    total_usd: number;
+    partner_count: number;
+    source: string;
+    /** True when the answer is for the chapter rather than the exact code. */
+    is_chapter_level: boolean;
+    requested_code: string;
+    partners: Array<{
+      partner: string;
+      iso3: string | null;
+      value_usd: number;
+      share_pct: number;
+      net_weight_kg: number | null;
+      unit_value_usd_per_kg: number | null;
+    }>;
+  } | null;
   totals: {
     export_usd: number;
     import_usd: number;

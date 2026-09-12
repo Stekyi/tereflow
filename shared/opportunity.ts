@@ -78,6 +78,105 @@ export function opportunityScore(input: ScoreInput): number {
   );
 }
 
+export interface ScoreComponent {
+  /** The name a reader sees, not the variable name. */
+  label: string;
+  /** What this term is measuring, in one sentence. */
+  meaning: string;
+  /** The figure it was computed from, already formatted. */
+  input: string;
+  /** 0 to 1, before weighting. */
+  normalised: number;
+  /** Points out of 100 this term contributed. */
+  weight: number;
+  points: number;
+  /** Said out loud when a term is standing in for a missing number. */
+  note: string | null;
+}
+
+export interface ScoreExplanation {
+  score: number;
+  components: ScoreComponent[];
+}
+
+/**
+ * The score, with the reasoning that produced it.
+ *
+ * A bare number out of 100 asks to be trusted and gives nobody a way to argue.
+ * The same four terms that make the score are returned alongside it so a reader
+ * can see that, say, a 62 is mostly size and confidence with almost no growth,
+ * and decide for themselves whether that is the trade they want.
+ *
+ * Same input, same output, as with everything else here. No clock, no network.
+ */
+export function explainScore(input: ScoreInput): ScoreExplanation {
+  const rawGrowth = input.cagr_3y ?? 0;
+  const isNew = isNewTrade(rawGrowth);
+  const growth = isNew ? 0.8 : clamp01(rawGrowth / 60);
+  const momentum = clamp01(input.momentum ?? 0);
+  const confidence = clamp01(input.confidence ?? 0);
+  const size = sizeTerm(input.value_usd);
+
+  const components: ScoreComponent[] = [
+    {
+      label: 'Growth',
+      meaning: 'How fast the trade has grown over three years. Full marks at 60% a year.',
+      input: input.cagr_3y == null ? 'Not available' : `${input.cagr_3y.toFixed(1)}% a year`,
+      normalised: growth,
+      weight: WEIGHTS.growth,
+      points: WEIGHTS.growth * growth,
+      note: isNew
+        ? 'Growth this steep measures a near-zero starting point rather than compounding, so it is credited as strong rather than infinite.'
+        : input.cagr_3y == null
+          ? 'No growth rate on record, so this term contributes nothing.'
+          : null,
+    },
+    {
+      label: 'Momentum',
+      meaning: 'Whether the climb was steady or one freak year, and how much share it took.',
+      input: input.momentum == null ? 'Not available' : input.momentum.toFixed(2),
+      normalised: momentum,
+      weight: WEIGHTS.momentum,
+      points: WEIGHTS.momentum * momentum,
+      note: input.momentum == null ? 'No momentum on record, so this term contributes nothing.' : null,
+    },
+    {
+      label: 'Confidence',
+      meaning: 'How much history and detail sits behind the figures.',
+      input: input.confidence == null ? 'Not available' : input.confidence.toFixed(2),
+      normalised: confidence,
+      weight: WEIGHTS.confidence,
+      points: WEIGHTS.confidence * confidence,
+      note: input.confidence == null ? 'No confidence on record, so this term contributes nothing.' : null,
+    },
+    {
+      label: 'Market size',
+      meaning: 'Value of the trade, on a log scale from $2m to $10bn.',
+      input: input.value_usd == null ? 'Not available' : formatUsd(input.value_usd),
+      normalised: size,
+      weight: WEIGHTS.size,
+      points: WEIGHTS.size * size,
+      note: input.value_usd == null ? 'No value on record, so this term contributes nothing.' : null,
+    },
+  ];
+
+  return {
+    // Rounded exactly as opportunityScore rounds, so the parts always add to
+    // the number shown beside them. A breakdown that does not reconcile is
+    // worse than no breakdown.
+    score: Math.round(components.reduce((s, c) => s + c.points, 0)),
+    components,
+  };
+}
+
+function formatUsd(v: number): string {
+  const abs = Math.abs(v);
+  if (abs >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+  if (abs >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
+  return `$${v.toFixed(0)}`;
+}
+
 export type ScoreBand = 'strong' | 'moderate' | 'watch';
 
 /**

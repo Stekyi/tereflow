@@ -277,6 +277,8 @@ function Tile({
   tone,
   text,
   title,
+  onClick,
+  expanded,
 }: {
   k: string;
   v: string;
@@ -284,14 +286,171 @@ function Tile({
   tone?: string;
   text?: boolean;
   title?: string;
+  /** When given, the tile becomes a button that reveals its own reasoning. */
+  onClick?: () => void;
+  expanded?: boolean;
 }) {
-  return (
-    <div className={`insight-tile${text ? ' text' : ''}`}>
-      <span className="k">{k}</span>
+  const body = (
+    <>
+      <span className="k">
+        {k}
+        {onClick && (
+          <span className="tiny dim" style={{ marginLeft: 6 }}>
+            {expanded ? 'hide' : 'why?'}
+          </span>
+        )}
+      </span>
       <span className={`v${tone ? ` ${tone}` : ''}`} title={title}>
         {v}
       </span>
       {s && <span className="s">{s}</span>}
+    </>
+  );
+
+  if (!onClick) {
+    return <div className={`insight-tile${text ? ' text' : ''}`}>{body}</div>;
+  }
+
+  // A real button rather than a clickable div, so it reaches the keyboard and
+  // announces itself to a screen reader instead of looking interactive only to
+  // a mouse.
+  return (
+    <button
+      type="button"
+      className={`insight-tile${text ? ' text' : ''} tile-button`}
+      onClick={onClick}
+      aria-expanded={expanded}
+    >
+      {body}
+    </button>
+  );
+}
+
+/**
+ * Where a country's trade in one product actually comes from or goes to.
+ *
+ * This is the question the modal used to carry a caption apologising for. On
+ * the Comtrade tier it genuinely could not be answered: partner and product
+ * cannot be fetched together without a key. A country read from its own
+ * statistics office does carry it, so it is shown for those and still refused
+ * for the rest rather than filled in with something that looks similar.
+ *
+ * Kept visually distinct from the world totals underneath for the same reason.
+ * "United States 27.5%" means something entirely different in each table, and a
+ * reader who conflates them has been misled by the layout rather than by any
+ * individual number.
+ */
+function PartnerFlows({ flows }: { flows: NonNullable<ProductInsight['partner_flows']> }) {
+  const top = flows.partners.slice(0, 12);
+  const rest = flows.partners.length - top.length;
+  const direction = flows.trade_flow === 'import' ? 'comes from' : 'goes to';
+
+  return (
+    <div className="card">
+      <p className="card-title">
+        Where {flows.country_name}&apos;s {flows.trade_flow === 'import' ? 'supply' : 'trade'} {direction}
+      </p>
+      <p className="tiny dim" style={{ margin: '0 0 8px' }}>
+        {flows.country_name}&apos;s own {flows.trade_flow}s of this line in {flows.year}, by partner
+        country, from {flows.source}.
+        {flows.is_chapter_level && (
+          <>
+            {' '}
+            The source reports partners at chapter level, so these are chapter{' '}
+            {flows.product_code} rather than {flows.requested_code} exactly.
+          </>
+        )}
+      </p>
+
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Partner</th>
+              <th className="align-right">Value</th>
+              <th className="align-right">Share</th>
+              <th className="align-right">Unit value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {top.map((p) => (
+              <tr key={p.partner}>
+                <td>{p.partner}</td>
+                <td className="align-right">{fmtUsd(p.value_usd)}</td>
+                <td className="align-right">{p.share_pct.toFixed(1)}%</td>
+                <td className="align-right">
+                  {/* Blank weight is common in this source. Saying so beats a
+                      zero, which would read as goods that cost nothing. */}
+                  {p.unit_value_usd_per_kg == null
+                    ? <span className="dim">Weight not reported</span>
+                    : '$' + p.unit_value_usd_per_kg.toFixed(2) + '/kg'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="tiny dim" style={{ marginTop: 6 }}>
+        {fmtUsd(flows.total_usd)} across {flows.partner_count} partner
+        {flows.partner_count === 1 ? '' : 's'}
+        {rest > 0 ? ', ' + rest + ' smaller ones not shown' : ''}.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * What the opportunity score is made of.
+ *
+ * Every term shows the figure it came from, what it was worth out of 100,
+ * and a note when it is standing in for something missing. The parts add to
+ * the total on purpose: a breakdown that does not reconcile with the number
+ * beside it is worse than none, because it teaches the reader that neither
+ * can be relied on.
+ */
+function ScoreBreakdown({ breakdown }: { breakdown: NonNullable<ProductInsight['score_breakdown']> }) {
+  return (
+    <div className="card" style={{ marginTop: 10 }}>
+      <p className="card-title">How this score was reached</p>
+      <p className="tiny dim" style={{ margin: "0 0 8px" }}>
+        Four weighted terms, adding to {breakdown.score} out of 100. Same figures in, same
+        score out, every time.
+      </p>
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Term</th>
+              <th>From</th>
+              <th className="align-right">Weight</th>
+              <th className="align-right">Points</th>
+            </tr>
+          </thead>
+          <tbody>
+            {breakdown.components.map((c) => (
+              <tr key={c.label}>
+                <td>
+                  <div>{c.label}</div>
+                  <div className="tiny dim">{c.meaning}</div>
+                  {c.note && <div className="tiny dim">{c.note}</div>}
+                </td>
+                <td>{c.input}</td>
+                <td className="align-right">{c.weight}</td>
+                <td className="align-right">{c.points.toFixed(1)}</td>
+              </tr>
+            ))}
+            <tr>
+              <td colSpan={3} style={{ fontWeight: 650 }}>Total</td>
+              <td className="align-right" style={{ fontWeight: 650 }}>{breakdown.score}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p className="tiny dim" style={{ marginTop: 6 }}>
+        A score ranks one line against others on the same evidence. It is not a measure of
+        whether a business will work, which depends on things no trade dataset records.
+      </p>
     </div>
   );
 }
@@ -357,6 +516,9 @@ export default function ProductModal({
    */
   const [asideFlow, setAsideFlow] = useState<'export' | 'import'>(flow ?? 'export');
   const [insight, setInsight] = useState<ProductInsight | null>(null);
+  // The score is the one figure here that asks to be trusted, so it opens to
+  // show the four terms behind it rather than staying a bare number.
+  const [scoreOpen, setScoreOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
@@ -593,6 +755,8 @@ export default function ProductModal({
                   <Tile
                     k="Opportunity score"
                     v={insight.score != null ? `${insight.score}/100` : 'Not scored'}
+                    onClick={insight.score_breakdown ? () => setScoreOpen((o) => !o) : undefined}
+                    expanded={scoreOpen}
                     s={
                       insight.score == null
                         ? 'This line was not ranked in any market on record'
@@ -616,11 +780,16 @@ export default function ProductModal({
                     k="Unit value"
                     v={fmtUnitValue(insight.unit_value_usd_t)}
                     s={
-                      showBorrowedPrice
-                        ? `Price from ${insight.price_from_name}`
-                        : insight.world_median_usd_t != null
-                          ? `World median ${fmtUnitValue(insight.world_median_usd_t)}`
-                          : undefined
+                      insight.unit_value_usd_t == null
+                        ? // A price is value divided by weight. Roughly half of all
+                          // filings carry a value and no weight, so there is no
+                          // price to show and no honest way to estimate one.
+                          'No weight filed, so no price can be derived'
+                        : showBorrowedPrice
+                          ? `Price from ${insight.price_from_name}`
+                          : insight.world_median_usd_t != null
+                            ? `World median ${fmtUnitValue(insight.world_median_usd_t)}`
+                            : undefined
                     }
                   />
                   <Tile
@@ -647,6 +816,10 @@ export default function ProductModal({
                     text
                   />
                 </div>
+
+                {scoreOpen && insight.score_breakdown && (
+                  <ScoreBreakdown breakdown={insight.score_breakdown} />
+                )}
 
                 {showBorrowedPrice && (
                   <p className="tiny dim" style={{ margin: '10px 0 0' }}>
@@ -739,15 +912,27 @@ export default function ProductModal({
                   )}
                 </div>
 
+                {/* Who this country actually trades with, when the source
+                    knows. This is a different question from the world totals
+                    below it, and the two must not be allowed to blur: one says
+                    where Ghana's vehicles come from, the other says who is big
+                    in vehicles worldwide. */}
+                {insight.partner_flows && (
+                  <PartnerFlows flows={insight.partner_flows} />
+                )}
+
                 <div className="card">
-                  <p className="card-title">Who trades this, by country</p>
-                  {!insight.partner_detail_available && (
-                    <p className="tiny dim" style={{ margin: '0 0 4px' }}>
-                      These are each country's own totals for this product on the current sources,
-                      not proof of who ships to whom. Country to country flows are not available
-                      on this data tier.
-                    </p>
-                  )}
+                  <p className="card-title">
+                    {insight.partner_flows ? 'Who else trades this, worldwide' : 'Who trades this, by country'}
+                  </p>
+                  <p className="tiny dim" style={{ margin: '0 0 4px' }}>
+                    {insight.partner_flows
+                      ? "Each country's own totals for this product, for scale. These are not flows to or from " +
+                        insight.partner_flows.country_name + '.'
+                      : "These are each country's own totals for this product on the current sources, " +
+                        'not proof of who ships to whom. Country to country flows are not available ' +
+                        'on this data tier.'}
+                  </p>
                   <CountryTable title="Sold by" rows={insight.sellers} />
                   <CountryTable title="Bought by" rows={insight.buyers} />
                 </div>

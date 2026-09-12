@@ -2556,3 +2556,18 @@ textarea {
 .budget-card {
   border-color: var(--brand);
 }
+/* A tile that reveals its own reasoning. Styled to look like the tiles beside
+   it rather than like a form control, since it is the same kind of thing with
+   one extra affordance. */
+.insight-tile.tile-button {
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--line-soft);
+  background: var(--surface);
+  width: 100%;
+}
+.insight-tile.tile-button:hover {
+  border-color: var(--brand);
+}

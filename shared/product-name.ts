@@ -238,3 +238,86 @@ export function hasLongerDescription(description: string | null | undefined): bo
   const raw = (description ?? '').trim();
   return Boolean(raw) && shortProductName(raw) !== raw;
 }
+
+/** Longest prefix shared by every string, cut back to a word boundary. */
+function commonPrefix(texts: string[]): number {
+  if (texts.length < 2) return 0;
+  let n = 0;
+  const first = texts[0];
+  while (n < first.length && texts.every((t) => t[n] === first[n])) n += 1;
+  // Cutting mid-word turns "over 1000" into "over 100", which is a different
+  // number. Only ever break where the shared run already ended a word.
+  while (n > 0 && !/[\s,;(]/.test(first[n - 1])) n -= 1;
+
+  // A prefix must not end part-way through a comparison. Three engine bands all
+  // share "cylinder capacity over ", and keeping that word in the shared half
+  // leaves tails reading "1500 but not over 3000cc" with no "over" in front of
+  // the first number, which inverts what the band covers. So the shared run
+  // gives back any trailing words that only mean something attached to what
+  // follows them.
+  let cut = n;
+  for (;;) {
+    const m = first.slice(0, cut).match(/(?:^|[\s,;(])(not|over|under|above|below|exceeding|of|to)\s+$/i);
+    if (!m) break;
+    cut -= m[0].length - (m[0].startsWith(' ') ? 1 : 0);
+    if (cut <= 0) return 0;
+  }
+  return cut;
+}
+
+/**
+ * Labels for a set of products shown together.
+ *
+ * HS6 splits one trade into bands that differ only in their tail: four vehicle
+ * lines separated by engine size all shorten to "Vehicles with only
+ * spark-ignition...", so a chart of them reads as the same row four times.
+ *
+ * These are not duplicates and are not merged. A market for engines under
+ * 1000cc is a different business from one over 3000cc, and collapsing them
+ * would hide that rather than tidy it. Instead the part that differs is carried
+ * into the label, in the source's own words: no rephrasing "not over 1000cc"
+ * into "up to 1000cc", because that is the writer's wording, not the filer's.
+ *
+ * Names that are already distinct are returned untouched.
+ */
+export function disambiguateProductNames(
+  items: { code: string; description: string | null | undefined }[],
+): Map<string, string> {
+  const labels = new Map<string, string>();
+  const groups = new Map<string, { code: string; description: string }[]>();
+
+  for (const item of items) {
+    const raw = (item.description ?? '').trim();
+    const short = shortProductName(raw);
+    labels.set(item.code, short);
+    if (!raw) continue;
+    const group = groups.get(short);
+    if (group) group.push({ code: item.code, description: raw });
+    else groups.set(short, [{ code: item.code, description: raw }]);
+  }
+
+  for (const [short, group] of groups) {
+    if (group.length < 2) continue;
+
+    // Only label with a code when it actually is one. A fallback key built from
+    // the name would print "HS Cocoa beans", which claims a classification that
+    // does not exist.
+    const codeLabel = (code: string) => (/^\d{2,10}$/.test(code) ? `${short} (HS ${code})` : short);
+
+    const cut = commonPrefix(group.map((g) => g.description));
+    // Descriptions that share no opening words collided for some other reason;
+    // there is no honest tail to show, so the codes stay as the only separator.
+    if (cut === 0) {
+      for (const g of group) labels.set(g.code, codeLabel(g.code));
+      continue;
+    }
+
+    const base = clip(short, 34);
+    for (const g of group) {
+      const tail = stripNoise(g.description.slice(cut).trim()).replace(/[.;,]+$/, '');
+      labels.set(g.code, tail ? `${base} (${clip(tail, 40)})` : codeLabel(g.code));
+    }
+  }
+
+  return labels;
+}

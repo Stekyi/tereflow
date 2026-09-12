@@ -19,7 +19,7 @@ import { useSession } from '../lib/auth';
 import { usePageTitle } from '../lib/pageTitle';
 import { CHART } from '../lib/theme';
 import { Term } from '../components/Term';
-import { shortProductName } from '../../shared/product-name';
+import { disambiguateProductNames, shortProductName } from '../../shared/product-name';
 import { BarRow, Empty, FollowButton, Skeletons, Stat, useToast } from '../components/ui';
 import GlobalProductModal from '../components/ProductModal';
 import SectionNav, { type Section } from '../components/SectionNav';
@@ -759,15 +759,24 @@ interface ChartDatum {
 /**
  * Axis labels for these charts.
  *
- * Product names arrive as full tariff descriptions, which repeat a shelving
- * word before the semicolon: four different vehicle lines all begin
- * "Vehicles; with...". Truncating those to one short line produced four
- * identical labels. So the shortener runs first to drop the repeated head,
- * then the result is split across two lines. The untouched name stays in the
- * tooltip.
+ * Takes an already-shortened name. Shortening happens in
+ * `disambiguateProductNames`, which needs to see every product in the chart at
+ * once: four vehicle lines separated only by engine size shorten to the same
+ * text, so what distinguishes them has to be carried through. Re-shortening
+ * here would clip that distinguishing tail straight back off.
+ *
+ * The untouched name stays in the tooltip.
  */
-function axisLabel(name: string): string[] {
-  const short = shortProductName(name);
+function axisLabel(short: string): string[] {
+  // A disambiguated label carries what distinguishes this line from its
+  // neighbours in a trailing bracket. That part is the whole reason the label
+  // exists, so it gets its own line rather than competing for the word budget
+  // and losing.
+  const distinct = short.match(/^(.*?)\s*\(([^()]+)\)$/);
+  if (distinct) {
+    return [clipLine(distinct[1]), clipLine(distinct[2], AXIS_DISTINCT_CHARS)];
+  }
+
   const words = short.split(' ');
   const lines: string[] = [];
   let line = '';
@@ -792,6 +801,30 @@ function axisLabel(name: string): string[] {
 /** Characters per axis line. Two of these is the budget. */
 const AXIS_CHARS = 22;
 
+/**
+ * The line carrying what distinguishes one product from its neighbours gets a
+ * wider budget than the shared name above it, because it is the only part of
+ * the label doing any work.
+ */
+const AXIS_DISTINCT_CHARS = 32;
+
+/**
+ * One axis line, marked when it had to be cut.
+ *
+ * Never breaks inside a number. "over 1500 but not over 3000cc" clipped to the
+ * ordinary budget reads "over 1500 but not ove..." at best and "...over 300..."
+ * at worst, and 300cc is a real engine size, so the clip would not look like a
+ * clip. Where a digit run would be split the cut moves back to before it.
+ */
+function clipLine(text: string, max: number = AXIS_CHARS): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  let cut = max - 1;
+  while (cut > 0 && /\d/.test(t[cut - 1]) && /[\d,.]/.test(t[cut])) cut -= 1;
+  const head = t.slice(0, cut).trimEnd().replace(/[,;]$/, '');
+  return head ? `${head}...` : `${t.slice(0, max - 1).trimEnd()}...`;
+}
+
 /** Renders the two-line label; recharts ticks do not wrap on their own. */
 function AxisTick({
   x,
@@ -812,7 +845,12 @@ function AxisTick({
           y={i * 11 - (lines.length - 1) * 5.5}
           dy={3.5}
           textAnchor="end"
-          fontSize={10}
+          // The second line of a two-line label is what separates this product
+          // from its near-identical neighbours, and for engine or capacity
+          // bands that runs long. Shrinking it keeps the whole band inside the
+          // axis width, which matters more than matching the line above:
+          // clipping it would cut a number in half and read as a smaller one.
+          fontSize={i === 1 && line.length > AXIS_CHARS ? 8.5 : 10}
           fill={CHART.axis}
         >
           {line}
@@ -876,9 +914,14 @@ function ProductBarChart({
   showGrowth?: boolean;
   emptyHint: string;
 }) {
+  // Disambiguation needs the whole chart in view: whether a label collides is a
+  // property of the set, not of any one product.
+  const labels = disambiguateProductNames(
+    items.map((i) => ({ code: i.code ?? i.name, description: i.name })),
+  );
   const rows: ChartDatum[] = items.map((i) => ({
     name: i.name,
-    short: axisLabel(i.name).join('\n'),
+    short: axisLabel(labels.get(i.code ?? i.name) ?? shortProductName(i.name)).join('\n'),
     value: i.value_usd,
     growthLabel: i.cagr_3y != null ? `${fmtPct(i.cagr_3y, 0)}/yr` : '',
     category: i.category,

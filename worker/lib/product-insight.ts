@@ -1,8 +1,9 @@
 import type { Env } from '../lib/db';
 import { loadSettings } from '../lib/settings';
+import { loadPartnerBreakdown, type PartnerBreakdown } from './partner-flows';
 import { hs2Label, hs2Sector, hs6Label } from '../agent/codes';
 import { shortProductName } from '../../shared/product-name';
-import { opportunityScore } from '../../shared/opportunity';
+import { explainScore, opportunityScore } from '../../shared/opportunity';
 import { classify, loadClassifications } from '../lib/classify';
 import type {
   PricePremium,
@@ -72,6 +73,22 @@ function toRow(r: AnalyticsRow, rank: number, high: number, low: number): Produc
  * lists, which is what makes the same modal work when it is opened from a
  * country page and when it is opened from the global product list.
  */
+/**
+ * The country code a slug maps to, for looking up stored observations.
+ *
+ * trade_observations is keyed on the two-letter code from the country config,
+ * because that is what a provider knows about itself. The rest of the app is
+ * keyed on slugs. Only the countries actually ingested from their own
+ * statistics office need an entry, and an unknown slug returns something that
+ * matches nothing rather than guessing: a wrong match here would attach one
+ * country's partners to another country's product.
+ */
+function countryCodeFor(slug: string | null | undefined): string {
+  if (!slug) return '';
+  const known: Record<string, string> = { ghana: 'GH' };
+  return known[slug] ?? '';
+}
+
 export async function buildProductInsight(
   env: Env,
   hs: string,
@@ -193,12 +210,21 @@ export async function buildProductInsight(
   // Partner-level flows are a separate fetch the keyless source tier does not
   // provide. Saying so is the difference between "these are country totals"
   // and letting a reader assume they are country-to-country flows.
-  const partnerDetail = await env.DB.prepare(
-    `SELECT 1 FROM trade_facts
-      WHERE hs_code = ? AND partner_iso3 IS NOT NULL LIMIT 1`,
-  )
-    .bind(hs)
-    .first();
+  // Who this country actually trades the product with.
+  //
+  // Comtrade's keyless tier cannot fetch partner and product together, which is
+  // why this used to be a bare existence check and the modal carried a caption
+  // apologising for it. A country ingested from its own statistics office does
+  // have the breakdown, so the question the caption was dodging can now be
+  // answered for those countries and is still honestly refused for the others.
+  const partnerDetail: PartnerBreakdown | null = focus
+    ? await loadPartnerBreakdown(env, {
+        countryCode: countryCodeFor(focus.slug),
+        countryName: focus.name,
+        hs,
+        flow: (focusFlow ?? focus.flow) === 'export' ? 'export' : 'import',
+      })
+    : null;
 
   const covered = await env.DB.prepare(
     `SELECT COUNT(DISTINCT a.entity_id) AS n
@@ -244,6 +270,9 @@ export async function buildProductInsight(
         .first<SignalRow>();
 
   const score = signal ? opportunityScore(signal) : null;
+  // The same four terms that produced the score, so the reader can see what it
+  // is made of rather than being asked to trust a number out of 100.
+  const scoreExplanation = signal ? explainScore(signal) : null;
 
   return {
     hs_code: hs,
@@ -286,6 +315,10 @@ export async function buildProductInsight(
     subscriber_count: subscribers.length,
 
     partner_detail_available: Boolean(partnerDetail),
+    // The rows themselves, so the modal can show who actually ships to whom
+    // rather than each country's unrelated world totals.
+    partner_flows: partnerDetail,
+    score_breakdown: scoreExplanation,
     totals: {
       export_usd: all.filter((r) => r.flow === 'export').reduce((s, r) => s + r.value_usd, 0),
       import_usd: all.filter((r) => r.flow === 'import').reduce((s, r) => s + r.value_usd, 0),

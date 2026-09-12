@@ -9,6 +9,7 @@ import { budgetFit } from '../../shared/budget';
 import { buildProductInsight } from '../lib/product-insight';
 import { loadBlueOceans, type BlueOceanVisibility, type ViewerTier } from '../lib/blue-oceans';
 import { loadMarketContext } from '../lib/market-context';
+import { loadProductFamilies } from '../lib/product-families';
 import { loadSettings, type Settings } from '../lib/settings';
 import {
   classify,
@@ -168,6 +169,14 @@ pub.get('/dashboard/:slug', async (c) => {
   // charging for something we did not produce.
   const marketContext = await loadMarketContext(c.env.DB, entity.id);
 
+  // Grouped over every line rather than over the ranked twelve. Summing the
+  // ranked list would understate each family by whatever fell below the cutoff
+  // and label the result a total.
+  const [familiesImport, familiesExport] = await Promise.all([
+    loadProductFamilies(c.env.DB, entity.id, 'import'),
+    loadProductFamilies(c.env.DB, entity.id, 'export'),
+  ]);
+
   // Blue oceans are gated twice: by what the admin published for this country,
   // and by who is asking. Anonymous readers never see them under either
   // setting, so the tier is resolved from the session rather than assumed.
@@ -210,6 +219,8 @@ pub.get('/dashboard/:slug', async (c) => {
     blue_ocean_visibility: blueOceans.visibility,
     blue_ocean_withheld_reason: blueOceans.withheld_reason,
     market_context: marketContext,
+    families_import: familiesImport,
+    families_export: familiesExport,
     computed_at: computed?.at ?? null,
   };
 

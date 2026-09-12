@@ -32,6 +32,7 @@ import {
   LINK_HEALTH_LABEL,
   type BlueOcean,
   type CountryDashboard,
+  type FamilyBreakdown,
   type MarketContext,
   type CountrySummary,
   type ExportCategory,
@@ -119,6 +120,10 @@ export default function Country() {
   // list by default -- an SME can't act on them -- with an explicit toggle
   // to reveal them, rather than ranking them alongside things it can trade.
   const [showMajor, setShowMajor] = useState(false);
+  // On by default: the ungrouped chart spends four of its twelve slots on
+  // vehicle engine bands, which is what the grouping exists to fix. The toggle
+  // stays because the individual lines are real and somebody will want them.
+  const [grouped, setGrouped] = useState(true);
 
   // Key a subscription by kind+value so follow state survives a re-render.
   const subKey = (kind: string, value: string) => `${kind}:${value.toLowerCase()}`;
@@ -264,7 +269,7 @@ export default function Country() {
       />
       <p className="tiny dim" style={{ margin: '-6px 0 14px' }}>
         Trade figures for {o.year}
-        {o.coverage_note ? ` Ã‚Â· ${o.coverage_note}` : ''}
+        {o.coverage_note ? ` Ãƒâ€šÃ‚Â· ${o.coverage_note}` : ''}
       </p>
       {t.node}
       {modal && (
@@ -327,26 +332,56 @@ export default function Country() {
         Include major traditional trade (gold, oil, and similar) in the imports chart
       </label>
 
-      <ProductBarChart
-        title="Top imports by value"
-        caption="What this country buys most, coloured by sector so you can read the mix at a glance. Faded bars are large licensed trade (gold, oil, and similar); solid bars are non-traditional lines an SME can supply. Tap a bar for this country's figures on that product."
-        items={reRank(data.top_imports, showMajor)}
-        flow="import"
-        onProductClick={openProduct}
-        emptyHint="No import breakdown recorded for this year."
-      />
+      {data.families_import && (
+        <label className="row small dim" style={{ gap: 6, marginBottom: 14, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={grouped}
+            onChange={(e) => setGrouped(e.target.checked)}
+            style={{ width: 'auto' }}
+          />
+          Group near-identical lines into product families
+        </label>
+      )}
+
+      {grouped && data.families_import ? (
+        <FamilyChart
+          title="Top imports by product family"
+          breakdown={data.families_import}
+          flow="import"
+          onProductClick={openProduct}
+        />
+      ) : (
+        <ProductBarChart
+          title="Top imports by value"
+          caption="What this country buys most, coloured by sector so you can read the mix at a glance. Faded bars are large licensed trade (gold, oil, and similar); solid bars are non-traditional lines an SME can supply. Tap a bar for this country's figures on that product."
+          items={reRank(data.top_imports, showMajor)}
+          flow="import"
+          onProductClick={openProduct}
+          emptyHint="No import breakdown recorded for this year."
+        />
+      )}
       </section>
 
       <section id="exports" className="section-anchor" aria-label="Non-traditional exports">
-      <ProductBarChart
-        title="Non-traditional exports"
-        caption="Value sold abroad outside the headline commodities, coloured by sector, with recent yearly growth per line. Tap a bar for this country's figures on that product."
-        items={data.top_exports.filter((i) => i.category === 'non_traditional')}
-        flow="export"
-        showGrowth
-        onProductClick={openProduct}
-        emptyHint="No non-traditional export lines recorded for this year."
-      />
+      {grouped && data.families_export ? (
+        <FamilyChart
+          title="Top exports by product family"
+          breakdown={data.families_export}
+          flow="export"
+          onProductClick={openProduct}
+        />
+      ) : (
+        <ProductBarChart
+          title="Non-traditional exports"
+          caption="Value sold abroad outside the headline commodities, coloured by sector, with recent yearly growth per line. Tap a bar for this country's figures on that product."
+          items={data.top_exports.filter((i) => i.category === 'non_traditional')}
+          flow="export"
+          showGrowth
+          onProductClick={openProduct}
+          emptyHint="No non-traditional export lines recorded for this year."
+        />
+      )}
       </section>
 
       <section id="balance" className="section-anchor" aria-label="Trade balance">
@@ -514,7 +549,7 @@ export default function Country() {
             )
           ) : (
             <div className="locked">
-              <div style={{ fontSize: 26 }}>Ã°Å¸â€â€™</div>
+              <div style={{ fontSize: 26 }}>ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬â„¢</div>
               <h3>
                 {data.opportunities_locked} emerging{' '}
                 {data.opportunities_locked === 1 ? 'signal' : 'signals'} detected
@@ -706,7 +741,7 @@ function Ranked({
               {i.share_pct.toFixed(1)}% share
               {i.cagr_3y != null && (
                 <>
-                  {' Ã‚Â· '}
+                  {' Ãƒâ€šÃ‚Â· '}
                   <span className={i.cagr_3y >= 0 ? 'up' : 'down'}>
                     <Term k="cagr" tone="quiet">
                       {fmtPct(i.cagr_3y, 0)}/yr
@@ -716,7 +751,7 @@ function Ranked({
               )}
               {partnerDest && (
                 <>
-                  {' Ã‚Â· '}
+                  {' Ãƒâ€šÃ‚Â· '}
                   <span className="u">View market {'\u203a'}</span>
                 </>
               )}
@@ -747,7 +782,7 @@ function Rec({ rec }: { rec: Recommendation }) {
       {rec.evidence.length > 0 && (
         <div className="evidence">
           {rec.evidence.map((e, i) => (
-            <div key={i}>Ã¢â‚¬Â¢ {e}</div>
+            <div key={i}>ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {e}</div>
           ))}
         </div>
       )}
@@ -1121,8 +1156,8 @@ function BlueOceanCard({ o }: { o: BlueOcean }) {
         <div>
           <strong style={{ fontSize: 15 }}>{shortProductName(o.product_name)}</strong>
           <div className="tiny dim" style={{ marginTop: 2 }}>
-            {o.kind === 'concentrated_supply' ? 'Supply held by few' : 'Growing and unserved'} Â·{' '}
-            {o.trade_flow} Â· HS {o.product_code}
+            {o.kind === 'concentrated_supply' ? 'Supply held by few' : 'Growing and unserved'} Ã‚Â·{' '}
+            {o.trade_flow} Ã‚Â· HS {o.product_code}
           </div>
         </div>
         <span className="badge" title="Opportunity score from Ghana's own statistics: market size, growth, import dependency, stability and supplier concentration. Not the same scale as the momentum score shown against products.">
@@ -1218,7 +1253,7 @@ function MarketContextPanel({ context }: { context: MarketContext }) {
                 <span className="context-value">{formatContext(f.value, f.unit)}</span>
                 <span className="tiny dim">
                   {f.year}
-                  {f.stale_note && ' ·  older'}
+                  {f.stale_note && ' Â·  older'}
                 </span>
               </button>
             ))}
@@ -1299,4 +1334,119 @@ function fmtCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
   return String(Math.round(n));
+}
+/**
+ * Product families: one bar per family, opening to the lines inside it.
+ *
+ * The ungrouped chart spends four of its twelve slots on vehicle engine bands
+ * and still shows under two thirds of what the country buys in that family.
+ * This shows the family whole, says how many lines went into it, and keeps
+ * every one of them a click away. Nothing is discarded: a market for engines
+ * under 1000cc really is a different business from one over 3000cc.
+ */
+function FamilyChart({
+  title,
+  breakdown,
+  flow,
+  onProductClick,
+}: {
+  title: string;
+  breakdown: FamilyBreakdown;
+  flow: 'export' | 'import';
+  onProductClick: (item: RankedItem, flow: 'export' | 'import') => void;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  const families = breakdown.families;
+
+  if (families.length === 0) {
+    return (
+      <div className="card">
+        <p className="card-title">{title}</p>
+        <Empty title="Nothing to group" hint="No product lines were filed for this year." />
+      </div>
+    );
+  }
+
+  const max = families[0].value_usd;
+
+  return (
+    <div className="card">
+      <p className="card-title">{title}</p>
+      <p className="tiny dim" style={{ margin: '0 0 10px' }}>
+        The tariff splits one trade into lines that differ by a detail, so vehicles alone run to
+        fourteen codes. These are grouped by heading, computed over every line rather than over the
+        top few, and each opens to show what is inside it.
+      </p>
+
+      {breakdown.coverage_note && (
+        <p className="tiny dim" style={{ margin: '0 0 10px' }}>
+          {breakdown.coverage_note}
+        </p>
+      )}
+
+      <div style={{ display: 'grid', gap: 4 }}>
+        {families.map((f) => (
+          <div key={f.code}>
+            <button
+              className={`family-row${open === f.code ? ' open' : ''}`}
+              onClick={() => setOpen((o) => (o === f.code ? null : f.code))}
+            >
+              <span
+                className="family-fill"
+                style={{ width: `${Math.max(2, (f.value_usd / max) * 100)}%` }}
+                aria-hidden
+              />
+              <span className="family-label">
+                <span className="family-name">{f.name}</span>
+                <span className="tiny dim">
+                  HS {f.code} {'\u00b7'} {f.line_count === 1 ? 'one line' : `${f.line_count} lines`}{' '}
+                  {'\u00b7'} {f.share_pct.toFixed(1)}%
+                </span>
+              </span>
+              <span className="family-value num">{fmtUsd(f.value_usd)}</span>
+            </button>
+
+            {open === f.code && (
+              <div className="family-members">
+                {f.line_count === 1 ? (
+                  <p className="tiny dim" style={{ margin: 0 }}>
+                    Nothing was grouped here: this heading has a single line.
+                  </p>
+                ) : (
+                  <p className="tiny dim" style={{ margin: '0 0 6px' }}>
+                    The {f.line_count} lines inside this family, largest first.
+                  </p>
+                )}
+                {f.members.map((m) => (
+                  <button
+                    key={m.code}
+                    className="family-member"
+                    onClick={() =>
+                      onProductClick(
+                        {
+                          rank: 0,
+                          code: m.code,
+                          name: m.name,
+                          value_usd: m.value_usd,
+                          share_pct: m.share_of_family_pct,
+                          cagr_3y: null,
+                          yoy_pct: null,
+                        } as RankedItem,
+                        flow,
+                      )
+                    }
+                  >
+                    <span>{m.name}</span>
+                    <span className="tiny dim">
+                      {fmtUsd(m.value_usd)} {'\u00b7'} {m.share_of_family_pct.toFixed(0)}% of family
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }

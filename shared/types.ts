@@ -719,7 +719,43 @@ export interface CountryDashboard {
    * Null when nothing has been ingested for this country yet.
    */
   market_context: MarketContext | null;
+  /**
+   * The same trade grouped into HS4 families, computed over every line rather
+   * than over the ranked list, so a family total is the whole family.
+   */
+  families_import: FamilyBreakdown | null;
+  families_export: FamilyBreakdown | null;
   computed_at: string | null;
+}
+
+export interface FamilyMember {
+  code: string;
+  name: string;
+  value_usd: number;
+  /** Share of this family, not of the country's trade. */
+  share_of_family_pct: number;
+}
+
+export interface ProductFamily {
+  code: string;
+  /** Derived from what the members' descriptions share, not from a lookup. */
+  name: string;
+  sector: string;
+  value_usd: number;
+  share_pct: number;
+  /** How many HS6 lines were folded in. 1 means nothing was grouped. */
+  line_count: number;
+  members: FamilyMember[];
+}
+
+export interface FamilyBreakdown {
+  families: ProductFamily[];
+  year: number;
+  /** Total across the HS6 lines only, not the country's whole trade. */
+  total_usd: number;
+  country_total_usd: number | null;
+  /** Set when HS6 covers materially less than the country filed. */
+  coverage_note: string | null;
 }
 
 /** One figure from the national statistics, with its year and its history. */

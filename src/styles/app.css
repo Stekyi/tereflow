@@ -2625,3 +2625,77 @@ textarea {
   background: var(--brand-soft);
   border-radius: 0 8px 8px 0;
 }
+
+/* Product families: a horizontal bar that is also the control opening it.
+   The fill sits behind the text rather than beside it, so the row reads as one
+   thing at a glance and the value is always legible over the bar. */
+.family-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  overflow: hidden;
+}
+.family-row:hover { border-color: var(--brand); }
+.family-row.open { border-color: var(--brand); }
+.family-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--brand-soft);
+  pointer-events: none;
+}
+.family-label {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.family-name {
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.family-value {
+  position: relative;
+  font-weight: 680;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.family-members {
+  margin: 4px 0 8px 14px;
+  padding: 9px 11px;
+  border-left: 2px solid var(--brand);
+  background: var(--brand-soft);
+  border-radius: 0 8px 8px 0;
+  display: grid;
+  gap: 3px;
+}
+.family-member {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  font-size: 13px;
+}
+.family-member:hover { background: var(--surface); }

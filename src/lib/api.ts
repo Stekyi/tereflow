@@ -650,9 +650,13 @@ export const api = {
     if (params.limit) qs.set('limit', String(params.limit));
     if (params.budget) qs.set('budget', String(params.budget));
     const s = qs.toString();
-    return req<{ products: ProductCard[]; count: number; summary: ProductSummary }>(
-      `/api/products${s ? `?${s}` : ''}`,
-    );
+    return req<{
+      products: ProductCard[];
+      count: number;
+      summary: ProductSummary;
+      /** Set when the search was expanded past what the reader typed. */
+      note: string | null;
+    }>(`/api/products${s ? `?${s}` : ''}`);
   },
 
   /** One product, everywhere it is traded. Backs the product modal. */
@@ -696,7 +700,12 @@ export const api = {
       if (q) qs.set('q', q);
       if (includeTraditional) qs.set('all', '1');
       const s = qs.toString();
-      return req<{ codes: MarketHsCode[] }>(`/api/market/hs-codes${s ? `?${s}` : ''}`);
+      // `note` is set when the search went somewhere the reader did not type,
+      // so a result like "Vegetable fats and oils, n.e.c." for "shea butter"
+      // can say why it is the right answer rather than looking like a wrong one.
+      return req<{ codes: MarketHsCode[]; note: string | null }>(
+        `/api/market/hs-codes${s ? `?${s}` : ''}`,
+      );
     },
     products: (hs: string) =>
       req<MarketProducts>(`/api/market/products?hs=${encodeURIComponent(hs)}`),

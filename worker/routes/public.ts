@@ -4,6 +4,7 @@ import { attachSources, bad, getEntityBySlug, json } from '../lib/db';
 import { currentUser, isEntitled } from '../lib/session';
 import { hs2Label, hs2Sector, hs6Label } from '../agent/codes';
 import { shortProductName } from '../../shared/product-name';
+import { expandQuery, scoreMatch, typedWords } from '../../shared/search-terms';
 import { opportunityScore, scoreBand } from '../../shared/opportunity';
 import { budgetFit } from '../../shared/budget';
 import { buildProductInsight } from '../lib/product-insight';
@@ -413,9 +414,25 @@ pub.get('/products', async (c) => {
 
   const clauses = ['e.is_active = 1', 's.hs_code IS NOT NULL'];
   const binds: unknown[] = [];
+  // Expansion, as on the HS code lookup: the tariff writes "Cocoa; powder" and
+  // says photovoltaic where a trader says solar panel. Each word is matched
+  // separately in SQL and the full test runs in code below, because a single
+  // LIKE on the raw query cannot cross the tariff's punctuation.
+  const expanded = q ? expandQuery(q) : { tokens: [], codes: [], note: null };
+  const typedQ = q ? typedWords(q) : [];
   if (q) {
-    clauses.push('(s.product_name LIKE ? OR s.hs_code LIKE ?)');
-    binds.push(`%${q}%`, `${q}%`);
+    const parts: string[] = [];
+    for (const token of expanded.tokens.slice(0, 6)) {
+      parts.push('s.product_name LIKE ?');
+      binds.push(`%${token}%`);
+    }
+    for (const code of expanded.codes.slice(0, 8)) {
+      parts.push('s.hs_code = ?');
+      binds.push(code);
+    }
+    parts.push('s.hs_code LIKE ?');
+    binds.push(`${q}%`);
+    clauses.push(`(${parts.join(' OR ')})`);
   }
   if (flow === 'export' || flow === 'import') {
     clauses.push('s.flow = ?');
@@ -464,10 +481,31 @@ pub.get('/products', async (c) => {
   const settings = await loadSettings(c.env);
   const budget = Number(c.req.query('budget') ?? 0);
 
+  const synonymsQ = expanded.tokens.filter((t) => !typedQ.includes(t));
+  const mappedQ = new Set(expanded.codes);
+
   const matched = (results ?? [])
     .map((r) => toProductCard(r, classifications, settings))
     .filter((p) => includeTraditional || p.category !== 'traditional')
-    .sort((a, b) => b.score - a.score);
+    // SQL widened the net with OR so no candidate is missed; this narrows it
+    // back and ranks by how well each answers the query. Matched against the
+    // full description, not the shortened display name: the shortener drops
+    // qualifiers to fit a label, so searching the short form would miss the
+    // words it removed.
+    .map((p) => ({
+      p,
+      quality: !q
+        ? 1
+        : mappedQ.has(p.hs_code) || p.hs_code.startsWith(q)
+          ? 4
+          : scoreMatch(p.name_full || p.name, typedQ, synonymsQ),
+    }))
+    .filter((x) => x.quality > 0)
+    // How well it answers the query first, then how strong the opening is.
+    // Opportunity score alone would put a big unrelated line above an exact
+    // match for what somebody actually typed.
+    .sort((a, b) => b.quality - a.quality || b.p.score - a.p.score)
+    .map((x) => x.p);
 
   /*
    * The figures the home page leads with.
@@ -498,7 +536,13 @@ pub.get('/products', async (c) => {
     priced: matched.filter((p) => p.unit_value_usd_t != null).length,
   };
 
-  return json({ products: matched.slice(0, limit), count: matched.length, summary });
+  return json({
+    products: matched.slice(0, limit),
+    count: matched.length,
+    summary,
+    // Set when the search went somewhere the reader did not type.
+    note: expanded.note,
+  });
 });
 
 interface SignalRow {
@@ -1005,34 +1049,70 @@ pub.get('/market/hs-codes', async (c) => {
   const includeTraditional = c.req.query('all') === '1';
   const LIMIT = q ? 60 : 30;
 
-  // Restricted to the specific-product level and to world-total rows.
-  //
-  // Without the level filter this ranks HS2 chapters and their HS6 children in
-  // one list, which both double-counts the underlying trade and puts a chapter
-  // above every product inside it. This endpoint exists to find a specific
-  // line, so it lists specific lines.
-  const { results } = await c.env.DB.prepare(
-    q
-      ? `SELECT hs_code, MAX(product_name) AS product_name, SUM(value_usd) AS total_value
-           FROM trade_facts
-          WHERE stream = 'goods' AND length(hs_code) = 6 AND partner_iso3 IS NULL
-            AND flow = 'export' AND product_name LIKE ?
-          GROUP BY hs_code
-          ORDER BY total_value DESC
-          LIMIT ?`
-      : `SELECT hs_code, MAX(product_name) AS product_name, SUM(value_usd) AS total_value
-           FROM trade_facts
-          WHERE stream = 'goods' AND length(hs_code) = 6 AND partner_iso3 IS NULL
-            AND flow = 'export'
-          GROUP BY hs_code
-          ORDER BY total_value DESC
-          LIMIT ?`,
-  )
-    .bind(...(q ? [`%${q}%`, LIMIT * 4] : [LIMIT * 4]))
-    .all<{ hs_code: string; product_name: string | null; total_value: number }>();
+  // The tariff is written by customs, not by traders. "cocoa powder" matched
+  // nothing because the tariff writes "Cocoa; powder" and a LIKE cannot cross
+  // the semicolon; "solar panel" matched nothing because the tariff says
+  // photovoltaic. Expansion turns what somebody typed into words the tariff
+  // uses, and into codes where the tariff uses no word for it at all.
+  const expanded = q ? expandQuery(q) : { tokens: [], codes: [], note: null };
+
+  // Every token is fetched separately and intersected in code rather than
+  // built into one SQL string. Concatenating an unknown number of LIKE clauses
+  // is how a query ends up depending on what somebody typed.
+  const rows = new Map<string, { hs_code: string; product_name: string | null; total_value: number }>();
+
+  async function collect(sql: string, binds: unknown[]) {
+    const { results } = await c.env.DB.prepare(sql).bind(...binds).all<{
+      hs_code: string;
+      product_name: string | null;
+      total_value: number;
+    }>();
+    for (const r of results ?? []) rows.set(r.hs_code, r);
+  }
+
+  const SELECT = `SELECT hs_code, MAX(product_name) AS product_name, SUM(value_usd) AS total_value
+                    FROM trade_facts
+                   WHERE stream = 'goods' AND length(hs_code) = 6 AND partner_iso3 IS NULL
+                     AND flow = 'export'`;
+
+  if (!q) {
+    await collect(`${SELECT} GROUP BY hs_code ORDER BY total_value DESC LIMIT ?`, [LIMIT * 4]);
+  } else {
+    for (const token of expanded.tokens.slice(0, 6)) {
+      await collect(
+        `${SELECT} AND product_name LIKE ? GROUP BY hs_code ORDER BY total_value DESC LIMIT ?`,
+        [`%${token}%`, LIMIT * 4],
+      );
+    }
+    for (const code of expanded.codes.slice(0, 8)) {
+      await collect(`${SELECT} AND hs_code = ? GROUP BY hs_code`, [code]);
+    }
+  }
+
+  // Now require every word the person actually typed, which is what a single
+  // LIKE could not do across punctuation. The same splitting function as the
+  // expansion, so the two cannot disagree about which words count.
+  const typed = q ? typedWords(q) : [];
+  const synonymList = expanded.tokens.filter((t) => !typed.includes(t));
+  const mapped = new Set(expanded.codes);
+
+  const matched = [...rows.values()]
+    .map((r) => ({
+      row: r,
+      // A mapped code is the strongest answer available: somebody who knows the
+      // trade said this is where the product lives.
+      quality: mapped.has(r.hs_code)
+        ? 4
+        : scoreMatch(r.product_name ?? hs6Label(r.hs_code), typed, synonymList),
+    }))
+    .filter((x) => x.quality > 0)
+    // Better matches first, and value only decides between equals. Sorting by
+    // value alone is how a big irrelevant line outranks the thing searched for.
+    .sort((a, b) => b.quality - a.quality || b.row.total_value - a.row.total_value)
+    .map((x) => x.row);
 
   const globalClassifications = await loadClassifications(c.env.DB, '*');
-  const codes = (results ?? [])
+  const codes = matched
     .map((r) => ({
       code: r.hs_code,
       label: r.product_name ?? hs6Label(r.hs_code),
@@ -1042,7 +1122,10 @@ pub.get('/market/hs-codes', async (c) => {
     .filter((r) => includeTraditional || r.category !== 'traditional')
     .slice(0, LIMIT);
 
-  return json({ codes });
+  // Said out loud when the search went somewhere the reader did not type, so
+  // finding "Vegetable fats and oils, n.e.c." for "shea butter" looks like an
+  // answer rather than a wrong result.
+  return json({ codes, note: expanded.note });
 });
 
 /**

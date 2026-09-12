@@ -36,6 +36,9 @@ export default function Home() {
   const [continent, setContinent] = useState<string>('all');
   const [products, setProducts] = useState<ProductCard[]>([]);
   const [summary, setSummary] = useState<ProductSummary | null>(null);
+  // Set when the search reached past the words typed: "solar panel" answered
+  // with photovoltaic cells is the right result, but only if it says so.
+  const [searchNote, setSearchNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalHs, setModalHs] = useState<string | null>(null);
   const [modalCountry, setModalCountry] = useState<string | null>(null);
@@ -61,10 +64,12 @@ export default function Home() {
         .then((r) => {
           setProducts(r.products);
           setSummary(r.summary);
+          setSearchNote(r.note ?? null);
         })
         .catch(() => {
           setProducts([]);
           setSummary(null);
+          setSearchNote(null);
         })
         .finally(() => setLoading(false));
     }, 200);
@@ -143,6 +148,11 @@ export default function Home() {
       <div className="section-head">
         <h2 style={{ fontSize: 16 }}>{listHeading}</h2>
       </div>
+      {searchNote && (
+        <p className="tiny dim" style={{ margin: '2px 0 0' }}>
+          {searchNote}
+        </p>
+      )}
       <p className="tiny dim" style={{ margin: '2px 0 12px' }}>
         Ranked by momentum score across the markets Tereflow has analysed: how fast each line is
         moving, not how easy it is to enter.

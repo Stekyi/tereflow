@@ -8,6 +8,7 @@ import { opportunityScore, scoreBand } from '../../shared/opportunity';
 import { budgetFit } from '../../shared/budget';
 import { buildProductInsight } from '../lib/product-insight';
 import { loadBlueOceans, type BlueOceanVisibility, type ViewerTier } from '../lib/blue-oceans';
+import { loadMarketContext } from '../lib/market-context';
 import { loadSettings, type Settings } from '../lib/settings';
 import {
   classify,
@@ -162,6 +163,11 @@ pub.get('/dashboard/:slug', async (c) => {
     .bind(entity.id)
     .first<{ at: string | null }>();
 
+  // Market context is open to everybody, signed in or not. It is published
+  // national statistics, and gating public data behind a login would be
+  // charging for something we did not produce.
+  const marketContext = await loadMarketContext(c.env.DB, entity.id);
+
   // Blue oceans are gated twice: by what the admin published for this country,
   // and by who is asking. Anonymous readers never see them under either
   // setting, so the tier is resolved from the session rather than assumed.
@@ -203,6 +209,7 @@ pub.get('/dashboard/:slug', async (c) => {
     blue_oceans: blueOceans.blue_oceans,
     blue_ocean_visibility: blueOceans.visibility,
     blue_ocean_withheld_reason: blueOceans.withheld_reason,
+    market_context: marketContext,
     computed_at: computed?.at ?? null,
   };
 

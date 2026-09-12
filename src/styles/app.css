@@ -2588,3 +2588,40 @@ textarea {
 .pick-row:hover { border-color: var(--brand); }
 .pick-row.picked { border-color: var(--brand); background: var(--brand-soft); }
 .pick-row input { margin-top: 3px; flex: none; }
+
+/* Context figures: a scannable grid where each cell opens to explain itself.
+   Sized so a phone shows two per row and a desktop four, since the point is
+   comparing them at a glance rather than reading one at a time. */
+.context-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+}
+.context-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.context-figure:hover { border-color: var(--brand); }
+.context-figure.open { border-color: var(--brand); background: var(--brand-soft); }
+.context-value {
+  font-size: 18px;
+  font-weight: 680;
+  font-variant-numeric: tabular-nums;
+}
+.context-detail {
+  margin-top: 10px;
+  padding: 10px;
+  border-left: 2px solid var(--brand);
+  background: var(--brand-soft);
+  border-radius: 0 8px 8px 0;
+}

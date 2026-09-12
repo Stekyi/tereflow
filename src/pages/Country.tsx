@@ -32,6 +32,7 @@ import {
   LINK_HEALTH_LABEL,
   type BlueOcean,
   type CountryDashboard,
+  type MarketContext,
   type CountrySummary,
   type ExportCategory,
   type RankedItem,
@@ -239,6 +240,7 @@ export default function Country() {
     { id: 'balance', label: 'Trade balance' },
     { id: 'read', label: 'What this means' },
     ...(hasSignals ? [{ id: 'signals', label: 'Early signals' }] : []),
+    ...(data.market_context ? [{ id: 'context', label: 'The market' }] : []),
     ...(data.blue_oceans?.length ? [{ id: 'blue-oceans', label: 'Blue oceans' }] : []),
     ...(hasPartners ? [{ id: 'partners', label: 'Partners' }] : []),
     ...(sources ? [{ id: 'sources', label: 'Sources' }] : []),
@@ -262,7 +264,7 @@ export default function Country() {
       />
       <p className="tiny dim" style={{ margin: '-6px 0 14px' }}>
         Trade figures for {o.year}
-        {o.coverage_note ? ` Â· ${o.coverage_note}` : ''}
+        {o.coverage_note ? ` Ã‚Â· ${o.coverage_note}` : ''}
       </p>
       {t.node}
       {modal && (
@@ -512,7 +514,7 @@ export default function Country() {
             )
           ) : (
             <div className="locked">
-              <div style={{ fontSize: 26 }}>ðŸ”’</div>
+              <div style={{ fontSize: 26 }}>Ã°Å¸â€â€™</div>
               <h3>
                 {data.opportunities_locked} emerging{' '}
                 {data.opportunities_locked === 1 ? 'signal' : 'signals'} detected
@@ -535,6 +537,8 @@ export default function Country() {
         </>
       )}
       </section>
+
+      {data.market_context && <MarketContextPanel context={data.market_context} />}
 
       <BlueOceans data={data} slug={slug ?? ''} signedIn={Boolean(user)} />
 
@@ -702,7 +706,7 @@ function Ranked({
               {i.share_pct.toFixed(1)}% share
               {i.cagr_3y != null && (
                 <>
-                  {' Â· '}
+                  {' Ã‚Â· '}
                   <span className={i.cagr_3y >= 0 ? 'up' : 'down'}>
                     <Term k="cagr" tone="quiet">
                       {fmtPct(i.cagr_3y, 0)}/yr
@@ -712,7 +716,7 @@ function Ranked({
               )}
               {partnerDest && (
                 <>
-                  {' Â· '}
+                  {' Ã‚Â· '}
                   <span className="u">View market {'\u203a'}</span>
                 </>
               )}
@@ -743,7 +747,7 @@ function Rec({ rec }: { rec: Recommendation }) {
       {rec.evidence.length > 0 && (
         <div className="evidence">
           {rec.evidence.map((e, i) => (
-            <div key={i}>â€¢ {e}</div>
+            <div key={i}>Ã¢â‚¬Â¢ {e}</div>
           ))}
         </div>
       )}
@@ -1117,8 +1121,8 @@ function BlueOceanCard({ o }: { o: BlueOcean }) {
         <div>
           <strong style={{ fontSize: 15 }}>{shortProductName(o.product_name)}</strong>
           <div className="tiny dim" style={{ marginTop: 2 }}>
-            {o.kind === 'concentrated_supply' ? 'Supply held by few' : 'Growing and unserved'} ·{' '}
-            {o.trade_flow} · HS {o.product_code}
+            {o.kind === 'concentrated_supply' ? 'Supply held by few' : 'Growing and unserved'} Â·{' '}
+            {o.trade_flow} Â· HS {o.product_code}
           </div>
         </div>
         <span className="badge" title="Opportunity score from Ghana's own statistics: market size, growth, import dependency, stability and supplier concentration. Not the same scale as the momentum score shown against products.">
@@ -1154,4 +1158,145 @@ function BlueOceanCard({ o }: { o: BlueOcean }) {
       )}
     </div>
   );
+}
+/**
+ * Market context: the country behind the trade figures.
+ *
+ * An investor reading "Ghana imports $837m of vehicles" cannot judge it without
+ * knowing there are 35 million people, 59% urban, spending $1,728 a head. This
+ * is that, from published national statistics rather than from anything this
+ * codebase inferred.
+ *
+ * Every figure shows its year. The World Bank publishes these on different
+ * cycles, so Ghana's population is 2025 while its Gini is 2016, nine years
+ * older, because the last household survey was that long ago. A row of numbers
+ * with no years would present those as the same vintage.
+ */
+function MarketContextPanel({ context }: { context: MarketContext }) {
+  const [open, setOpen] = useState<string | null>(null);
+  if (!context.groups.length) return null;
+
+  return (
+    <section id="context" className="section-anchor" aria-label="Market context">
+      <div className="section-head">
+        <h2>The market behind the trade</h2>
+      </div>
+
+      <p className="tiny dim" style={{ margin: '0 0 10px' }}>
+        Who lives here, what they have to spend, and what the economy is made of. From{' '}
+        {context.source_name}, latest figures to {context.latest_year}. Nothing is estimated: a year
+        nobody filed is left out rather than carried forward.
+      </p>
+
+      {context.stale_figures.length > 0 && (
+        // Said once at the top as well as on each figure. Somebody scanning the
+        // numbers should not have to notice the year themselves.
+        <div className="callout warn" style={{ marginBottom: 10 }}>
+          Measured less often than the rest and therefore older:{' '}
+          {context.stale_figures.join(', ')}. These come from household surveys, which most
+          countries run every few years rather than annually.
+        </div>
+      )}
+
+      {context.groups.map((g) => (
+        <div className="card" key={g.key}>
+          <p className="card-title" style={{ marginBottom: 2 }}>
+            {g.title}
+          </p>
+          <p className="tiny dim" style={{ margin: '0 0 10px' }}>
+            {g.purpose}
+          </p>
+          <div className="context-grid">
+            {g.figures.map((f) => (
+              <button
+                key={f.code}
+                className={`context-figure${open === f.code ? ' open' : ''}`}
+                onClick={() => setOpen((o) => (o === f.code ? null : f.code))}
+                title={f.meaning}
+              >
+                <span className="tiny dim">{f.label}</span>
+                <span className="context-value">{formatContext(f.value, f.unit)}</span>
+                <span className="tiny dim">
+                  {f.year}
+                  {f.stale_note && ' ·  older'}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {g.figures
+            .filter((f) => f.code === open)
+            .map((f) => (
+              <div key={f.code} className="context-detail">
+                <p style={{ margin: '0 0 4px' }}>{f.meaning}</p>
+                {f.stale_note && (
+                  <p className="tiny dim" style={{ margin: '0 0 6px' }}>
+                    {f.stale_note}
+                  </p>
+                )}
+                {f.history.length > 1 && (
+                  <p className="tiny dim" style={{ margin: '0 0 4px' }}>
+                    {f.history
+                      .slice(-6)
+                      .map((h) => `${h.year} ${formatContext(h.value, f.unit)}`)
+                      .join('   ')}
+                  </p>
+                )}
+                {f.source_url && (
+                  <a className="tiny" href={f.source_url} target="_blank" rel="noreferrer">
+                    The figures, at source
+                  </a>
+                )}
+              </div>
+            ))}
+        </div>
+      ))}
+
+      {context.not_published.length > 0 && (
+        <p className="tiny dim">
+          Not published for this country, so left empty rather than estimated:{' '}
+          {context.not_published.join(', ')}.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * A context figure, in the shape its unit calls for.
+ *
+ * Population wants 35.1M, a percentage wants one decimal, and money wants a
+ * currency marker. Printing all three through one formatter would give
+ * "35064272.0" beside "59.0", which is legible to nobody.
+ */
+function formatContext(value: number, unit: string): string {
+  switch (unit) {
+    case 'percent':
+      return `${value.toFixed(1)}%`;
+    case 'usd':
+      // Per-head figures live in the hundreds and thousands, where "$2.6K"
+      // throws away the digits that distinguish one country from another.
+      // $2,630 and $2,550 are a real difference and both abbreviate to $2.6K.
+      return value < 1_000_000
+        ? `$${Math.round(value).toLocaleString()}`
+        : fmtUsd(value);
+    case 'persons':
+      return fmtCount(value);
+    case 'persons_per_km2':
+      return `${Math.round(value)}/km2`;
+    case 'per_100':
+      return `${value.toFixed(0)} per 100`;
+    case 'index':
+      return value.toFixed(1);
+    default:
+      return value.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  }
+}
+
+/** Headcounts, which run to tens of millions and do not want a dollar sign. */
+function fmtCount(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}bn`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
+  return String(Math.round(n));
 }

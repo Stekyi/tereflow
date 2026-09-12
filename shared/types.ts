@@ -713,7 +713,45 @@ export interface CountryDashboard {
   blue_ocean_visibility: BlueOceanVisibility;
   /** Set when blue_oceans is null, saying which rule withheld them. */
   blue_ocean_withheld_reason: string | null;
+  /**
+   * Population, spending power, sector mix and operating conditions. Open to
+   * everybody: it is published national statistics, not our analysis.
+   * Null when nothing has been ingested for this country yet.
+   */
+  market_context: MarketContext | null;
   computed_at: string | null;
+}
+
+/** One figure from the national statistics, with its year and its history. */
+export interface ContextFigure {
+  code: string;
+  label: string;
+  /** What it measures, in the terms a reader would ask the question. */
+  meaning: string;
+  value: number;
+  unit: string;
+  year: number;
+  /** Set when this figure is materially older than the newest in the set. */
+  stale_note: string | null;
+  history: { year: number; value: number }[];
+  source_url: string | null;
+}
+
+export interface ContextGroup {
+  key: string;
+  title: string;
+  purpose: string;
+  figures: ContextFigure[];
+}
+
+export interface MarketContext {
+  groups: ContextGroup[];
+  latest_year: number;
+  /** Series older than the rest, named so the gap is stated once up front. */
+  stale_figures: string[];
+  /** Series this country does not publish. Absent, not zero. */
+  not_published: string[];
+  source_name: string;
 }
 
 export const INTENTS = [

@@ -144,7 +144,8 @@ export default function Home() {
         <h2 style={{ fontSize: 16 }}>{listHeading}</h2>
       </div>
       <p className="tiny dim" style={{ margin: '2px 0 12px' }}>
-        Ranked by opportunity score across the markets Tereflow has analysed.
+        Ranked by momentum score across the markets Tereflow has analysed: how fast each line is
+        moving, not how easy it is to enter.
         {summary && summary.total > products.length && (
           <> Showing the top {products.length} of {summary.total}.</>
         )}

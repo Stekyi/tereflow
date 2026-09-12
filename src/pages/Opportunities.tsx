@@ -77,6 +77,12 @@ export default function Opportunities() {
           What Ghana buys from abroad, ranked by how much a locally made alternative might matter.
           Every figure comes from {feed.source} at {feed.classification} chapter level.
         </p>
+        <p className="tiny dim">
+          The opportunity score here weighs market size, growth, import dependency, stability and
+          supplier concentration on Ghana's own statistics. It is a different measure from the
+          momentum score shown against products elsewhere, which reads how fast a line is moving in
+          world trade data. The two are not on the same scale and should not be compared.
+        </p>
 
         {feed.serving_stale && (
           <div className="callout warn" style={{ marginTop: 10 }}>

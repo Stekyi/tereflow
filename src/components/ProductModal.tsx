@@ -17,7 +17,14 @@ import { useBudget } from '../lib/budget';
 import { budgetFit, fmtQuantity } from '../../shared/budget';
 import { CHART } from '../lib/theme';
 import { Empty, FollowButton } from './ui';
-import { isNewTrade, scoreBand, SCORE_BAND_LABEL, SCORE_BASIS } from '../../shared/opportunity';
+import {
+  isNewTrade,
+  MOMENTUM_SCORE_LABEL,
+  scoreBand,
+  SCORE_BAND_LABEL,
+  SCORE_BASIS,
+  SCORE_NOT_COMPARABLE,
+} from '../../shared/opportunity';
 import { hasLongerDescription } from '../../shared/product-name';
 import {
   fmtPct,
@@ -401,7 +408,7 @@ function PartnerFlows({ flows }: { flows: NonNullable<ProductInsight['partner_fl
 }
 
 /**
- * What the opportunity score is made of.
+ * What the momentum score is made of.
  *
  * Every term shows the figure it came from, what it was worth out of 100,
  * and a note when it is standing in for something missing. The parts add to
@@ -450,6 +457,9 @@ function ScoreBreakdown({ breakdown }: { breakdown: NonNullable<ProductInsight['
       <p className="tiny dim" style={{ marginTop: 6 }}>
         A score ranks one line against others on the same evidence. It is not a measure of
         whether a business will work, which depends on things no trade dataset records.
+      </p>
+      <p className="tiny dim" style={{ marginTop: 4 }}>
+        {SCORE_NOT_COMPARABLE}
       </p>
     </div>
   );
@@ -753,7 +763,7 @@ export default function ProductModal({
               <div className="insight-main">
                 <div className="insight-tiles">
                   <Tile
-                    k="Opportunity score"
+                    k={MOMENTUM_SCORE_LABEL}
                     v={insight.score != null ? `${insight.score}/100` : 'Not scored'}
                     onClick={insight.score_breakdown ? () => setScoreOpen((o) => !o) : undefined}
                     expanded={scoreOpen}
@@ -766,7 +776,7 @@ export default function ProductModal({
                     }
                     title={
                       insight.score != null
-                        ? SCORE_BASIS
+                        ? `${SCORE_BASIS} ${SCORE_NOT_COMPARABLE}`
                         : 'A score is only given where the pipeline ranked this product for a country. No score is not a low score.'
                     }
                   />

@@ -10,6 +10,16 @@
  * interesting is this". Confidence answers "how much do we actually know". A
  * product can score 88 on two years of chapter-level data, and saying both
  * numbers is the honest version of that sentence.
+ *
+ * THIS IS NOT THE SAME NUMBER as the momentum score in shared/opportunity.ts.
+ * That one runs on world Comtrade data across countries and weighs growth and
+ * steadiness, asking how fast a line is moving. This one runs on a single
+ * country's own statistics and weighs import dependency, stability and supplier
+ * concentration, asking how enterable a market is. Different questions, on
+ * different data, at different classification levels. They are named
+ * differently and captioned wherever either appears, because two numbers
+ * sharing a label is how a reader ends up treating them as one measure that
+ * keeps contradicting itself.
  */
 import type { CountryConfig, ExclusionRule, ScoringWeights } from '../providers/types';
 import type { ProductMetrics, Trend } from './metrics';

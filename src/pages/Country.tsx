@@ -1121,7 +1121,9 @@ function BlueOceanCard({ o }: { o: BlueOcean }) {
             {o.trade_flow} · HS {o.product_code}
           </div>
         </div>
-        <span className="badge">{Math.round(o.opportunity_score)}/100</span>
+        <span className="badge" title="Opportunity score from Ghana's own statistics: market size, growth, import dependency, stability and supplier concentration. Not the same scale as the momentum score shown against products.">
+          {Math.round(o.opportunity_score)}/100
+        </span>
       </div>
 
       <p style={{ marginBottom: 6 }}>{o.reason}</p>

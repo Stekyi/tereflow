@@ -1,6 +1,21 @@
 
 /**
- * A 0-100 readability score for one opportunity.
+ * The momentum score: a 0-100 reading of how fast one trade line is moving.
+ *
+ * Named for what it weighs. Growth and momentum carry 60 of its 100 points, so
+ * a line can score highly on a trade that is small, difficult to enter, and
+ * already supplied by somebody entrenched. It ranks trajectory in the reported
+ * data and nothing else.
+ *
+ * THIS IS NOT THE SAME NUMBER as the opportunity score on the country
+ * opportunities page. That one runs on a single country's own statistics and
+ * weighs import dependency, stability and supplier concentration, which are
+ * about whether a market can be entered. This one runs on world Comtrade data
+ * across countries and asks only how fast a line is moving. The two answer
+ * different questions on different data and are not comparable, so they are
+ * named differently and captioned wherever either is shown. Two numbers sharing
+ * a label is how a reader ends up treating them as one measure that keeps
+ * disagreeing with itself.
  *
  * The pipeline stores momentum, growth, confidence and size. Those are the
  * right things to store, but "momentum 0.41" means nothing to somebody
@@ -8,8 +23,8 @@
  * stated basis, computed at read time so the weighting can be corrected
  * without re-running the pipeline against live APIs.
  *
- * It is deliberately not a prediction. It ranks how well-evidenced an opening
- * is, which is a different claim, and `scoreBasis` spells that out in the UI.
+ * It is deliberately not a prediction. It ranks how well-evidenced a movement
+ * is, which is a different claim, and `SCORE_BASIS` spells that out in the UI.
  */
 
 /**
@@ -208,7 +223,19 @@ export const SCORE_BAND_LABEL: Record<ScoreBand, string> = {
 };
 
 /** Shown wherever the score is, so nobody reads it as a forecast. */
+/** The label shown wherever this number appears. One name, one meaning. */
+export const MOMENTUM_SCORE_LABEL = 'Momentum score';
+
 export const SCORE_BASIS =
-  'Blends growth rate, share gained, how steady the growth has been, and how big the trade already is. ' +
-  'It ranks how well evidenced an opening is in the reported data. It is not a forecast of returns.';
+  'Weighs how fast the trade is growing, how steadily, how well evidenced it is, and how big it ' +
+  'already is. Growth and steadiness carry most of it, so this reads movement rather than ease ' +
+  'of entry. It is not a forecast of returns.';
+
+/**
+ * Said wherever the momentum score sits near anything from the country
+ * opportunities page, so nobody reads 83 here and 64 there as the same scale.
+ */
+export const SCORE_NOT_COMPARABLE =
+  'Measured on world trade data across countries. Not the same scale as the opportunity score on a ' +
+  "country's own opportunities page, which weighs how enterable a market is.";
 

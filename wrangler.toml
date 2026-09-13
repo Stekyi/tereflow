@@ -10,6 +10,17 @@ compatibility_flags = ["nodejs_compat"]
 # goes on tokens and scopes rather than on the account being addressed.
 account_id = "959613069119a4056537a3f89f8d91ac"
 
+# NOTE ON CHANGING database_id
+#
+# The local miniflare file is named after this id, so editing it does not point
+# the dev server at a different database: it silently creates an empty one and
+# every request fails with "no such table: entities". The previous data is still
+# on disk under the old id's filename, not lost, just no longer addressed.
+#
+# If local suddenly has no tables after a config change, that is why. Either put
+# the id back, or re-run `npm run db:migrate:local && npm run seed:local` to
+# populate the new file.
+
 # Serve the built React SPA straight from the Worker.
 [assets]
 directory = "./dist"

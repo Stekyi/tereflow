@@ -473,6 +473,35 @@ interface IngestFact {
   source_ref: string;
 }
 
+/**
+ * One published statistic for a country, as the context ingest sends it.
+ *
+ * `value` is required and `year` is required: a figure with no year cannot be
+ * placed against the others, and the panel's whole job is showing that
+ * population is 2025 while the Gini is 2016. Everything else is optional
+ * because the sources vary in what they attach.
+ */
+interface ContextIndicatorRow {
+  indicator_code: string;
+  category?: string | null;
+  year: number;
+  value: number;
+  unit?: string | null;
+  source_name?: string | null;
+  source_url?: string | null;
+  confidence?: number | null;
+}
+
+interface ContextSectorRow {
+  sector_code: string;
+  sector_name?: string | null;
+  year: number;
+  share_of_gdp?: number | null;
+  unit?: string | null;
+  source_name?: string | null;
+  source_url?: string | null;
+}
+
 async function resolveEntity(c: { env: Env }, slug: string) {
   return c.env.DB.prepare(
     'SELECT id, slug, name FROM entities WHERE slug = ? OR id = ?',
@@ -898,9 +927,131 @@ admin.post('/ingest/commit', async (c) => {
   return json({ ok: true, results: Object.keys(body.analysis).length, signals: body.signals?.length ?? 0 });
 });
 
+/**
+ * Market context: population, spending power, sector mix, operating conditions.
+ *
+ * Its own endpoint rather than part of the trade ingest, because the two fail
+ * independently. The World Bank being down must not discard a good StatBank
+ * run, and a country whose trade figures did not refresh this week still has
+ * the same population it had last week.
+ *
+ * Replace-by-source, not append. Everything carrying this source_ref for this
+ * country is cleared first, so re-running corrects figures rather than stacking
+ * duplicate years. Only this source's rows: anything an admin uploaded by hand
+ * is left where it is.
+ *
+ * A year nobody published is absent, never interpolated. That is the caller's
+ * responsibility and this endpoint does not second-guess it: rows arrive as
+ * they were fetched.
+ */
+admin.post('/ingest/context', async (c) => {
+  const body = (await c.req.json()) as {
+    slug: string;
+    source_ref: string;
+    indicators?: ContextIndicatorRow[];
+    sectors?: ContextSectorRow[];
+  };
+
+  const entity = await resolveEntity(c, body.slug);
+  if (!entity) return bad(`Unknown entity: ${body.slug}`, 404);
+  if (!body.source_ref) return bad('source_ref required');
+
+  const indicators = body.indicators ?? [];
+  const sectors = body.sectors ?? [];
+  // A ceiling, because an unbounded body is a way to run a Worker out of memory.
+  // One country is about 300 rows, so this is a generous multiple of real use.
+  if (indicators.length + sectors.length > 2000) {
+    return bad('Send at most 2000 rows per request');
+  }
+
+  const statements: D1PreparedStatement[] = [
+    c.env.DB.prepare(
+      'DELETE FROM indicator_observations WHERE entity_id = ? AND source_ref = ?',
+    ).bind(entity.id, body.source_ref),
+    c.env.DB.prepare(
+      'DELETE FROM sector_observations WHERE entity_id = ? AND source_ref = ?',
+    ).bind(entity.id, body.source_ref),
+  ];
+
+  // D1 allows 100 bound parameters per statement, so the rows per statement
+  // have to divide by the column count rather than be guessed at.
+  const IND_COLS = 10;
+  const indPerStmt = Math.floor(D1_MAX_BOUND_PARAMS / IND_COLS);
+  const indTuple = `(${Array(IND_COLS).fill('?').join(',')})`;
+  for (let i = 0; i < indicators.length; i += indPerStmt) {
+    const slice = indicators.slice(i, i + indPerStmt);
+    const binds: unknown[] = [];
+    for (const r of slice) {
+      binds.push(
+        entity.id,
+        r.indicator_code,
+        r.category ?? null,
+        r.year,
+        r.value,
+        r.unit ?? null,
+        r.source_name ?? null,
+        r.source_url ?? null,
+        r.confidence ?? null,
+        body.source_ref,
+      );
+    }
+    statements.push(
+      c.env.DB.prepare(
+        `INSERT INTO indicator_observations
+           (entity_id, indicator_code, category, year, value, unit,
+            source_name, source_url, confidence, source_ref)
+         VALUES ${slice.map(() => indTuple).join(',')}`,
+      ).bind(...binds),
+    );
+  }
+
+  const SEC_COLS = 9;
+  const secPerStmt = Math.floor(D1_MAX_BOUND_PARAMS / SEC_COLS);
+  const secTuple = `(${Array(SEC_COLS).fill('?').join(',')})`;
+  for (let i = 0; i < sectors.length; i += secPerStmt) {
+    const slice = sectors.slice(i, i + secPerStmt);
+    const binds: unknown[] = [];
+    for (const r of slice) {
+      binds.push(
+        entity.id,
+        r.sector_code,
+        r.sector_name ?? null,
+        r.year,
+        r.share_of_gdp ?? null,
+        r.unit ?? null,
+        r.source_name ?? null,
+        r.source_url ?? null,
+        body.source_ref,
+      );
+    }
+    statements.push(
+      c.env.DB.prepare(
+        `INSERT INTO sector_observations
+           (entity_id, sector_code, sector_name, year, share_of_gdp, unit,
+            source_name, source_url, source_ref)
+         VALUES ${slice.map(() => secTuple).join(',')}`,
+      ).bind(...binds),
+    );
+  }
+
+  // The two DELETEs lead the first batch, so a failure part-way through leaves
+  // the country with fewer rows rather than with this run's rows layered on top
+  // of the last one's. Fewer rows is visibly incomplete; doubled years are not.
+  const BATCH = 25;
+  for (let i = 0; i < statements.length; i += BATCH) {
+    await c.env.DB.batch(statements.slice(i, i + BATCH));
+  }
+
+  return json({
+    slug: entity.slug,
+    indicators: indicators.length,
+    sectors: sectors.length,
+    statements: statements.length,
+  });
+});
+
 /** Record a country the local run could not complete. */
-admin.post('/ingest/fail', async (c) => {
-  const body = (await c.req.json()) as { slug: string; error: string };
+admin.post('/ingest/fail', async (c) => {  const body = (await c.req.json()) as { slug: string; error: string };
   const entity = await resolveEntity(c, body.slug);
   if (!entity) return bad(`Unknown entity: ${body.slug}`, 404);
   await c.env.DB.prepare(

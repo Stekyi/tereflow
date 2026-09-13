@@ -98,10 +98,9 @@ REM Bank. Runs after the trade pipeline and in its own step, because a failure
 REM here must not discard a successful trade ingest. The trade figures are the
 REM product; this is the background an investor reads them against.
 REM
-REM NOTE: this writes to the local D1 file directly. On a deployed instance it
-REM needs the same treatment the trade pipeline already has, pushing finished
-REM rows to the Worker rather than opening the database. Until then the context
-REM panel is refreshed only where the scheduled task runs.
+REM Publishes over the admin API using the same TEREFLOW_API_URL and
+REM TEREFLOW_ADMIN_TOKEN as the pipeline above, so it reaches whichever instance
+REM local\.env points at rather than only the database on this machine.
 node "scripts\ingest-context.mjs" >> "local\logs\context-%stamp%.log" 2>&1
 "@ | Set-Content -Path $wrapper -Encoding ASCII
 

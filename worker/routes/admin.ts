@@ -3,6 +3,7 @@ import type { Env } from '../lib/db';
 import { attachSources, bad, getEntityBySlug, json, slugify, uid } from '../lib/db';
 import { requireAdmin } from '../lib/auth';
 import { currentUser } from '../lib/session';
+import { discoverCountryConfig, dominanceCandidates } from '../providers/discover';
 import { loadSettings } from '../lib/settings';
 import { dominantCodes, loadClassifications, resolveAll } from '../lib/classify';
 import { loadResult } from './public';
@@ -1047,6 +1048,177 @@ admin.post('/ingest/context', async (c) => {
     indicators: indicators.length,
     sectors: sectors.length,
     statements: statements.length,
+  });
+});
+
+/**
+ * Working out a country's config from its PXWeb endpoint.
+ *
+ * Read-only and writes nothing. It fetches one metadata document and returns a
+ * proposal: every dimension it thinks it identified, why, and how far that can
+ * be trusted. Saving is a separate, explicit call, because a guess reaching a
+ * live request is exactly what the confirm step exists to prevent.
+ */
+admin.post('/discover', async (c) => {
+  const body = (await c.req.json()) as { endpoint?: string };
+  const endpoint = (body.endpoint ?? '').trim();
+  if (!endpoint) return bad('endpoint required');
+  if (!/^https?:\/\//i.test(endpoint)) return bad('endpoint must be an http or https URL');
+
+  try {
+    const result = await discoverCountryConfig(endpoint);
+    return json(result);
+  } catch (err) {
+    // The message is the useful part: a 404 on the metadata URL and a response
+    // that is not PXWeb at all are different problems with different fixes.
+    return bad(err instanceof Error ? err.message : 'Discovery failed', 502);
+  }
+});
+
+/**
+ * Save a confirmed config.
+ *
+ * Takes the admin's corrected version, not the discovery output. The two are
+ * stored together so that when a figure looks wrong months later, what was
+ * proposed and what was accepted can both be read.
+ */
+admin.put('/entities/:slug/config', async (c) => {
+  const entity = await getEntityBySlug(c.env.DB, c.req.param('slug'));
+  if (!entity) return bad('Not found', 404);
+
+  const body = (await c.req.json()) as {
+    endpoint?: string;
+    provider_type?: string;
+    config?: unknown;
+    discovery?: unknown;
+  };
+
+  if (!body.endpoint) return bad('endpoint required');
+  if (!body.config || typeof body.config !== 'object') return bad('config required');
+
+  // Checked here rather than trusted, because this is the boundary between a
+  // proposal and something a scheduled run will use unattended.
+  const cfg = body.config as Record<string, unknown>;
+  const provider = cfg.provider as Record<string, unknown> | undefined;
+  const dims = provider?.dimensions as Record<string, string> | undefined;
+  const missing = ['valuation', 'flow', 'year', 'product', 'partner'].filter((k) => !dims?.[k]);
+  if (missing.length) {
+    return bad(`Config is missing required dimensions: ${missing.join(', ')}`);
+  }
+  if (!Array.isArray(cfg.partners) || cfg.partners.length === 0) {
+    return bad('Config has no partner mappings, so no request could be built.');
+  }
+
+  const actor = await currentUser(c.req.raw, c.env);
+  await c.env.DB.prepare(
+    `INSERT INTO country_configs
+       (entity_id, endpoint, provider_type, config_json, discovery_json, confirmed_by, confirmed_at, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'), datetime('now'))
+     ON CONFLICT(entity_id) DO UPDATE SET
+       endpoint = ?2, provider_type = ?3, config_json = ?4, discovery_json = ?5,
+       confirmed_by = ?6, updated_at = datetime('now')`,
+  )
+    .bind(
+      entity.id,
+      body.endpoint,
+      body.provider_type ?? 'pxweb',
+      JSON.stringify(body.config),
+      body.discovery ? JSON.stringify(body.discovery) : null,
+      actor?.email ?? 'unknown',
+    )
+    .run();
+
+  return json({ slug: entity.slug, saved: true });
+});
+
+/** The confirmed config for a country, or null if it has never been confirmed. */
+admin.get('/entities/:slug/config', async (c) => {
+  const entity = await getEntityBySlug(c.env.DB, c.req.param('slug'));
+  if (!entity) return bad('Not found', 404);
+
+  const row = await c.env.DB.prepare(
+    `SELECT endpoint, provider_type, config_json, discovery_json, confirmed_by, confirmed_at, updated_at
+       FROM country_configs WHERE entity_id = ?`,
+  )
+    .bind(entity.id)
+    .first<{
+      endpoint: string;
+      provider_type: string;
+      config_json: string;
+      discovery_json: string | null;
+      confirmed_by: string | null;
+      confirmed_at: string;
+      updated_at: string;
+    }>();
+
+  if (!row) return json({ slug: entity.slug, config: null });
+
+  return json({
+    slug: entity.slug,
+    endpoint: row.endpoint,
+    provider_type: row.provider_type,
+    config: JSON.parse(row.config_json),
+    discovery: row.discovery_json ? JSON.parse(row.discovery_json) : null,
+    confirmed_by: row.confirmed_by,
+    confirmed_at: row.confirmed_at,
+    updated_at: row.updated_at,
+  });
+});
+
+/**
+ * Chapters large enough to be worth asking about excluding.
+ *
+ * Runs after a country has data, because it is computed from that data. It
+ * proposes and never applies: excluding a country's largest trade on a
+ * threshold would remove the thing a reader most expects to see, and the
+ * removal would be invisible in the result.
+ */
+admin.get('/entities/:slug/dominance', async (c) => {
+  const entity = await getEntityBySlug(c.env.DB, c.req.param('slug'));
+  if (!entity) return bad('Not found', 404);
+  if (!entity.iso2) return bad('This country has no ISO2 code, so its observations cannot be located.');
+
+  const threshold = Number(c.req.query('threshold') ?? 12);
+  if (!Number.isFinite(threshold) || threshold <= 0 || threshold >= 100) {
+    return bad('threshold must be a percentage between 0 and 100');
+  }
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT product_code,
+            MAX(product_description) AS product_description,
+            SUM(import_value_usd)    AS value_usd
+       FROM trade_observations
+      WHERE country_code = ?1 AND import_value_usd > 0
+      GROUP BY product_code`,
+  )
+    .bind(entity.iso2)
+    .all<{ product_code: string; product_description: string | null; value_usd: number }>();
+
+  const candidates = dominanceCandidates(results ?? [], threshold);
+
+  // The existing exclusions, so the checklist shows what is already decided
+  // rather than re-asking about chapters somebody has already ruled on.
+  const cfg = await c.env.DB.prepare('SELECT config_json FROM country_configs WHERE entity_id = ?')
+    .bind(entity.id)
+    .first<{ config_json: string }>();
+  let existing: string[] = [];
+  if (cfg) {
+    try {
+      const parsed = JSON.parse(cfg.config_json) as {
+        filters?: { excluded?: { codes?: string[] }[] };
+      };
+      existing = (parsed.filters?.excluded ?? []).flatMap((e) => e.codes ?? []);
+    } catch {
+      // A config that will not parse is a problem for the config endpoint to
+      // report, not a reason to fail the checklist.
+    }
+  }
+
+  return json({
+    slug: entity.slug,
+    threshold_pct: threshold,
+    candidates: candidates.map((x) => ({ ...x, already_excluded: existing.includes(x.product_code) })),
+    products_considered: (results ?? []).length,
   });
 });
 

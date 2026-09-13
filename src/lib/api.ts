@@ -1,5 +1,8 @@
 import type {
   BlueOceanVisibility,
+  DiscoveryResult,
+  DominanceCandidate,
+  RunProgress,
   BusinessCard,
   BusinessCardInput,
   ConversationSummary,
@@ -744,6 +747,51 @@ export const api = {
         `/api/admin/entities/${slug}/blue-ocean`,
         { method: 'PATCH', body: JSON.stringify({ visibility }) },
       ),
+
+    /** Read a PXWeb endpoint's metadata and propose a config. Saves nothing. */
+    discover: (endpoint: string) =>
+      req<DiscoveryResult>('/api/admin/discover', {
+        method: 'POST',
+        body: JSON.stringify({ endpoint }),
+      }),
+
+    /** The confirmed config for a country, or null if never confirmed. */
+    getConfig: (slug: string) =>
+      req<{
+        slug: string;
+        endpoint?: string;
+        provider_type?: string;
+        config: Record<string, unknown> | null;
+        discovery?: DiscoveryResult | null;
+        confirmed_by?: string | null;
+        confirmed_at?: string;
+      }>(`/api/admin/entities/${slug}/config`),
+
+    /** Save a corrected config. This is the step a guess must pass through. */
+    saveConfig: (
+      slug: string,
+      body: { endpoint: string; provider_type?: string; config: unknown; discovery?: unknown },
+    ) =>
+      req<{ slug: string; saved: boolean }>(`/api/admin/entities/${slug}/config`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+
+    /** Chapters large enough to be worth asking about excluding. Proposes only. */
+    dominance: (slug: string, threshold = 12) =>
+      req<{
+        slug: string;
+        threshold_pct: number;
+        candidates: DominanceCandidate[];
+        products_considered: number;
+      }>(`/api/admin/entities/${slug}/dominance?threshold=${threshold}`),
+
+    /** One run, small enough to poll every couple of seconds. */
+    runProgress: (runId: string) => req<RunProgress>(`/api/ghana/runs/${runId}`),
+
+    /** Recent runs for a country, newest first, with progress fields. */
+    countryRuns: (country: string) =>
+      req<{ country: string; runs: RunProgress[] }>(`/api/ghana/runs?country=${country}`),
     bulkActive: (slugs: string[], is_active: boolean) =>
       req<{ updated: number }>('/api/admin/entities/activation/bulk', {
         method: 'POST',

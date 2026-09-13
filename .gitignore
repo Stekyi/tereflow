@@ -31,3 +31,8 @@ extract/.pytest_cache/.manual-verification/
 .qout.txt
 .audit-*.txt
 .audit-frontend/
+
+# Ad-hoc ingest and test run logs. Output of a command, not part of the project.
+gexp*.txt
+ghana-*.txt
+e2e-out.txt

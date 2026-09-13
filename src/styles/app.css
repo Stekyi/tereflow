@@ -1,35 +1,35 @@
 :root {
   /* Ivory paper rather than stark white. Warmth is most of what separates a
      premium surface from a utilitarian one. */
-  --bg: #fbfaf7;
-  --bg-2: #f4f1ea;
+  --bg: #f7f8fb;
+  --bg-2: #eef1f7;
   --surface: #ffffff;
-  --surface-2: #f7f4ed;
-  --line: #ddd6c8;
-  --line-soft: #e8e2d6;
+  --surface-2: #f4f6fa;
+  --line: #dfe3ec;
+  --line-soft: #e9ecf4;
 
   /* Ink, not black. A blue undertone keeps long text from feeling harsh. */
-  --ink: #0e1c2b;
+  --ink: #1a1636;
   --text: #16283b;
   --muted: #556273;
   --dim: #8a94a2;
 
   /* Deep navy carries authority where a bright blue reads as a utility. */
-  --brand: #0b3d67;
-  --brand-hover: #06263f;
-  --brand-2: #2f6f9f;
+  --brand: #0f9d58;
+  --brand-hover: #0b7f46;
+  --brand-2: #34c77b;
 
   /* The metallic accent. Used sparingly: premium, ratings, emphasis. */
-  --gold: #a8802c;
-  --gold-soft: #f3ead6;
-  --gold-line: #dcc79a;
+  --gold: #6d3bd4;
+  --gold-soft: #efe9ff;
+  --gold-line: #d4c4ff;
 
-  --up: #17604a;
-  --up-soft: #e6f0eb;
-  --down: #8f3222;
-  --down-soft: #f7e9e5;
-  --warn: #8a6116;
-  --warn-soft: #f7efdd;
+  --up: #0f9d58;
+  --up-soft: #e4f7ed;
+  --down: #d93025;
+  --down-soft: #fdecea;
+  --warn: #b8860b;
+  --warn-soft: #fdf4e0;
 
   --r-sm: 6px;
   --r: 10px;
@@ -156,7 +156,7 @@ textarea {
   gap: 12px;
   padding: 12px var(--pad);
   padding-top: calc(12px + env(safe-area-inset-top));
-  background: rgba(251, 250, 247, 0.9);
+  background: rgba(247, 248, 251, 0.9);
   backdrop-filter: saturate(180%) blur(14px);
   border-bottom: 1px solid var(--line-soft);
 }
@@ -188,7 +188,7 @@ textarea {
   width: 30px;
   height: 30px;
   border-radius: 7px;
-  background: linear-gradient(160deg, #12456f, var(--ink));
+  background: linear-gradient(160deg, #7c4dff, var(--ink));
   flex: none;
   position: relative;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 2px 6px rgba(14, 28, 43, 0.25);
@@ -249,7 +249,7 @@ main {
   z-index: 30;
   margin: calc(var(--pad) * -1) calc(var(--pad) * -1) 14px;
   padding: var(--pad) var(--pad) 10px;
-  background: rgba(251, 250, 247, 0.94);
+  background: rgba(247, 248, 251, 0.94);
   backdrop-filter: saturate(180%) blur(14px);
   border-bottom: 1px solid var(--line-soft);
 }
@@ -271,7 +271,7 @@ main {
   right: 0;
   z-index: 50;
   display: flex;
-  background: rgba(251, 250, 247, 0.94);
+  background: rgba(247, 248, 251, 0.94);
   backdrop-filter: saturate(180%) blur(16px);
   border-top: 1px solid var(--line-soft);
   padding-bottom: env(safe-area-inset-bottom);
@@ -599,8 +599,12 @@ main {
 /* The primary action is ink with a gold underline that grows on hover. It is
    the one moment of theatre in the interface, and it is a single element. */
 .btn.primary {
-  background: var(--ink);
-  border-color: var(--ink);
+  /* Green. This is the button that does the thing, and green is the accent
+     that means action throughout. It previously sat on ink and hovered to
+     green, so the resting and hover states disagreed about what colour the
+     control was. */
+  background: var(--brand);
+  border-color: var(--brand);
   color: #fff;
   position: relative;
   overflow: hidden;
@@ -613,7 +617,9 @@ main {
   bottom: 0;
   width: 0;
   height: 2px;
-  background: var(--gold);
+  /* Light, not the brand purple: the underline sits on a green fill and a
+     purple line against it is close enough in value to read as a smudge. */
+  background: rgba(255, 255, 255, 0.75);
   transform: translateX(-50%);
   transition: width 0.28s ease;
 }
@@ -621,7 +627,7 @@ main {
 .btn.primary:hover:not(:disabled) {
   background: var(--brand-hover);
   border-color: var(--brand-hover);
-  box-shadow: 0 6px 18px rgba(14, 28, 43, 0.22);
+  box-shadow: 0 6px 18px rgba(15, 157, 88, 0.28);
 }
 
 .btn.primary:hover:not(:disabled)::after {
@@ -636,9 +642,9 @@ main {
 }
 
 .btn.gold:hover:not(:disabled) {
-  background: #8f6b22;
-  border-color: #8f6b22;
-  box-shadow: 0 6px 18px rgba(168, 128, 44, 0.28);
+  background: #6d3bd4;
+  border-color: #5a2ec0;
+  box-shadow: 0 6px 18px rgba(109, 59, 212, 0.28);
 }
 
 .btn.danger {
@@ -812,13 +818,18 @@ textarea {
 }
 
 .chip.active {
-  background: var(--ink);
-  border-color: var(--ink);
+  /* Green, because this is a selection the reader made and the same colour
+     means "on" everywhere else in the app. Dark ink here read as a heading
+     rather than as a control, and it also hovered to green, so the resting and
+     hover states disagreed about what colour the control was. */
+  background: var(--brand);
+  border-color: var(--brand);
   color: #fff;
 }
 
 .chip.active:hover {
   background: var(--brand-hover);
+  border-color: var(--brand-hover);
 }
 
 /* Related-product chips carry full product names, which can be wider than a
@@ -1201,7 +1212,7 @@ textarea {
 /* The top-ranked row in any list is marked in gold. One highlight per list is
    a hierarchy; highlighting everything is noise. */
 .bar-row:first-child .bar-fill {
-  background: linear-gradient(90deg, rgba(168, 128, 44, 0.24), rgba(168, 128, 44, 0.04));
+  background: linear-gradient(90deg, rgba(109, 59, 212, 0.24), rgba(109, 59, 212, 0.04));
 }
 
 .bar-row:first-child .rank-badge {
@@ -1515,7 +1526,7 @@ textarea {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #eef2f5, #f7fafc, #eef2f5);
+  background: linear-gradient(90deg, #eef1f7, #f9fafc, #eef1f7);
   background-size: 200% 100%;
   animation: shimmer 1.3s infinite;
   border-radius: var(--r);
@@ -1537,20 +1548,26 @@ textarea {
    reads as a theme. */
 .hero {
   position: relative;
-  background: linear-gradient(155deg, #14324e 0%, var(--ink) 62%);
-  border: 1px solid var(--ink);
+  /* Purple rather than the flat navy this replaced. The navy read as dull
+     against a light canvas because it was the only dark thing on the page and
+     had nothing to relate to; a gradient gives it depth and ties it to the
+     brand marks elsewhere. */
+  background: linear-gradient(135deg, #7c4dff 0%, #6d3bd4 45%, var(--ink) 100%);
+  border: 1px solid transparent;
   border-radius: var(--r-lg);
   padding: 28px 24px 26px;
   margin-bottom: 20px;
   overflow: hidden;
-  box-shadow: var(--lift);
+  box-shadow: 0 10px 30px rgba(109, 59, 212, 0.22);
 }
 
 .hero::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(120% 90% at 88% 0%, rgba(168, 128, 44, 0.28), transparent 62%);
+  /* Green, so the accent that means "growth" everywhere else in the app is
+     present in the header rather than arriving unannounced further down. */
+  background: radial-gradient(110% 90% at 92% 0%, rgba(52, 199, 123, 0.35), transparent 60%);
   pointer-events: none;
 }
 
@@ -1561,7 +1578,7 @@ textarea {
   top: 0;
   width: 46px;
   height: 3px;
-  background: var(--gold);
+  background: #34c77b;
 }
 
 .hero h2 {
@@ -1847,7 +1864,7 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #eaf1f7;
+  color: #ece6ff;
 }
 
 .brand-dot::before,
@@ -1895,7 +1912,7 @@ textarea {
       rgba(6, 17, 27, 0.45) 62%,
       rgba(6, 17, 27, 0.12) 100%
     ),
-    radial-gradient(120% 90% at 92% 0%, rgba(168, 128, 44, 0.26), transparent 60%);
+    radial-gradient(120% 90% at 92% 0%, rgba(109, 59, 212, 0.26), transparent 60%);
 }
 
 /* On a narrow screen there is no room beside the text, so the scene drops back
@@ -1923,7 +1940,7 @@ textarea {
         rgba(6, 17, 27, 0.82) 48%,
         rgba(6, 17, 27, 0.6) 100%
       ),
-      radial-gradient(120% 90% at 92% 0%, rgba(168, 128, 44, 0.24), transparent 60%);
+      radial-gradient(120% 90% at 92% 0%, rgba(109, 59, 212, 0.24), transparent 60%);
   }
 }
 
@@ -1938,7 +1955,7 @@ textarea {
   padding: 0;
   border-radius: 50%;
   border: 1px solid var(--ink);
-  background: linear-gradient(160deg, #12456f, var(--ink));
+  background: linear-gradient(160deg, #7c4dff, var(--ink));
   color: #fff;
   cursor: pointer;
   display: flex;
@@ -2374,7 +2391,7 @@ textarea {
   z-index: 30;
   margin: calc(var(--pad) * -1) calc(var(--pad) * -1) 0;
   padding: 10px var(--pad);
-  background: rgba(251, 250, 247, 0.94);
+  background: rgba(247, 248, 251, 0.94);
   backdrop-filter: saturate(180%) blur(14px);
   border-bottom: 1px solid var(--line-soft);
 }
@@ -2699,3 +2716,67 @@ textarea {
   font-size: 13px;
 }
 .family-member:hover { background: var(--surface); }
+
+/* --- run result and progress ------------------------------------------------
+
+   Large numbers, one accent per meaning, on a plain card. The colours are not
+   decoration: green means the rows survived, red means they did not, and the
+   two have to be readable apart at a glance or the summary says nothing a
+   single total would not. */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+.kpi {
+  padding: 14px 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  background: var(--surface);
+}
+.kpi-number {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.kpi-label {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted, #6b7280);
+}
+.kpi-good .kpi-number { color: var(--up); }
+.kpi-good { border-color: rgba(15, 157, 88, 0.3); background: var(--up-soft); }
+.kpi-warn .kpi-number { color: var(--warn); }
+.kpi-warn { border-color: rgba(184, 134, 11, 0.3); background: var(--warn-soft); }
+.kpi-bad .kpi-number { color: var(--down); }
+.kpi-bad { border-color: rgba(217, 48, 37, 0.3); background: var(--down-soft); }
+
+.progress-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand) 0%, var(--brand-2) 100%);
+  transition: width 400ms ease;
+}
+/* A source with no chapters to count has no percentage. Sliding rather than
+   sitting at zero, because a bar stuck at the start reads as stalled. */
+.progress-fill.indeterminate {
+  width: 35%;
+  animation: progress-slide 1.4s ease-in-out infinite;
+}
+@keyframes progress-slide {
+  0%   { margin-left: -35%; }
+  100% { margin-left: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill.indeterminate { animation: none; width: 100%; opacity: 0.45; }
+  .progress-fill { transition: none; }
+}

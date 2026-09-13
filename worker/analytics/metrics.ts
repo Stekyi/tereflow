@@ -134,9 +134,30 @@ function metricsForOne(rows: TradeObservation[], minYears: number): ProductMetri
       y.weight = (y.weight ?? 0) + r.net_weight_kg;
     }
     y.months = Math.max(y.months, r.months_counted ?? 12);
-    const p = y.partners.get(r.partner_country) ?? { value: 0, iso3: r.partner_iso3 };
-    p.value += r.import_value_usd;
-    y.partners.set(r.partner_country, p);
+    // Only partners that actually shipped something.
+    //
+    // PXWeb returns a dense grid: every partner against every product, with a
+    // literal 0 where no trade happened. Counting those made the app say
+    // "United States supplied 27% of it, of 86 reporting partners" for Ghana's
+    // vehicle imports when 62 partners reported a value and 24 reported zero.
+    // A country that shipped nothing did not report a figure, it reported an
+    // absence, and the sentence claims otherwise.
+    //
+    // Across Ghana that is 22,683 of 41,280 partner entries, so the inflation
+    // is the majority of the list rather than an edge case.
+    //
+    // It also defeats the guard below. `shares.length >= 2` exists because an
+    // HHI over one supplier is 1 by definition and says nothing about
+    // concentration; a single phantom alongside one real supplier would pass
+    // that test and publish a concentration reading nobody measured.
+    //
+    // The year total is deliberately untouched: adding zero changes nothing,
+    // and a row reporting zero is still a row the source filed.
+    if (r.import_value_usd > 0) {
+      const p = y.partners.get(r.partner_country) ?? { value: 0, iso3: r.partner_iso3 };
+      p.value += r.import_value_usd;
+      y.partners.set(r.partner_country, p);
+    }
     byYear.set(r.year, y);
   }
 

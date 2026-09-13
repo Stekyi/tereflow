@@ -115,6 +115,85 @@ export const BLUE_OCEAN_VISIBILITIES: BlueOceanVisibility[] = ['hidden', 'premiu
 
 export type BlueOceanKind = 'concentrated_supply' | 'growing_unserved';
 
+// --- country config discovery ------------------------------------------------
+
+/** How far a discovery guess can be trusted, and why it is only that far. */
+export type DiscoveryCertainty = 'certain' | 'likely' | 'uncertain';
+
+export type DimensionRole =
+  | 'valuation'
+  | 'flow'
+  | 'year'
+  | 'month'
+  | 'product'
+  | 'partner'
+  | 'unknown';
+
+export interface DimensionGuess {
+  role: DimensionRole;
+  code: string;
+  text: string;
+  certainty: DiscoveryCertainty;
+  /** Why this role was assigned. Shown to the admin, not just logged. */
+  reason: string;
+  value_count: number;
+  sample_values: string[];
+  picked: { key: string; value: string | null; reason: string }[];
+}
+
+export interface DiscoveredPartner {
+  app_name: string;
+  source_name: string;
+  iso3: string;
+  certainty: DiscoveryCertainty;
+  reason: string;
+}
+
+export interface DiscoveryResult {
+  endpoint: string;
+  title: string;
+  dimensions: DimensionGuess[];
+  partners: DiscoveredPartner[];
+  /** Source names nothing could be matched to. Never silently dropped. */
+  unmatched_partners: string[];
+  classification_level: 'HS2' | 'HS4' | 'HS6' | 'HS10' | null;
+  classification_reason: string;
+  years: string[];
+  warnings: { severity: 'blocking' | 'check'; message: string }[];
+  ready_to_confirm: boolean;
+}
+
+/** A chapter big enough to be worth asking whether it should be excluded. */
+export interface DominanceCandidate {
+  product_code: string;
+  product_description: string | null;
+  value_usd: number;
+  share_pct: number;
+  reason: string;
+  already_excluded?: boolean;
+}
+
+/** A run in progress or finished, as the polling endpoint reports it. */
+export interface RunProgress {
+  id: string;
+  country_code: string;
+  provider: string;
+  started_at: string;
+  completed_at: string | null;
+  status: string;
+  records_received: number | null;
+  records_processed: number | null;
+  records_rejected: number | null;
+  /** Null when the source has no chapters to count, such as a single PDF. */
+  chapters_done: number | null;
+  chapters_total: number | null;
+  current_step: string | null;
+  error_message: string | null;
+  /** Null rather than 0 when there is nothing to divide. */
+  percent: number | null;
+  is_finished: boolean;
+}
+
 /** One uncontested line, with the reasoning and the caveats attached. */
 export interface BlueOcean {
   product_code: string;

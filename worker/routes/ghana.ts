@@ -42,6 +42,122 @@ async function sha256(text: string): Promise<string> {
  * This route writes only. It never fetches, so it cannot silently substitute a
  * source: whatever arrives here was produced by a provider that named itself.
  */
+/**
+ * Open a run before any fetching starts.
+ *
+ * Progress could not be reported before this existed. `/store` creates the run
+ * row after every chapter has already been fetched, so for the fourteen minutes
+ * that actually take time there was no row to poll and the UI could only show a
+ * spinner. A spinner cannot tell a run on chapter 84 of 96 from one that died
+ * on chapter 3.
+ *
+ * The run is opened as `running` with a known total and no records yet.
+ */
+ghana.post('/runs/open', async (c) => {
+  const denied = requireAdmin(c.req.raw, c.env);
+  if (denied) return denied;
+
+  const body = (await c.req.json().catch(() => null)) as {
+    country?: string;
+    provider?: string;
+    chapters_total?: number;
+    endpoint?: string;
+  } | null;
+  if (!body?.country) return bad('country is required.');
+
+  const runId = uid('run_');
+  await c.env.DB.prepare(
+    `INSERT INTO ingestion_runs
+       (id, country_code, provider, started_at, status, records_received,
+        records_processed, records_rejected, chapters_done, chapters_total, current_step, endpoint)
+     VALUES (?,?,?,datetime('now'),'running',0,0,0,0,?,?,?)`,
+  )
+    .bind(
+      runId,
+      body.country,
+      body.provider ?? 'pxweb',
+      // Null when the source has no chapters to count, such as a single PDF.
+      // Zero would render as a bar stuck at the start rather than as an absence.
+      typeof body.chapters_total === 'number' && body.chapters_total > 0 ? body.chapters_total : null,
+      'Starting',
+      body.endpoint ?? null,
+    )
+    .run();
+
+  return json({ run_id: runId, status: 'running' });
+});
+
+/**
+ * Move a run forward.
+ *
+ * Every field is optional and only what is sent is written, so a caller that
+ * knows its chapter count but not its record count does not have to invent one.
+ * Counts are absolute rather than increments: a retried chapter would otherwise
+ * be added twice, and the total would be wrong in a way that still looks like a
+ * total.
+ */
+ghana.post('/runs/:id/progress', async (c) => {
+  const denied = requireAdmin(c.req.raw, c.env);
+  if (denied) return denied;
+
+  const body = (await c.req.json().catch(() => null)) as {
+    chapters_done?: number;
+    chapters_total?: number;
+    records_received?: number;
+    records_processed?: number;
+    records_rejected?: number;
+    current_step?: string;
+  } | null;
+  if (!body) return bad('Expected a JSON body.');
+
+  const sets: string[] = [];
+  const binds: unknown[] = [];
+  const put = (column: string, value: unknown) => {
+    if (value === undefined || value === null) return;
+    sets.push(`${column} = ?`);
+    binds.push(value);
+  };
+
+  put('chapters_done', body.chapters_done);
+  put('chapters_total', body.chapters_total);
+  put('records_received', body.records_received);
+  put('records_processed', body.records_processed);
+  put('records_rejected', body.records_rejected);
+  put('current_step', body.current_step);
+
+  if (!sets.length) return bad('Nothing to update.');
+
+  binds.push(c.req.param('id'));
+  const res = await c.env.DB.prepare(
+    // Only while running. A finished run must not be edged forward afterwards:
+    // that would let a failed run quietly acquire a full progress bar.
+    `UPDATE ingestion_runs SET ${sets.join(', ')} WHERE id = ? AND status = 'running'`,
+  )
+    .bind(...binds)
+    .run();
+
+  if (!res.meta.changes) return bad('Unknown run, or it has already finished.', 404);
+  return json({ updated: true });
+});
+
+/** Close a run that failed, so it does not sit as running forever. */
+ghana.post('/runs/:id/fail', async (c) => {
+  const denied = requireAdmin(c.req.raw, c.env);
+  if (denied) return denied;
+
+  const body = (await c.req.json().catch(() => null)) as { error?: string } | null;
+  const res = await c.env.DB.prepare(
+    `UPDATE ingestion_runs
+        SET status = 'failed', completed_at = datetime('now'), error_message = ?, current_step = NULL
+      WHERE id = ? AND status = 'running'`,
+  )
+    .bind(body?.error ?? 'The run stopped without reporting a reason.', c.req.param('id'))
+    .run();
+
+  if (!res.meta.changes) return bad('Unknown run, or it has already finished.', 404);
+  return json({ failed: true });
+});
+
 ghana.post('/store', async (c) => {
   const denied = requireAdmin(c.req.raw, c.env);
   if (denied) return denied;
@@ -56,32 +172,66 @@ ghana.post('/store', async (c) => {
   const config = ACTIVE_COUNTRIES[body.country];
   if (!config) return bad(`No active configuration for ${body.country}.`, 404);
 
-  const runId = uid('run_');
   const now = new Date().toISOString();
 
-  await c.env.DB.prepare(
-    `INSERT INTO ingestion_runs
-       (id, country_code, provider, started_at, completed_at, status, records_received,
-        records_processed, records_rejected, years_requested, partners_requested,
-        products_requested, endpoint, query_json)
-     VALUES (?,?,?,?,?,'running',?,?,?,?,?,?,?,?)`,
-  )
-    .bind(
-      runId,
-      body.country,
-      'ghana-statbank',
-      body.started_at ?? now,
-      now,
-      body.records_received ?? body.observations.length,
-      body.observations.length,
-      body.records_rejected ?? 0,
-      (body.years ?? []).join(','),
-      body.partners_requested ?? 0,
-      new Set(body.observations.map((o) => o.product_code)).size,
-      body.endpoint ?? config.provider.endpoint,
-      JSON.stringify({ flow: body.flow, years: body.years }),
+  // Reuse the run the caller opened, so the row the UI has been polling is the
+  // row that gets the result. Creating a second one here would leave the first
+  // sitting as `running` forever and show the admin a finished run they were
+  // not watching.
+  const existing = body.run_id
+    ? await c.env.DB.prepare(`SELECT id FROM ingestion_runs WHERE id = ?`)
+        .bind(body.run_id)
+        .first<{ id: string }>()
+    : null;
+
+  const runId = existing?.id ?? uid('run_');
+
+  if (existing) {
+    await c.env.DB.prepare(
+      `UPDATE ingestion_runs
+          SET completed_at = ?, records_received = ?, records_processed = ?, records_rejected = ?,
+              years_requested = ?, partners_requested = ?, products_requested = ?,
+              endpoint = ?, query_json = ?, current_step = 'Storing'
+        WHERE id = ?`,
     )
-    .run();
+      .bind(
+        now,
+        body.records_received ?? body.observations.length,
+        body.observations.length,
+        body.records_rejected ?? 0,
+        (body.years ?? []).join(','),
+        body.partners_requested ?? 0,
+        new Set(body.observations.map((o) => o.product_code)).size,
+        body.endpoint ?? config.provider.endpoint,
+        JSON.stringify({ flow: body.flow, years: body.years }),
+        runId,
+      )
+      .run();
+  } else {
+    await c.env.DB.prepare(
+      `INSERT INTO ingestion_runs
+         (id, country_code, provider, started_at, completed_at, status, records_received,
+          records_processed, records_rejected, years_requested, partners_requested,
+          products_requested, endpoint, query_json)
+       VALUES (?,?,?,?,?,'running',?,?,?,?,?,?,?,?)`,
+    )
+      .bind(
+        runId,
+        body.country,
+        'ghana-statbank',
+        body.started_at ?? now,
+        now,
+        body.records_received ?? body.observations.length,
+        body.observations.length,
+        body.records_rejected ?? 0,
+        (body.years ?? []).join(','),
+        body.partners_requested ?? 0,
+        new Set(body.observations.map((o) => o.product_code)).size,
+        body.endpoint ?? config.provider.endpoint,
+        JSON.stringify({ flow: body.flow, years: body.years }),
+      )
+      .run();
+  }
 
   try {
     await storeRaw(c.env, runId, config, body.raw ?? []);
@@ -102,7 +252,13 @@ ghana.post('/store', async (c) => {
     return bad(`Storing failed and the run was marked failed: ${message}`, 500);
   }
 
-  await c.env.DB.prepare(`UPDATE ingestion_runs SET status='ok' WHERE id=?`).bind(runId).run();
+  await c.env.DB.prepare(
+    `UPDATE ingestion_runs SET status='ok', current_step=NULL,
+            chapters_done = COALESCE(chapters_total, chapters_done)
+      WHERE id=?`,
+  )
+    .bind(runId)
+    .run();
 
   return json({
     run_id: runId,
@@ -116,6 +272,12 @@ ghana.post('/store', async (c) => {
 interface StorePayload {
   country: string;
   flow: TradeFlow;
+  /**
+   * The run opened before fetching started, if there was one. Sent so the row
+   * the UI has been polling is the row that gets the result, rather than a
+   * second row appearing at the end and the first sitting as running forever.
+   */
+  run_id?: string;
   started_at?: string;
   endpoint?: string;
   years?: string[];
@@ -376,13 +538,51 @@ ghana.get('/runs', async (c) => {
   const country = c.req.query('country') ?? 'GH';
   const { results } = await c.env.DB.prepare(
     `SELECT id, provider, started_at, completed_at, status, records_received,
-            records_processed, records_rejected, error_message
+            records_processed, records_rejected, error_message,
+            chapters_done, chapters_total, current_step
        FROM ingestion_runs WHERE country_code = ?
       ORDER BY started_at DESC LIMIT 20`,
   )
     .bind(country)
     .all();
   return json({ country, runs: results ?? [] });
+});
+
+/**
+ * One run, for polling while it is going.
+ *
+ * Separate from /runs because it is called every couple of seconds and should
+ * stay as small as it can be. It returns the counts the table already tracks
+ * rather than inventing a progress model: what was received, what survived
+ * parsing, and what was rejected are the three numbers that describe a run.
+ *
+ * chapters_done and chapters_total are null for a source with no chapters to
+ * count, such as a single PDF. Null means "no progress to report", which the
+ * UI shows as an absence rather than as a bar stuck at zero.
+ */
+ghana.get('/runs/:id', async (c) => {
+  const run = await c.env.DB.prepare(
+    `SELECT id, country_code, provider, started_at, completed_at, status,
+            records_received, records_processed, records_rejected,
+            chapters_done, chapters_total, current_step, error_message
+       FROM ingestion_runs WHERE id = ?`,
+  )
+    .bind(c.req.param('id'))
+    .first();
+
+  if (!run) return bad('Unknown run', 404);
+
+  const done = run.chapters_done as number | null;
+  const total = run.chapters_total as number | null;
+  return json({
+    ...run,
+    // Computed here so every caller shows the same number. A percentage worked
+    // out in two places is a percentage that eventually disagrees with itself.
+    // Null rather than 0 when there is nothing to divide, because a run with no
+    // chapters has no percentage, not a percentage of zero.
+    percent: total != null && total > 0 && done != null ? Math.round((done / total) * 100) : null,
+    is_finished: run.status !== 'running',
+  });
 });
 
 function shapeOpportunity(r: Record<string, unknown>) {

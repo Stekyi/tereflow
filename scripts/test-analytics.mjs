@@ -316,6 +316,95 @@ console.log('---------------------------------');
     opps.filter((o) => !o.is_excluded)[0].product_code === '87');
 }
 
+console.log('\nA partner that shipped nothing is not a partner');
+console.log('----------------------------------------------');
+// PXWeb returns a dense grid: every partner against every product, with a
+// literal 0 where no trade happened. Counting those made Ghana's vehicle
+// imports read "United States supplied 27% of it, of 86 reporting partners"
+// when 62 reported a value and 24 reported zero. Across Ghana that was 22,683
+// of 41,280 partner entries, so the inflation was most of the list.
+{
+  const rows = [
+    ...series([4e6, 5e6, 6e6, 7e6, 8e6], { partner_country: 'India', partner_iso3: 'IND' }),
+    ...series([2e6, 2e6, 2e6, 2e6, 2e6], { partner_country: 'Turkey', partner_iso3: 'TUR' }),
+    ...series([0, 0, 0, 0, 0], { partner_country: 'Fiji', partner_iso3: 'FJI' }),
+    ...series([0, 0, 0, 0, 0], { partner_country: 'Samoa', partner_iso3: 'WSM' }),
+  ];
+  const m = computeMetrics(rows, GHANA)[0];
+
+  check('partners that shipped nothing are not counted', m.partner_count === 2, `${m.partner_count}`);
+  check(
+    'and do not appear in the shares list',
+    !m.partner_shares.some((p) => p.partner === 'Fiji' || p.partner === 'Samoa'),
+    m.partner_shares.map((p) => p.partner).join(', '),
+  );
+  check('no share is 0%', m.partner_shares.every((p) => p.share_pct > 0));
+
+  // The year total is deliberately untouched: adding zero changes nothing, and
+  // a row reporting zero is still a row the source filed.
+  check('the year total is unchanged', m.import_value_usd === 10e6, `${m.import_value_usd}`);
+  check(
+    'shares still add to 100',
+    Math.abs(m.partner_shares.reduce((s, p) => s + p.share_pct, 0) - 100) < 0.01,
+  );
+}
+
+console.log('\nPhantoms cannot defeat the single-supplier guard');
+console.log('-----------------------------------------------');
+// `shares.length >= 2` exists because an HHI over one supplier is 1 by
+// definition and says nothing about concentration. One phantom alongside one
+// real supplier would pass that test and publish a concentration reading
+// nobody measured.
+{
+  const rows = [
+    ...series([4e6, 5e6, 6e6, 7e6, 8e6], { partner_country: 'India', partner_iso3: 'IND' }),
+    ...series([0, 0, 0, 0, 0], { partner_country: 'Fiji', partner_iso3: 'FJI' }),
+  ];
+  const m = computeMetrics(rows, GHANA)[0];
+
+  check('one real supplier counts as one', m.partner_count === 1, `${m.partner_count}`);
+  check(
+    'and concentration is withheld, not reported as total',
+    m.supplier_hhi === null,
+    `${m.supplier_hhi}`,
+  );
+  check(
+    'with the reason stated',
+    m.limitations.some((l) => /[Ff]ewer than two partner/.test(l)),
+    m.limitations.join(' | '),
+  );
+
+  // classifySignal() treats a sole supplier as supplier_diversification on
+  // purpose: calling it import_substitution would put "supplied from many
+  // countries" over a single supplier. So the classification is not where the
+  // phantom does damage.
+  //
+  // The damage is above it. With one real partner and one phantom, shares.length
+  // is 2, so an HHI of 1.0 gets published as a measurement and the "fewer than
+  // two partner countries reported" limitation is never emitted. The number is
+  // arithmetically correct and the claim it makes is false: nobody measured
+  // concentration across two suppliers, because there was only ever one.
+  check(
+    'a sole supplier is still named as concentrated supply',
+    classifySignal(m, GHANA) === 'supplier_diversification',
+    String(classifySignal(m, GHANA)),
+  );
+}
+
+console.log('\nA product nobody shipped claims no suppliers');
+console.log('-------------------------------------------');
+{
+  const rows = series([0, 0, 0, 0, 0], { partner_country: 'Fiji', partner_iso3: 'FJI' });
+  const m = computeMetrics(rows, GHANA)[0];
+  // The rows are real and the year totals are real, so metrics may still exist.
+  // What must not happen is a partner list implying somebody supplied it.
+  if (m) {
+    check('no partners are claimed', m.partner_count === 0, `${m.partner_count}`);
+    check('and no top partner is named', m.top_partner == null, JSON.stringify(m.top_partner));
+  } else {
+    check('a product with no positive trade produces no metrics', true);
+  }
+}
 console.log(`\n${passed} passed, ${failed} failed\n`);
 rmSync(OUT, { force: true });
 process.exitCode = failed === 0 ? 0 : 1;

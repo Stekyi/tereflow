@@ -32,6 +32,7 @@ import {
   type SourceHealth,
 } from '../lib/api';
 import { Chips, Empty, Skeletons, Toggle, useToast } from '../components/ui';
+import { CountryOnboarding } from '../components/CountryOnboarding';
 import {
   EXPORT_CATEGORY_LABEL,
   KIND_LABEL,
@@ -52,6 +53,7 @@ type SectionId =
   | 'overview'
   | 'registry'
   | 'pipeline'
+  | 'countries'
   | 'sources'
   | 'products'
   | 'users'
@@ -67,6 +69,7 @@ const SECTIONS: { id: SectionId; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z' },
   { id: 'registry', label: 'Registry', icon: 'M4 6h16M4 12h16M4 18h16' },
   { id: 'pipeline', label: 'Pipeline', icon: 'M4 7h6M4 12h10M4 17h7M20 5v14' },
+  { id: 'countries', label: 'Countries', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18' },
   { id: 'sources', label: 'Sources', icon: 'M9 15l6-6M8 9a3 3 0 0 0 0 6h1M16 9h-1a3 3 0 0 1 0 6' },
   { id: 'products', label: 'Products', icon: 'M20 12l-8 8-8-8 8-8h8zM16 8h.01' },
   { id: 'users', label: 'Users', icon: 'M16 11a3 3 0 1 0-6 0M4 20c0-3 3-5 6-5s6 2 6 5M18 14c2 0 4 1.5 4 4' },
@@ -161,6 +164,7 @@ export default function Portal() {
           {section === 'overview' && <Overview onError={onError} />}
           {section === 'registry' && <Registry t={t} onError={onError} />}
           {section === 'pipeline' && <Pipeline onError={onError} />}
+          {section === 'countries' && <CountryOnboarding t={t} onError={onError} />}
           {section === 'sources' && <Sources t={t} onError={onError} />}
           {section === 'products' && <Products t={t} onError={onError} />}
           {section === 'users' && <Users onError={onError} />}
@@ -221,9 +225,9 @@ function Panel({
 
 /* ---- helpers ---- */
 
-const fmtDate = (s: string | null | undefined) => (s ? s.slice(0, 10) : '—');
+const fmtDate = (s: string | null | undefined) => (s ? s.slice(0, 10) : 'Ã¢â‚¬â€');
 const fmtDateTime = (s: string | null | undefined) =>
-  s ? s.slice(0, 16).replace('T', ' ') : '—';
+  s ? s.slice(0, 16).replace('T', ' ') : 'Ã¢â‚¬â€';
 const num = (n: number | null | undefined) => (n == null ? '0' : n.toLocaleString('en'));
 
 function StatusBadge({ status }: { status: string }) {
@@ -309,7 +313,7 @@ function Overview({ onError }: { onError: OnError }) {
             <div className="tiny dim">
               {num(run.entities_ok)} ok, {num(run.entities_failed)} failed, {num(run.entities_skipped)} skipped
               {run.facts_written != null ? `, ${num(run.facts_written)} facts written` : ''}
-              {run.finished_at ? ` · finished ${fmtDateTime(run.finished_at)}` : ' · still running'}
+              {run.finished_at ? ` Ã‚Â· finished ${fmtDateTime(run.finished_at)}` : ' Ã‚Â· still running'}
             </div>
           </div>
         ) : (
@@ -471,7 +475,7 @@ function Registry({ t, onError }: { t: Toaster; onError: OnError }) {
     <>
       <div className="row between" style={{ marginBottom: 12 }}>
         <span className="small dim">
-          {entities.length} records · {activeCount} active
+          {entities.length} records Ã‚Â· {activeCount} active
         </span>
         <Link className="btn primary sm" to="/admin/new">
           + New record
@@ -539,10 +543,10 @@ function Registry({ t, onError }: { t: Toaster; onError: OnError }) {
                 <div className="name">{e.name}</div>
                 <div className="tiny dim">
                   {KIND_LABEL[e.kind]}
-                  {e.iso3 ? ` · ${e.iso3}` : ''} · {links} links
-                  {broken > 0 && <span className="down"> · {broken} broken</span>}
-                  {e.last_error && <span className="down"> · error</span>}
-                  {e.last_ingest_at && ` · ${e.last_ingest_at.slice(0, 10)}`}
+                  {e.iso3 ? ` Ã‚Â· ${e.iso3}` : ''} Ã‚Â· {links} links
+                  {broken > 0 && <span className="down"> Ã‚Â· {broken} broken</span>}
+                  {e.last_error && <span className="down"> Ã‚Â· error</span>}
+                  {e.last_ingest_at && ` Ã‚Â· ${e.last_ingest_at.slice(0, 10)}`}
                 </div>
               </div>
               <div className="row" style={{ gap: 6 }}>
@@ -643,7 +647,7 @@ function Pipeline({ onError }: { onError: OnError }) {
                     <td className="align-right">{num(r.entities_ok)}</td>
                     <td className="align-right">{num(r.entities_failed)}</td>
                     <td className="align-right">{num(r.entities_skipped)}</td>
-                    <td className="align-right">{r.facts_written == null ? '—' : num(r.facts_written)}</td>
+                    <td className="align-right">{r.facts_written == null ? 'Ã¢â‚¬â€' : num(r.facts_written)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -676,7 +680,7 @@ function Pipeline({ onError }: { onError: OnError }) {
                     </span>
                   </td>
                   <td>{fmtDate(c.last_ingest_at)}</td>
-                  <td className="align-right">{c.coverage_score == null ? '—' : c.coverage_score.toFixed(0)}</td>
+                  <td className="align-right">{c.coverage_score == null ? 'Ã¢â‚¬â€' : c.coverage_score.toFixed(0)}</td>
                   <td className="align-right">{num(c.facts)}</td>
                   <td className="align-right">{num(c.signals)}</td>
                   <td className="down tiny">{c.last_error ?? ''}</td>
@@ -782,7 +786,7 @@ function Sources({ t, onError }: { t: Toaster; onError: OnError }) {
                       {s.tls_warning ? <span className="badge watch" style={{ marginLeft: 6 }}>TLS warning</span> : null}
                     </td>
                     <td>{s.fmt}</td>
-                    <td className="align-right">{s.last_status ?? '—'}</td>
+                    <td className="align-right">{s.last_status ?? 'Ã¢â‚¬â€'}</td>
                     <td>{fmtDate(s.last_checked_at)}</td>
                   </tr>
                 );
@@ -904,7 +908,7 @@ function Products({ t, onError }: { t: Toaster; onError: OnError }) {
             <div className="row between">
               <span className="grow">
                 <span className="name">
-                  HS {r.hs_code} · {r.label}
+                  HS {r.hs_code} Ã‚Â· {r.label}
                 </span>
                 <span className="tiny dim">{SOURCE_LABEL[r.source]}</span>
               </span>
@@ -1072,11 +1076,11 @@ function Users({ onError }: { onError: OnError }) {
               {users.map((u) => (
                 <tr key={u.id}>
                   <td>{u.email}{u.email_verified ? '' : ' (unverified)'}</td>
-                  <td>{u.full_name ?? '—'}</td>
+                  <td>{u.full_name ?? 'Ã¢â‚¬â€'}</td>
                   <td>
                     <span className={`badge ${u.tier === 'premium' ? 'premium' : 'off'}`}>{u.tier}</span>
                   </td>
-                  <td>{u.country_iso3 ?? '—'}</td>
+                  <td>{u.country_iso3 ?? 'Ã¢â‚¬â€'}</td>
                   <td className="align-right">{num(u.cards)}</td>
                   <td className="align-right">{num(u.follows)}</td>
                   <td>{fmtDate(u.created_at)}</td>
@@ -1146,8 +1150,8 @@ function Network({ onError }: { onError: OnError }) {
                 {cards.map((c) => (
                   <tr key={c.id}>
                     <td>{c.display_name}</td>
-                    <td>{c.company ?? '—'}</td>
-                    <td>{c.country_iso3 ?? '—'}</td>
+                    <td>{c.company ?? 'Ã¢â‚¬â€'}</td>
+                    <td>{c.country_iso3 ?? 'Ã¢â‚¬â€'}</td>
                     <td>
                       <span className={`badge ${c.is_published ? 'on' : 'off'}`}>
                         {c.is_published ? 'Published' : 'Draft'}
@@ -1155,9 +1159,9 @@ function Network({ onError }: { onError: OnError }) {
                       {c.is_verified ? <span className="badge strong" style={{ marginLeft: 4 }}>Verified</span> : null}
                     </td>
                     <td className="align-right">
-                      {c.rating_count > 0 ? `${(c.rating_avg ?? 0).toFixed(1)} (${c.rating_count})` : '—'}
+                      {c.rating_count > 0 ? `${(c.rating_avg ?? 0).toFixed(1)} (${c.rating_count})` : 'Ã¢â‚¬â€'}
                     </td>
-                    <td className="tiny dim">{c.owner_email ?? c.owner_name ?? '—'}</td>
+                    <td className="tiny dim">{c.owner_email ?? c.owner_name ?? 'Ã¢â‚¬â€'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1176,15 +1180,15 @@ function Network({ onError }: { onError: OnError }) {
             <div className="list-item" key={r.id} style={{ display: 'block', cursor: 'default' }}>
               <div className="row between">
                 <span className="name">
-                  {'★'.repeat(Math.max(0, Math.min(5, r.score)))}
-                  {'☆'.repeat(Math.max(0, 5 - r.score))}
+                  {'Ã¢Ëœâ€¦'.repeat(Math.max(0, Math.min(5, r.score)))}
+                  {'Ã¢Ëœâ€ '.repeat(Math.max(0, 5 - r.score))}
                 </span>
                 <span className="tiny dim">{fmtDate(r.created_at)}</span>
               </div>
               {r.comment && <p className="small" style={{ margin: '6px 0 0' }}>{r.comment}</p>}
               <p className="tiny dim" style={{ margin: '6px 0 0' }}>
                 {r.rater_name ?? 'Someone'} rated {r.rated_name ?? r.rated_headline ?? 'a card'}
-                {r.dealt_in ? ` · dealt in ${r.dealt_in}` : ''}
+                {r.dealt_in ? ` Ã‚Â· dealt in ${r.dealt_in}` : ''}
               </p>
             </div>
           ))
@@ -1286,12 +1290,12 @@ function Premium({ onError }: { onError: OnError }) {
                   <tr key={b.id}>
                     <td>{fmtDate(b.created_at)}</td>
                     <td>{b.kind}</td>
-                    <td>{b.provider ?? '—'}</td>
-                    <td>{b.plan ?? '—'}</td>
+                    <td>{b.provider ?? 'Ã¢â‚¬â€'}</td>
+                    <td>{b.plan ?? 'Ã¢â‚¬â€'}</td>
                     <td className="align-right">
-                      {b.amount_minor == null ? '—' : `${(b.amount_minor / 100).toFixed(2)} ${b.currency ?? ''}`}
+                      {b.amount_minor == null ? 'Ã¢â‚¬â€' : `${(b.amount_minor / 100).toFixed(2)} ${b.currency ?? ''}`}
                     </td>
-                    <td className="tiny dim">{b.user_email ?? '—'}</td>
+                    <td className="tiny dim">{b.user_email ?? 'Ã¢â‚¬â€'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1340,14 +1344,14 @@ function Content({ onError }: { onError: OnError }) {
             {playbooks.map((p) => (
               <tr key={p.slug}>
                 <td>{p.title}</td>
-                <td>{p.sector ?? '—'}</td>
-                <td>{p.country_iso3 ?? '—'}</td>
+                <td>{p.sector ?? 'Ã¢â‚¬â€'}</td>
+                <td>{p.country_iso3 ?? 'Ã¢â‚¬â€'}</td>
                 <td>
                   <span className={`badge ${p.premium_only ? 'premium' : 'on'}`}>
                     {p.premium_only ? 'Premium' : 'Free'}
                   </span>
                 </td>
-                <td className="align-right">{p.reading_minutes ?? '—'}</td>
+                <td className="align-right">{p.reading_minutes ?? 'Ã¢â‚¬â€'}</td>
                 <td>{fmtDate(p.published_at)}</td>
               </tr>
             ))}
@@ -1442,7 +1446,7 @@ function Feedback({ t, onError }: { t: Toaster; onError: OnError }) {
               ) : (
                 'Not signed in, no reply address'
               )}
-              {r.path ? ` · from ${r.path}` : ''}
+              {r.path ? ` Ã‚Â· from ${r.path}` : ''}
             </p>
 
             <div className="row" style={{ gap: 6 }}>

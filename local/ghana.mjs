@@ -153,6 +153,42 @@ async function main() {
   const chapters = chapterLimit ? limitedChapters(chapterLimit) : await allChapters(GHANA);
   log('INFO', `Products requested: ${chapters.length}`);
 
+  // Open the run before fetching, so there is something to poll for the
+  // fourteen minutes this takes. Without it the admin screen can only show a
+  // spinner, which cannot distinguish a run on chapter 84 from one that died on
+  // chapter 3.
+  //
+  // Best effort: a reporting failure must not stop an ingest. If the run cannot
+  // be opened the fetch still happens and /store creates the row at the end,
+  // exactly as it did before.
+  let runId = null;
+  try {
+    const opened = await api('/api/ghana/runs/open', {
+      method: 'POST',
+      body: JSON.stringify({
+        country: GHANA.code,
+        provider: 'ghana-statbank',
+        chapters_total: chapters.length,
+        endpoint: GHANA.provider.endpoint,
+      }),
+    });
+    runId = opened?.run_id ?? null;
+    if (runId) log('INFO', `Run opened: ${runId}`);
+  } catch (err) {
+    log('WARN', `Could not open a run for progress reporting: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  /** Push progress, swallowing failures. Reporting is not the job. */
+  async function reportProgress(body) {
+    if (!runId) return;
+    try {
+      await api(`/api/ghana/runs/${runId}/progress`, { method: 'POST', body: JSON.stringify(body) });
+    } catch {
+      // A dropped update leaves the bar briefly stale, which is a better
+      // outcome than a failed ingest.
+    }
+  }
+
   const observations = [];
   const notes = [];
   const rejections = [];
@@ -174,6 +210,15 @@ async function main() {
     } catch (err) {
       failedChapters++;
       log('WARN', `HS${code} failed: ${err instanceof Error ? err.message : String(err)}`);
+      // Counted as done even though it failed. Progress is how far through the
+      // work the run is, not how much of it worked; conflating the two leaves a
+      // run with failures appearing to stall.
+      await reportProgress({
+        chapters_done: i + 1,
+        records_received: received,
+        records_processed: observations.length,
+        current_step: `Chapter ${code} failed`,
+      });
       continue;
     }
 
@@ -186,6 +231,14 @@ async function main() {
     // the chapter it came from and the count in the log means something.
     const good = result.observations.filter(valid);
     observations.push(...good);
+
+    await reportProgress({
+      chapters_done: i + 1,
+      records_received: received,
+      records_processed: observations.length,
+      records_rejected: received - observations.length + rejections.length,
+      current_step: `Chapter ${code}`,
+    });
 
     if ((i + 1) % 12 === 0 || i === chapters.length - 1) {
       log('INFO', `Progress: ${i + 1}/${chapters.length} chapters, ${observations.length} observations`);
@@ -203,7 +256,18 @@ async function main() {
   for (const note of notes.slice(0, 6)) log('INFO', `Note: ${note}`);
   for (const r of rejections.slice(0, 6)) log('WARN', `Rejected (${r.reason}): ${r.detail}`);
 
-  if (!observations.length) return fail('No observations survived validation. Nothing was stored.');
+  if (!observations.length) {
+    // Close the run rather than leaving it as `running` forever. An abandoned
+    // row shows the admin screen a run permanently in progress, which is worse
+    // than a visible failure because nobody goes looking for it.
+    if (runId) {
+      await api(`/api/ghana/runs/${runId}/fail`, {
+        method: 'POST',
+        body: JSON.stringify({ error: 'No observations survived validation. Nothing was stored.' }),
+      }).catch(() => undefined);
+    }
+    return fail('No observations survived validation. Nothing was stored.');
+  }
 
   const result = {
     observations,
@@ -234,6 +298,14 @@ async function main() {
 
   if (dryRun) {
     log('INFO', 'Dry run: nothing was written.');
+    // A dry run that opened a row must close it, or the admin screen shows a
+    // run stuck at 100% that never finished.
+    if (runId) {
+      await api(`/api/ghana/runs/${runId}/fail`, {
+        method: 'POST',
+        body: JSON.stringify({ error: 'Dry run: nothing was written.' }),
+      }).catch(() => undefined);
+    }
     rmSync(BUNDLE, { force: true });
     return;
   }
@@ -244,6 +316,10 @@ async function main() {
       body: JSON.stringify({
         country: GHANA.code,
         flow,
+        // The run opened before fetching, so the row the admin screen has been
+        // polling is the row that gets the result rather than a second one
+        // appearing at the end.
+        run_id: runId ?? undefined,
         started_at: startedAt,
         endpoint: GHANA.provider.endpoint,
         years: GHANA.years,
@@ -264,7 +340,14 @@ async function main() {
     log('INFO', `Run: ${stored.run_id}`);
     log('INFO', 'Ghana StatBank ingestion completed successfully');
   } catch (err) {
-    return fail(`Storing results failed: ${err instanceof Error ? err.message : String(err)}`);
+    const detail = err instanceof Error ? err.message : String(err);
+    if (runId) {
+      await api(`/api/ghana/runs/${runId}/fail`, {
+        method: 'POST',
+        body: JSON.stringify({ error: `Storing results failed: ${detail}` }),
+      }).catch(() => undefined);
+    }
+    return fail(`Storing results failed: ${detail}`);
   }
 
   rmSync(BUNDLE, { force: true });

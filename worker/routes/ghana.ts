@@ -545,7 +545,25 @@ ghana.get('/runs', async (c) => {
   )
     .bind(country)
     .all();
-  return json({ country, runs: results ?? [] });
+
+  // Shaped exactly as /runs/:id shapes one run. The list left out `percent` and
+  // `is_finished`, so a caller reading a finished run from here saw
+  // `is_finished === undefined` and treated it as still going: the run summary
+  // never appeared, and the panel invited the admin to start a run that had
+  // already completed. Two endpoints describing the same row have to describe
+  // it the same way.
+  const runs = (results ?? []).map((run) => {
+    const done = run.chapters_done as number | null;
+    const total = run.chapters_total as number | null;
+    return {
+      ...run,
+      country_code: country,
+      percent: total != null && total > 0 && done != null ? Math.round((done / total) * 100) : null,
+      is_finished: run.status !== 'running',
+    };
+  });
+
+  return json({ country, runs });
 });
 
 /**

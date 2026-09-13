@@ -28,6 +28,7 @@ import type {
   TradeDataProvider,
   TradeFlow,
   TradeObservation,
+  FetchProgress,
 } from './types';
 
 /** json-stat2, the shape PXWeb returns when asked for it. */
@@ -63,6 +64,7 @@ export class GhanaStatBankProvider implements TradeDataProvider {
     years: string[];
     partners: PartnerMapping[];
     products: string[] | 'all';
+    onProgress?: (p: FetchProgress) => void | Promise<void>;
   }): Promise<ProviderResult> {
     const { config, flow, years, partners } = input;
     const result: ProviderResult = {
@@ -104,6 +106,18 @@ export class GhanaStatBankProvider implements TradeDataProvider {
 
     const retrievedAt = new Date().toISOString();
     let anySucceeded = false;
+    let done = 0;
+
+    // Reported per chapter rather than at the end, because the end is fourteen
+    // minutes away and until then a caller has nothing to show but a spinner. A
+    // spinner cannot distinguish a run on chapter 84 from one that died on
+    // chapter 3.
+    await input.onProgress?.({
+      done: 0,
+      total: wanted.length,
+      step: `Fetching ${wanted.length} chapters`,
+      observations: 0,
+    });
 
     for (const chapter of wanted) {
       try {
@@ -128,6 +142,17 @@ export class GhanaStatBankProvider implements TradeDataProvider {
           detail: `${chapterCode(chapter)}: ${message(err)}`,
         });
       }
+
+      // Counted whether the chapter succeeded or failed. Progress is how far
+      // through the work the run is, not how much of it worked; conflating the
+      // two would leave a run with failures appearing to stall.
+      done += 1;
+      await input.onProgress?.({
+        done,
+        total: wanted.length,
+        step: `Chapter ${chapterCode(chapter)}`,
+        observations: result.observations.length,
+      });
     }
 
     if (!anySucceeded) {

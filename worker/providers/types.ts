@@ -123,6 +123,15 @@ export interface CountryConfig {
   scoring: ScoringWeights;
 }
 
+/** How far through a fetch is. Reported as it goes, not at the end. */
+export interface FetchProgress {
+  done: number;
+  total: number;
+  /** What is happening right now, for the line under the bar. */
+  step: string;
+  observations: number;
+}
+
 export interface TradeDataProvider {
   readonly name: string;
   fetchObservations(input: {
@@ -131,5 +140,12 @@ export interface TradeDataProvider {
     years: string[];
     partners: PartnerMapping[];
     products: string[] | 'all';
+    /**
+     * Called as each unit of work completes. Optional, and awaited: a caller
+     * reporting progress over the network must not have its updates overlap,
+     * which would let an earlier count arrive after a later one and the bar go
+     * backwards.
+     */
+    onProgress?: (p: FetchProgress) => void | Promise<void>;
   }): Promise<ProviderResult>;
 }

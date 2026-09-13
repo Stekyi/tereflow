@@ -343,6 +343,9 @@ function RunPanel({
 }) {
   const [runs, setRuns] = useState<RunProgress[] | null>(null);
   const [watching, setWatching] = useState<RunProgress | null>(null);
+  const [flow, setFlow] = useState<'import' | 'export'>('import');
+  const [busy, setBusy] = useState(false);
+  const [agent, setAgent] = useState<{ queued: number; agent_recently_active: boolean } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const code = country?.iso2 ?? 'GH';
@@ -354,10 +357,11 @@ function RunPanel({
         setRuns(r.runs);
         // Pick up a run already going, so opening the page mid-run shows
         // progress rather than an idle button.
-        const live = r.runs.find((x) => x.status === 'running');
+        const live = r.runs.find((x) => x.status === 'running' || x.status === 'queued');
         setWatching(live ?? null);
       })
       .catch(onError);
+    api.admin.agentStatus(code).then(setAgent).catch(() => undefined);
   }, [code, onError]);
 
   useEffect(() => {
@@ -373,6 +377,9 @@ function RunPanel({
       try {
         const next = await api.admin.runProgress(watching.id);
         setWatching(next);
+        // Refreshed alongside, so a queued run that nothing picks up starts
+        // saying so rather than sitting under a bar forever.
+        api.admin.agentStatus(code).then(setAgent).catch(() => undefined);
         if (next.is_finished) {
           t.ok(next.status === 'ok' ? 'Run finished.' : `Run ${next.status}.`);
           load();
@@ -384,25 +391,68 @@ function RunPanel({
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [watching, load, t, onError]);
+  }, [watching, load, code, t, onError]);
+
+  async function startRun() {
+    setBusy(true);
+    try {
+      const r = await api.admin.requestRun(code, flow);
+      t.ok(r.already_pending ? (r.message ?? 'Already pending.') : `Run queued for ${flow}s.`);
+      load();
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const last = runs?.[0];
+  const pending = watching && !watching.is_finished;
+  // A queued run with nothing listening will not start. That is invisible from
+  // the run row alone, and showing a progress bar for it is how somebody waits
+  // twenty minutes for nothing.
+  const stuck = pending && watching.status === 'queued' && agent && !agent.agent_recently_active;
 
   return (
     <div className="card">
       <p className="card-title">Run analysis</p>
       <p className="tiny dim" style={{ margin: '0 0 10px' }}>
         Fetches whatever sources are configured for {country?.name ?? slug}, analyses them, and
-        publishes the result. Ingestion runs on the operator's machine rather than in the Worker,
-        because one full country is ninety-six sequential calls to somebody else's API.
+        publishes the result. One country is ninety-six sequential calls to somebody else's API at
+        roughly eight seconds each, so a run takes about fourteen minutes and happens on the
+        operator's machine rather than in the Worker.
       </p>
 
-      {watching && !watching.is_finished ? (
+      <div className="row" style={{ gap: 8, alignItems: 'center', marginBottom: 10 }}>
+        <select
+          value={flow}
+          onChange={(e) => setFlow(e.target.value as 'import' | 'export')}
+          style={{ flex: '0 0 140px' }}
+          disabled={busy || Boolean(pending)}
+        >
+          <option value="import">Imports</option>
+          <option value="export">Exports</option>
+        </select>
+        <button className="btn primary" onClick={startRun} disabled={busy || Boolean(pending)}>
+          {busy ? 'Asking\u2026' : pending ? 'A run is already going' : 'Run analysis'}
+        </button>
+      </div>
+
+      {stuck && (
+        <div className="callout warn" style={{ marginBottom: 10 }}>
+          <strong>This run is waiting and nothing is listening.</strong> The agent that does the
+          fetching is not running, so it will sit here until it starts. On the machine that holds
+          the credentials: <code>npm run ghana -- --watch</code>.
+        </div>
+      )}
+
+      {pending ? (
         <ProgressBar run={watching} />
       ) : (
         <p className="tiny dim">
-          Start a run from the command line with <code>npm run ghana</code>. Progress appears here
-          while it goes.
+          {agent?.agent_recently_active
+            ? 'An agent is listening. A run starts within a few seconds of asking.'
+            : 'No agent has claimed work recently. Start one with npm run ghana -- --watch, or a run will queue and wait.'}
         </p>
       )}
 

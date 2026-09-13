@@ -42,19 +42,30 @@ const val = (f) => {
 const dryRun = has('dry-run');
 const flow = val('flow') ?? 'import';
 const chapterLimit = Number(val('chapters') ?? 0) || null;
+/**
+ * Watch mode: stay up and take whatever the admin asks for.
+ *
+ * The admin wanted one button. The work behind it is about fourteen minutes of
+ * sequential calls to a government API, which does not fit in a Worker request,
+ * so the button queues and this drains the queue. Without something in watch
+ * mode a queued run waits forever, which is why the UI reports whether anything
+ * has claimed work recently rather than just showing a bar.
+ */
+const watch = has('watch');
+const pollSeconds = Number(val('poll') ?? 5) || 5;
 const BUNDLE = '.tmp-ghana-pipeline.mjs';
 
 function log(level, message) {
   console.log(`[${level}] ${message}`);
 }
 
-async function api(path, init = {}) {
+async function api(path, init = {}, timeoutMs = 180_000) {
   const headers = new Headers(init.headers);
   headers.set('accept', 'application/json');
   headers.set('authorization', `Bearer ${TOKEN}`);
   if (init.body) headers.set('content-type', 'application/json');
   headers.set('connection', 'close');
-  const res = await fetch(`${API}${path}`, { ...init, headers, signal: AbortSignal.timeout(180_000) });
+  const res = await fetch(`${API}${path}`, { ...init, headers, signal: AbortSignal.timeout(timeoutMs) });
   const text = await res.text();
   let body = null;
   try {
@@ -64,6 +75,28 @@ async function api(path, init = {}) {
   }
   if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status} from ${path}`);
   return body;
+}
+
+/**
+ * A progress update, which must never hold up the work it is describing.
+ *
+ * The default timeout is three minutes, which is right for storing a run's
+ * results and badly wrong for saying how far along it is. A stalled connection
+ * on a progress call froze an entire ingest before the first chapter, and the
+ * log went quiet with no indication why.
+ *
+ * Five seconds, and a failure is logged rather than swallowed. Best effort is
+ * not the same as silent: this failing means the admin watches an empty bar,
+ * and something should say so.
+ */
+async function reportRun(path, body, what) {
+  try {
+    await api(path, { method: 'POST', body: JSON.stringify(body) }, 5_000);
+    return true;
+  } catch (err) {
+    log('WARN', `Could not report ${what}: ${err instanceof Error ? err.message : String(err)}`);
+    return false;
+  }
 }
 
 function fail(messageText) {
@@ -106,15 +139,23 @@ function valid(o) {
   return true;
 }
 
-async function main() {
+/**
+ * One ingest.
+ *
+ * `runFlow` and `existingRunId` are passed rather than read from argv so watch
+ * mode can drive this per queued job. A run claimed from the queue already has
+ * a row, and opening a second one would leave the first as `running` forever
+ * while the admin watched the wrong bar.
+ */
+async function main(runFlow = flow, existingRunId = null) {
   // Stage 1: validate configuration before anything is fetched or written.
   if (!TOKEN) {
     log('ERROR', 'TEREFLOW_ADMIN_TOKEN is not set. Put it in local/.env or the environment.');
     process.exitCode = 1;
     return;
   }
-  if (flow !== 'import' && flow !== 'export') {
-    log('ERROR', `--flow must be import or export, not ${flow}`);
+  if (runFlow !== 'import' && runFlow !== 'export') {
+    log('ERROR', `--flow must be import or export, not ${runFlow}`);
     process.exitCode = 1;
     return;
   }
@@ -134,7 +175,7 @@ async function main() {
 
   log('INFO', 'Ghana StatBank ingestion started');
   log('INFO', `Years: ${GHANA.years.join(', ')}`);
-  log('INFO', `Trade flow: ${flow}`);
+  log('INFO', `Trade flow: ${runFlow}`);
   log('INFO', 'Valuation: USD and net weight in KG');
   log('INFO', `Partner countries: ${GHANA.partners.length}`);
   log('INFO', `Classification: ${GHANA.classification.level}`);
@@ -158,35 +199,47 @@ async function main() {
   // spinner, which cannot distinguish a run on chapter 84 from one that died on
   // chapter 3.
   //
+  // A run claimed from the queue already has a row and is already marked
+  // running. Opening a second one would leave the first as `running` forever
+  // while the admin watched a bar belonging to nothing.
+  //
   // Best effort: a reporting failure must not stop an ingest. If the run cannot
   // be opened the fetch still happens and /store creates the row at the end,
   // exactly as it did before.
-  let runId = null;
-  try {
-    const opened = await api('/api/ghana/runs/open', {
-      method: 'POST',
-      body: JSON.stringify({
-        country: GHANA.code,
-        provider: 'ghana-statbank',
-        chapters_total: chapters.length,
-        endpoint: GHANA.provider.endpoint,
-      }),
-    });
-    runId = opened?.run_id ?? null;
-    if (runId) log('INFO', `Run opened: ${runId}`);
-  } catch (err) {
-    log('WARN', `Could not open a run for progress reporting: ${err instanceof Error ? err.message : String(err)}`);
+  let runId = existingRunId;
+  if (runId) {
+    // Claimed runs are queued before the chapter list is known, so the total
+    // arrives now rather than at request time. Without it the bar has no
+    // denominator and shows "in progress" for the whole fourteen minutes,
+    // which is the spinner this replaced.
+    await reportRun(
+      `/api/ghana/runs/${runId}/progress`,
+      { chapters_total: chapters.length, current_step: 'Starting' },
+      'the chapter total',
+    );
+    log('INFO', `Run claimed: ${runId}`);
+  } else {
+    try {
+      const opened = await api('/api/ghana/runs/open', {
+        method: 'POST',
+        body: JSON.stringify({
+          country: GHANA.code,
+          provider: 'ghana-statbank',
+          chapters_total: chapters.length,
+          endpoint: GHANA.provider.endpoint,
+        }),
+      });
+      runId = opened?.run_id ?? null;
+      if (runId) log('INFO', `Run opened: ${runId}`);
+    } catch (err) {
+      log('WARN', `Could not open a run for progress reporting: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
-  /** Push progress, swallowing failures. Reporting is not the job. */
+  /** Push progress. Never blocks the work it describes. */
   async function reportProgress(body) {
     if (!runId) return;
-    try {
-      await api(`/api/ghana/runs/${runId}/progress`, { method: 'POST', body: JSON.stringify(body) });
-    } catch {
-      // A dropped update leaves the bar briefly stale, which is a better
-      // outcome than a failed ingest.
-    }
+    await reportRun(`/api/ghana/runs/${runId}/progress`, body, 'progress');
   }
 
   const observations = [];
@@ -202,7 +255,7 @@ async function main() {
     try {
       result = await provider.fetchObservations({
         config: GHANA,
-        flow,
+        flow: runFlow,
         years: GHANA.years,
         partners: GHANA.partners,
         products: [code],
@@ -315,7 +368,7 @@ async function main() {
       method: 'POST',
       body: JSON.stringify({
         country: GHANA.code,
-        flow,
+        flow: runFlow,
         // The run opened before fetching, so the row the admin screen has been
         // polling is the row that gets the result rather than a second one
         // appearing at the end.
@@ -353,7 +406,83 @@ async function main() {
   rmSync(BUNDLE, { force: true });
 }
 
-main().catch((err) => {
+/**
+ * Stay up and take whatever the admin asks for.
+ *
+ * The point of the button is that nobody opens a terminal. Something still has
+ * to do the fourteen minutes of work, so this is that something: it claims one
+ * queued run at a time and runs it exactly as a manual invocation would.
+ *
+ * One at a time on purpose. Two concurrent runs would double the request rate
+ * against somebody else's government API, and the second would be doing it
+ * without anybody having asked for more throughput.
+ */
+async function watchQueue() {
+  if (!TOKEN) {
+    log('ERROR', 'TEREFLOW_ADMIN_TOKEN is not set. Put it in local/.env or the environment.');
+    process.exitCode = 1;
+    return;
+  }
+
+  log('INFO', `Watching ${API} for queued runs, polling every ${pollSeconds}s`);
+  log('INFO', 'Nothing runs until an admin asks for one. Ctrl+C to stop.');
+
+  let stopping = false;
+  process.on('SIGINT', () => {
+    // Finish the run in hand rather than abandoning it mid-fetch, which would
+    // leave a row marked running that nothing is working on.
+    log('INFO', 'Stopping after the current run.');
+    stopping = true;
+  });
+
+  let idleLogged = false;
+
+  while (!stopping) {
+    let claimed = null;
+    try {
+      const res = await api('/api/ghana/runs/claim', {
+        method: 'POST',
+        body: JSON.stringify({ agent: 'ghana-statbank' }),
+      });
+      claimed = res?.claimed ?? null;
+    } catch (err) {
+      // A Worker that is down is a reason to wait, not to exit. The admin's
+      // queued run is still queued and will be picked up when it returns.
+      if (!idleLogged) {
+        log('WARN', `Could not reach ${API}: ${err instanceof Error ? err.message : String(err)}`);
+        idleLogged = true;
+      }
+      await new Promise((r) => setTimeout(r, pollSeconds * 1000));
+      continue;
+    }
+
+    if (!claimed) {
+      idleLogged = false;
+      await new Promise((r) => setTimeout(r, pollSeconds * 1000));
+      continue;
+    }
+
+    log('INFO', `Claimed ${claimed.run_id}: ${claimed.country} ${claimed.flow}`);
+    try {
+      await main(claimed.flow, claimed.run_id);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      log('ERROR', `Run ${claimed.run_id} failed: ${detail}`);
+      // Close it, or the admin watches a bar for a run nothing is working on.
+      await api(`/api/ghana/runs/${claimed.run_id}/fail`, {
+        method: 'POST',
+        body: JSON.stringify({ error: detail }),
+      }).catch(() => undefined);
+    }
+    // One failing run must not stop the agent: the next request should still
+    // be picked up.
+    process.exitCode = 0;
+  }
+}
+
+const entry = watch ? watchQueue() : main();
+
+entry.catch((err) => {
   log('ERROR', 'Ghana StatBank ingestion failed');
   log('ERROR', err instanceof Error ? err.message : String(err));
   log('ERROR', 'Previous successful dataset preserved');

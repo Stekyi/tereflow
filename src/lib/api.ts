@@ -88,7 +88,16 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   // sit under /api/admin, so it is included here. The public POST to submit
   // feedback carries the header only when the owner happens to have a token
   // stored, which the worker ignores, so nothing changes for normal senders.
-  if (path.startsWith('/api/admin') || path.startsWith('/api/feedback')) {
+  //
+  // The run routes are the same case: /api/ghana/runs/* is admin gated but does
+  // not sit under /api/admin, so without this the Run analysis button sent no
+  // credential, got a 401, and the portal signed the admin out on a button it
+  // had just offered them.
+  if (
+    path.startsWith('/api/admin') ||
+    path.startsWith('/api/feedback') ||
+    path.startsWith('/api/ghana/runs')
+  ) {
     const token = getAdminToken();
     if (token) headers.set('authorization', `Bearer ${token}`);
   }
@@ -785,6 +794,22 @@ export const api = {
         candidates: DominanceCandidate[];
         products_considered: number;
       }>(`/api/admin/entities/${slug}/dominance?threshold=${threshold}`),
+
+    /** Ask for a run. Queues it; an agent on the operator's machine does the work. */
+    requestRun: (country: string, flow: 'import' | 'export') =>
+      req<{ run_id: string; status: string; already_pending: boolean; message?: string }>(
+        '/api/ghana/runs/request',
+        { method: 'POST', body: JSON.stringify({ country, flow }) },
+      ),
+
+    /** Whether anything is listening, so a queued run can be told from a stuck one. */
+    agentStatus: (country: string) =>
+      req<{
+        country: string;
+        queued: number;
+        agent_last_claimed_at: string | null;
+        agent_recently_active: boolean;
+      }>(`/api/ghana/runs/agent?country=${country}`),
 
     /** One run, small enough to poll every couple of seconds. */
     runProgress: (runId: string) => req<RunProgress>(`/api/ghana/runs/${runId}`),

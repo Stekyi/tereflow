@@ -224,7 +224,7 @@ admin.patch('/entities/:slug/activation', async (c) => {
   return json({ slug: c.req.param('slug'), is_active: body.is_active });
 });
 
-/** Bulk tick — activate or deactivate a whole continent or kind at once. */
+/** Bulk tick â€” activate or deactivate a whole continent or kind at once. */
 admin.post('/entities/activation/bulk', async (c) => {
   const body = (await c.req.json()) as { slugs: string[]; is_active: boolean };
   if (!Array.isArray(body.slugs) || body.slugs.length === 0) return bad('slugs[] required');

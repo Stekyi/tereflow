@@ -158,6 +158,164 @@ ghana.post('/runs/:id/fail', async (c) => {
   return json({ failed: true });
 });
 
+/**
+ * Ask for a run. This is what the button does.
+ *
+ * It queues rather than starts, and the distinction is the whole design. One
+ * country is ninety-six sequential calls to a government API at roughly eight
+ * and a half seconds each, measured, which is about fourteen minutes. That does
+ * not fit in a Worker request and no arrangement of it does.
+ *
+ * So the row sits here until an agent on the operator's machine claims it. A
+ * queued run is a request, not a promise, and `/runs/agent` exists so the UI
+ * can say which it is rather than showing a bar that will never move.
+ */
+ghana.post('/runs/request', async (c) => {
+  const denied = requireAdmin(c.req.raw, c.env);
+  if (denied) return denied;
+
+  const body = (await c.req.json().catch(() => null)) as {
+    country?: string;
+    flow?: TradeFlow;
+    requested_by?: string;
+  } | null;
+  if (!body?.country) return bad('country is required.');
+
+  const flow = body.flow ?? 'import';
+  if (flow !== 'import' && flow !== 'export') return bad('flow must be import or export.');
+
+  const config = ACTIVE_COUNTRIES[body.country];
+  if (!config) return bad(`No active configuration for ${body.country}.`, 404);
+
+  // One at a time per country and flow. Two agents fetching the same chapters
+  // would double the load on somebody else's API and race each other to write
+  // the result, and the loser's rows would be silently replaced.
+  const existing = await c.env.DB.prepare(
+    `SELECT id, status FROM ingestion_runs
+      WHERE country_code = ? AND trade_flow = ? AND status IN ('queued','running')
+      ORDER BY started_at DESC LIMIT 1`,
+  )
+    .bind(body.country, flow)
+    .first<{ id: string; status: string }>();
+
+  if (existing) {
+    return json({
+      run_id: existing.id,
+      status: existing.status,
+      already_pending: true,
+      message:
+        existing.status === 'queued'
+          ? 'A run for this country and flow is already waiting to be picked up.'
+          : 'A run for this country and flow is already going.',
+    });
+  }
+
+  const runId = uid('run_');
+  await c.env.DB.prepare(
+    `INSERT INTO ingestion_runs
+       (id, country_code, provider, trade_flow, started_at, requested_at, requested_by,
+        status, records_received, records_processed, records_rejected,
+        chapters_done, chapters_total, current_step, endpoint)
+     VALUES (?,?,?,?,datetime('now'),datetime('now'),?,'queued',0,0,0,0,NULL,'Waiting to start',?)`,
+  )
+    .bind(
+      runId,
+      body.country,
+      'ghana-statbank',
+      flow,
+      body.requested_by ?? 'admin',
+      config.provider.endpoint,
+    )
+    .run();
+
+  return json({ run_id: runId, status: 'queued', already_pending: false });
+});
+
+/**
+ * Claim the oldest queued run. Called by the agent, not by a person.
+ *
+ * The claim is conditional on the row still being queued, so two agents racing
+ * produce one winner and one empty response rather than two runs fetching the
+ * same chapters.
+ */
+ghana.post('/runs/claim', async (c) => {
+  const denied = requireAdmin(c.req.raw, c.env);
+  if (denied) return denied;
+
+  const body = (await c.req.json().catch(() => null)) as { agent?: string } | null;
+
+  const next = await c.env.DB.prepare(
+    `SELECT id, country_code, trade_flow, endpoint FROM ingestion_runs
+      WHERE status = 'queued' ORDER BY requested_at LIMIT 1`,
+  ).first<{ id: string; country_code: string; trade_flow: string; endpoint: string | null }>();
+
+  if (!next) return json({ claimed: null });
+
+  const res = await c.env.DB.prepare(
+    `UPDATE ingestion_runs
+        SET status = 'running', claimed_at = datetime('now'), started_at = datetime('now'),
+            current_step = 'Starting', provider = COALESCE(?, provider)
+      WHERE id = ? AND status = 'queued'`,
+  )
+    .bind(body?.agent ?? null, next.id)
+    .run();
+
+  // Somebody else got there first. Not an error: the agent asks again.
+  if (!res.meta.changes) return json({ claimed: null });
+
+  return json({
+    claimed: {
+      run_id: next.id,
+      country: next.country_code,
+      flow: next.trade_flow ?? 'import',
+      endpoint: next.endpoint,
+    },
+  });
+});
+
+/**
+ * Whether anything is listening, and what is waiting.
+ *
+ * The UI needs this to tell a queued run that will start in a moment from one
+ * that will sit there forever because nothing is running. Those look identical
+ * from the run row alone, and showing a progress bar for the second is how an
+ * admin waits twenty minutes for nothing.
+ *
+ * Liveness is inferred from the most recent claim rather than from a heartbeat,
+ * because an agent that claims work is by definition alive and one that has
+ * not claimed anything in a while may not be.
+ */
+ghana.get('/runs/agent', async (c) => {
+  const country = c.req.query('country') ?? 'GH';
+
+  const [queued, lastClaim] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM ingestion_runs WHERE status = 'queued' AND country_code = ?`,
+    )
+      .bind(country)
+      .first<{ n: number }>(),
+    c.env.DB.prepare(
+      `SELECT claimed_at FROM ingestion_runs
+        WHERE claimed_at IS NOT NULL ORDER BY claimed_at DESC LIMIT 1`,
+    ).first<{ claimed_at: string }>(),
+  ]);
+
+  const lastSeen = lastClaim?.claimed_at ?? null;
+  const minutesSince = lastSeen
+    ? (Date.now() - new Date(`${lastSeen}Z`).getTime()) / 60_000
+    : null;
+
+  return json({
+    country,
+    queued: queued?.n ?? 0,
+    agent_last_claimed_at: lastSeen,
+    // Ten minutes: an agent polling every few seconds that has claimed nothing
+    // in that time is either stopped or unable to reach this Worker, and either
+    // way a queued run is not about to start.
+    agent_recently_active: minutesSince != null && minutesSince < 10,
+  });
+});
+
 ghana.post('/store', async (c) => {
   const denied = requireAdmin(c.req.raw, c.env);
   if (denied) return denied;
@@ -552,16 +710,7 @@ ghana.get('/runs', async (c) => {
   // never appeared, and the panel invited the admin to start a run that had
   // already completed. Two endpoints describing the same row have to describe
   // it the same way.
-  const runs = (results ?? []).map((run) => {
-    const done = run.chapters_done as number | null;
-    const total = run.chapters_total as number | null;
-    return {
-      ...run,
-      country_code: country,
-      percent: total != null && total > 0 && done != null ? Math.round((done / total) * 100) : null,
-      is_finished: run.status !== 'running',
-    };
-  });
+  const runs = (results ?? []).map((run) => shapeRun(run, country));
 
   return json({ country, runs });
 });
@@ -590,18 +739,32 @@ ghana.get('/runs/:id', async (c) => {
 
   if (!run) return bad('Unknown run', 404);
 
+  return json(shapeRun(run as Record<string, unknown>));
+});
+
+/**
+ * A run row as every endpoint reports it.
+ *
+ * Written once because it was written twice and drifted: the list and the
+ * single-run poll disagreed about `is_finished`, and a queued run came back as
+ * finished from one of them. Anything derived from a run belongs here.
+ */
+function shapeRun(run: Record<string, unknown>, countryCode?: string) {
   const done = run.chapters_done as number | null;
   const total = run.chapters_total as number | null;
-  return json({
+  const status = run.status as string;
+  return {
     ...run,
-    // Computed here so every caller shows the same number. A percentage worked
-    // out in two places is a percentage that eventually disagrees with itself.
+    ...(countryCode ? { country_code: countryCode } : {}),
     // Null rather than 0 when there is nothing to divide, because a run with no
     // chapters has no percentage, not a percentage of zero.
     percent: total != null && total > 0 && done != null ? Math.round((done / total) * 100) : null,
-    is_finished: run.status !== 'running',
-  });
-});
+    // Queued is not finished: it is work that has not started. Testing only for
+    // 'running' made a queued run report as complete, and the UI showed a
+    // result summary for a run that had fetched nothing.
+    is_finished: status !== 'running' && status !== 'queued',
+  };
+}
 
 function shapeOpportunity(r: Record<string, unknown>) {
   const parse = (v: unknown) => {

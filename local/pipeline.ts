@@ -21,11 +21,12 @@
  *   node local/dist/pipeline.mjs --slug ghana     one country
  *   node local/dist/pipeline.mjs --limit 10       first ten due
  *   node local/dist/pipeline.mjs --dry-run        analyse, publish nothing
+ *   node local/dist/pipeline.mjs --validate       fetch Comtrade, validate, publish nothing
  *   node local/dist/pipeline.mjs --force          skip the "unchanged?" check
  *
  * Before the expensive fetch, each country gets a cheap probe (latest-year
- * world totals only, 2-4 Comtrade calls instead of ~18) plus the World Bank
- * fetch (already cheap). If neither has moved since the last successful run,
+ * world totals only, two Comtrade calls) plus the World Bank context fetch.
+ * If neither has moved since the last successful run,
  * the country is skipped entirely -- no full fetch, no analyse(), no publish.
  * --force bypasses this, e.g. after fixing an analyse.ts bug when you want to
  * recompute even though the source itself hasn't changed.
@@ -34,14 +35,13 @@
  *   TEREFLOW_API_URL     https://tereflow.example.com   (default localhost:8787)
  *   TEREFLOW_ADMIN_TOKEN the ADMIN_TOKEN secret
  *   COMTRADE_API_KEY     optional, raises the UN Comtrade rate limit
- *   TEREFLOW_CALL_PACE_MS pause between calls within one country (default 300ms)
+ *   TEREFLOW_CALL_PACE_MS pause between direct Comtrade calls within one country (default 2000ms)
  */
 import { fetchComtrade, probeComtrade, RateLimited } from '../worker/agent/adapters/comtrade';
 import { fetchWorldBank } from '../worker/agent/adapters/worldbank';
 import { analyse } from '../worker/agent/analyse';
 import { CODE_TO_KEY, DEFAULTS, type Settings } from '../worker/lib/settings';
 import type { FactRow } from '../worker/agent/types';
-import { fetchNationalSource } from './source-parsers';
 import type { EntitySource } from '../shared/types';
 
 /**
@@ -74,6 +74,19 @@ async function loadRunSettings(api: Api, dryRun: boolean): Promise<Settings> {
   }
 }
 
+async function loadOpportunityClassifications(
+  api: Api,
+  slug: string,
+): Promise<Map<string, { category: 'traditional' | 'non_traditional' }>> {
+  try {
+    const { rows } = await api.classifications(slug);
+    return new Map(rows.map((r) => [r.hs_code, { category: r.category }]));
+  } catch {
+    console.log(`  classifications: unavailable for ${slug}, using universal defaults`);
+    return new Map(['26', '27', '71'].map((hs_code) => [hs_code, { category: 'traditional' as const }]));
+  }
+}
+
 interface Config {
   apiUrl: string;
   adminToken: string;
@@ -81,6 +94,8 @@ interface Config {
   slug?: string;
   limit?: number;
   dryRun: boolean;
+  /** Fetch Comtrade and run data-quality checks without analysis or publishing. */
+  validate: boolean;
   /** Skip the "is the source unchanged" check and always do the full fetch. */
   force: boolean;
   /**
@@ -143,12 +158,13 @@ function readConfig(): Config {
     comtradeKey: process.env.COMTRADE_API_KEY,
     slug: flag('slug'),
     limit: flag('limit') ? Number(flag('limit')) : undefined,
-    dryRun: args.includes('--dry-run'),
+    dryRun: args.includes('--dry-run') || args.includes('--validate'),
+    validate: args.includes('--validate'),
     force: args.includes('--force'),
     reanalyse: args.includes('--reanalyse') || args.includes('--reanalyze'),
     yearsBack: Number(process.env.TEREFLOW_YEARS_BACK ?? 6),
     politenessMs: Number(process.env.TEREFLOW_POLITENESS_MS ?? 1200),
-    callPaceMs: Number(process.env.TEREFLOW_CALL_PACE_MS ?? 300),
+    callPaceMs: Number(process.env.TEREFLOW_CALL_PACE_MS ?? 2000),
   };
 }
 
@@ -261,6 +277,11 @@ class Api {
       '/api/admin/portal/config',
     );
   }
+  classifications(slug: string) {
+    return this.call<{ rows: { hs_code: string; category: 'traditional' | 'non_traditional' }[] }>(
+      `/api/admin/classifications?entity=${encodeURIComponent(slug)}`,
+    );
+  }
   fail(slug: string, error: string) {
     return this.call<{ ok: true }>('/api/admin/ingest/fail', {
       method: 'POST',
@@ -284,40 +305,90 @@ class Api {
   }
 }
 
-async function fetchNationalPrimary(entity: EntityRow, years: number[]) {
-  const configured = Object.values(entity.sources ?? {})
-    .flat()
-    .filter((source, index, all) => all.findIndex((candidate) => candidate.id === source.id) === index)
-    .sort((a, b) => a.slot - b.slot);
-  const attempts: SourceAttempt[] = [];
-  for (const source of configured) {
-    try {
-      const result = await fetchNationalSource({ source, iso3: entity.iso3!, years });
-      attempts.push({
-        source_id: source.id,
-        source_ref: result.source_ref,
-        role: 'primary',
-        parser_key: source.parser_key,
-        url: source.url,
-        status: 'ok',
-        rows_written: result.rows.length,
-        note: result.note,
-      });
-      return { result, attempts };
-    } catch (error) {
-      attempts.push({
-        source_id: source.id,
-        source_ref: `national:${entity.iso3!.toLowerCase()}:${source.url}`,
-        role: 'primary',
-        parser_key: source.parser_key,
-        url: source.url,
-        status: 'failed',
-        rows_written: 0,
-        note: error instanceof Error ? error.message : String(error),
-      });
-    }
+function printComtradeValidation(iso3: string, country: string, result: Awaited<ReturnType<typeof fetchComtrade>>) {
+  const rows = result.rows;
+  const productRows = rows.filter((r) => r.hs_code?.length === 6 && r.partner_iso3);
+  const headlineRows = rows.filter((r) => !r.hs_code && !r.partner_iso3);
+  const chapterRows = rows.filter((r) => r.hs_code?.length === 2 && !r.partner_iso3);
+  const flows = ['export', 'import'] as const;
+  const years = [...new Set(rows.map((r) => r.year))].sort((a, b) => a - b);
+  const products = new Set(productRows.map((r) => r.hs_code));
+  const partners = new Set(productRows.map((r) => r.partner_iso3));
+  const duplicateKeys = new Set<string>();
+  const seen = new Set<string>();
+  for (const r of productRows) {
+    const key = `${r.year}|${r.flow}|${r.partner_iso3}|${r.hs_code}`;
+    if (seen.has(key)) duplicateKeys.add(key);
+    seen.add(key);
   }
-  return { result: null, attempts };
+
+  const moneyByFlow = (flow: 'export' | 'import', source: FactRow[]) =>
+    source.filter((r) => r.flow === flow).reduce((sum, r) => sum + Number(r.value_usd || 0), 0);
+  const productValueByFlow = (flow: 'export' | 'import') => moneyByFlow(flow, productRows);
+  const headlineValueByFlow = (flow: 'export' | 'import') => moneyByFlow(flow, headlineRows);
+  const pctDiff = (headline: number, productsValue: number) =>
+    headline > 0 ? ((productsValue - headline) / headline) * 100 : null;
+  const weightRows = productRows.filter((r) => r.qty != null && Number.isFinite(Number(r.qty)));
+  const weightByFlow = (flow: 'export' | 'import') =>
+    weightRows.filter((r) => r.flow === flow).reduce((sum, r) => sum + Number(r.qty || 0), 0);
+
+  console.log('');
+  console.log('COMTRADE DATA VALIDATION');
+  console.log('========================');
+  console.log(`Country: ${country} (${iso3})`);
+  console.log(`Years:   ${years.join(', ') || 'none'}`);
+  console.log('');
+  console.log('ROWS');
+  console.log('----');
+  console.log(`Total Comtrade facts:       ${rows.length.toLocaleString()}`);
+  console.log(`Partner × HS6 rows:         ${productRows.length.toLocaleString()}`);
+  console.log(`Headline World rows:        ${headlineRows.length.toLocaleString()}`);
+  console.log(`Generated HS2 rows:          ${chapterRows.length.toLocaleString()}`);
+  for (const flow of flows) {
+    console.log(`  ${flow.padEnd(6)} partner × HS6:       ${productRows.filter((r) => r.flow === flow).length.toLocaleString()}`);
+  }
+  console.log('');
+  console.log('PRODUCTS / PARTNERS');
+  console.log('-------------------');
+  console.log(`Unique HS6 products:        ${products.size.toLocaleString()}`);
+  console.log(`Unique partner countries:   ${partners.size.toLocaleString()}`);
+  console.log(`World aggregate product rows: ${productRows.filter((r) => r.partner_iso3 === 'WLD').length.toLocaleString()}`);
+  console.log('');
+  console.log('VALUE RECONCILIATION');
+  console.log('--------------------');
+  for (const flow of flows) {
+    const headline = headlineValueByFlow(flow);
+    const partnerProducts = productValueByFlow(flow);
+    const diff = pctDiff(headline, partnerProducts);
+    console.log(
+      `${flow.padEnd(6)} Comtrade total: $${(headline / 1e9).toFixed(2)}bn | ` +
+      `partner × HS6: $${(partnerProducts / 1e9).toFixed(2)}bn | ` +
+      `difference: ${diff == null ? 'n/a' : `${diff.toFixed(2)}%`}`,
+    );
+  }
+  console.log('');
+  console.log('WEIGHT / QUALITY');
+  console.log('----------------');
+  console.log(`Rows with net weight:       ${weightRows.length.toLocaleString()} / ${productRows.length.toLocaleString()}`);
+  for (const flow of flows) {
+    console.log(`  ${flow.padEnd(6)} net weight:        ${(weightByFlow(flow) / 1e9).toFixed(3)} million tonnes`);
+  }
+  console.log(`Duplicate partner-product keys: ${duplicateKeys.size.toLocaleString()}`);
+  console.log(`Zero-value partner rows:         ${productRows.filter((r) => !(Number(r.value_usd) > 0)).length.toLocaleString()}`);
+  console.log(`Truncated by 250k ceiling:       ${result.truncated_years?.length ? `YES (${result.truncated_years.join(', ')})` : 'NO'}`);
+  console.log('');
+  console.log('STATUS');
+  console.log('------');
+  const checks = [
+    ['Comtrade returned partner × HS6 rows', productRows.length > 0],
+    ['No duplicate partner-product keys', duplicateKeys.size === 0],
+    ['No World aggregate in partner dataset', productRows.every((r) => r.partner_iso3 !== 'WLD')],
+    ['No zero-value partner rows after normalization', productRows.every((r) => Number(r.value_usd) > 0)],
+    ['Response not truncated', !result.truncated_years?.length],
+  ];
+  for (const [label, ok] of checks) console.log(`${ok ? 'PASS' : 'WARN'}  ${label}`);
+  console.log('');
+  console.log(`Adapter note: ${result.note || 'none'}`);
 }
 
 async function main() {
@@ -328,7 +399,8 @@ async function main() {
   console.log('Tereflow pipeline');
   console.log(`  target      ${cfg.apiUrl}`);
   console.log(`  comtrade    ${cfg.comtradeKey ? 'keyed' : 'keyless (slower, fewer years)'}`);
-  if (cfg.dryRun) console.log('  mode        DRY RUN, nothing will be published');
+  if (cfg.validate) console.log('  mode        VALIDATE, fetch only; nothing will be analysed or published');
+  else if (cfg.dryRun) console.log('  mode        DRY RUN, nothing will be published');
   if (cfg.force) console.log('  mode        FORCE, ignoring the unchanged-since-last-check skip');
   console.log('');
 
@@ -380,6 +452,34 @@ async function main() {
     const t0 = Date.now();
 
     try {
+      if (cfg.validate) {
+        const comtradeEnv = { COMTRADE_API_KEY: cfg.comtradeKey } as never;
+        let comtrade: Awaited<ReturnType<typeof fetchComtrade>> | undefined;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            comtrade = await fetchComtrade(
+              comtradeEnv,
+              entity.iso3!,
+              years,
+              cfg.callPaceMs,
+              settings,
+            );
+            break;
+          } catch (err) {
+            if (!(err instanceof RateLimited) || attempt === 2) throw err;
+            const waitSeconds = Math.max(60, err.retryAfterSeconds ?? 60 * (attempt + 1));
+            console.log(`rate limited; waiting ${waitSeconds}s before retry`);
+            await sleep(waitSeconds * 1000);
+          }
+        }
+        if (!comtrade) throw new Error('Comtrade validation retry loop exhausted');
+        printComtradeValidation(entity.iso3!, entity.name, comtrade);
+        if (comtrade.ok) ok++; else failed++;
+        factsTotal += comtrade.rows.length;
+        console.log(`Validation completed in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+        continue;
+      }
+
       // Recompute-only path. Reads the facts already stored and runs the
       // analysis over them, contacting no source at all. This is what makes a
       // maths fix cheap: the expensive part of a run is the fetch, and the
@@ -396,6 +496,7 @@ async function main() {
         // than stored. If it is unavailable the services section is thinner,
         // which is visible, rather than wrong.
         const worldbank = await fetchWorldBank(entity.iso3!, years).catch(() => null);
+        const classifications = await loadOpportunityClassifications(api, entity.slug);
 
         const bundle = analyse(
           entity.name,
@@ -415,6 +516,7 @@ async function main() {
           [],
           settings,
           entity.iso3 ?? null,
+          classifications,
         );
 
         if (cfg.dryRun) {
@@ -456,35 +558,52 @@ async function main() {
         continue;
       }
 
-      // National publications are primary. Fetch them before touching
-      // Comtrade, so a rate-limited validator cannot block usable local data.
-      const [national, worldbank] = await Promise.all([
-        fetchNationalPrimary(entity, years),
-        fetchWorldBank(entity.iso3!, years),
-      ]);
-      let probe: Awaited<ReturnType<typeof probeComtrade>> | null = null;
-      let probeError: unknown = null;
-      if (!national.result) {
-        try {
-          probe = await probeComtrade(
-            { COMTRADE_API_KEY: cfg.comtradeKey } as never,
-            entity.iso3!,
-            candidateYears,
-          );
-        } catch (error) {
-          probeError = error;
-          console.log(`national source unavailable; Comtrade probe failed: ${String(error)}`);
+      const worldbank = await fetchWorldBank(entity.iso3!, years).catch(() => ({
+        ok: false,
+        source_ref: 'world-bank',
+        rows: [],
+        context: {
+          gdp_by_year: {},
+          services_export_by_year: {},
+          services_import_by_year: {},
+          gns_export_by_year: {},
+          gns_import_by_year: {},
+        },
+        note: 'World Bank context unavailable',
+        meta: {},
+      }));
+
+      // UN Comtrade is the primary trade-data source. National country sources
+      // remain available as contextual/enrichment sources, but they are not
+      // used as the trade-data authority or as a silent fallback.
+      // Comtrade is called directly by this local cron process. The Worker is
+      // only used below for D1 storage/publishing. If Comtrade temporarily
+      // rate-limits this machine, wait for the provider's retry window and
+      // retry the request rather than aborting the whole country immediately.
+      const comtradeEnv = { COMTRADE_API_KEY: cfg.comtradeKey } as never;
+      const comtradeProbe = async () => {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            return await probeComtrade(comtradeEnv, entity.iso3!, candidateYears);
+          } catch (err) {
+            if (!(err instanceof RateLimited) || attempt === 2) throw err;
+            const waitSeconds = err.retryAfterSeconds ?? Math.min(60 * (attempt + 1), 180);
+            console.log(`rate limited; waiting ${waitSeconds}s before retry`);
+            await sleep(waitSeconds * 1000);
+          }
         }
-      }
+        throw new Error('Comtrade probe retry loop exhausted');
+      };
+      const probe = await comtradeProbe();
       const fingerprint = JSON.stringify({
-        y: probe?.year ?? null,
-        x: probe?.export_usd ?? null,
-        m: probe?.import_usd ?? null,
-        wb: worldbank.meta?.lastupdated ?? null,
+        y: probe.year ?? null,
+        x: probe.export_usd ?? null,
+        m: probe.import_usd ?? null,
+        wb: (worldbank.meta as Record<string, unknown> | undefined)?.lastupdated ?? null,
       });
 
       const unchanged =
-        !national.result && !cfg.force && !cfg.dryRun && entity.last_ingest_at != null && fingerprint === entity.last_fingerprint;
+        !cfg.force && !cfg.dryRun && entity.last_ingest_at != null && fingerprint === entity.last_fingerprint;
 
       if (unchanged) {
         console.log('unchanged since last check, skipped');
@@ -494,61 +613,44 @@ async function main() {
         continue;
       }
 
-      const usingNational = national.result?.ok === true;
-      if (!usingNational && probeError) {
-        throw new Error(
-          `National source produced no rows and Comtrade fallback is unavailable: ${String(probeError)}`,
-        );
-      }
-      const comtrade = usingNational
-        ? {
-            rows: [] as FactRow[],
-            ok: probe?.ok ?? false,
-            source_ref: 'un-comtrade',
-            note: probe?.ok ? 'Latest-year totals checked as validator' : 'Validator probe unavailable',
-          }
-        : await fetchComtrade(
-            { COMTRADE_API_KEY: cfg.comtradeKey } as never,
+      let comtrade: Awaited<ReturnType<typeof fetchComtrade>> | undefined;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          comtrade = await fetchComtrade(
+            comtradeEnv,
             entity.iso3!,
             years,
             cfg.callPaceMs,
             settings,
           );
-      const rows: FactRow[] = usingNational
-        ? [...national.result!.rows, ...worldbank.rows]
-        : [...comtrade.rows, ...worldbank.rows];
-      if (rows.length === 0) {
-        throw new Error(`no data. ${comtrade.note} | ${worldbank.note}`);
+          break;
+        } catch (err) {
+          if (!(err instanceof RateLimited) || attempt === 2) throw err;
+          const waitSeconds = err.retryAfterSeconds ?? Math.min(60 * (attempt + 1), 180);
+          console.log(`rate limited; waiting ${waitSeconds}s before retry`);
+          await sleep(waitSeconds * 1000);
+        }
+      }
+      if (!comtrade) throw new Error('Comtrade fetch retry loop exhausted');
+      const rows: FactRow[] = [...comtrade.rows, ...worldbank.rows];
+      if (rows.length === 0 || !comtrade.ok) {
+        throw new Error(`UN Comtrade ingestion failed: ${comtrade.note}`);
       }
 
-      const sourceAttempts: SourceAttempt[] = [...national.attempts];
-      if (usingNational) {
-        sourceAttempts.push({
-          source_id: null,
-          source_ref: comtrade.source_ref,
-          role: 'validator',
-          parser_key: 'comtrade',
-          url: 'https://comtradeapi.un.org/data/v1/get/C/A/HS',
-          status: comtrade.ok ? 'ok' : 'failed',
-          rows_written: comtrade.rows.length,
-          note: comtrade.ok ? 'Compared with national statistical source' : comtrade.note,
-        });
-      } else {
-        sourceAttempts.push({
-          source_id: null,
-          source_ref: comtrade.source_ref,
-          role: 'fallback',
-          parser_key: 'comtrade',
-          url: 'https://comtradeapi.un.org/data/v1/get/C/A/HS',
-          status: comtrade.ok ? 'ok' : 'failed',
-          rows_written: comtrade.rows.length,
-          note: comtrade.note,
-        });
-      }
+      const sourceAttempts: SourceAttempt[] = [{
+        source_id: null,
+        source_ref: comtrade.source_ref,
+        role: 'primary',
+        parser_key: 'comtrade',
+        url: 'https://comtradeapi.un.org/data/v1/get/C/A/HS',
+        status: comtrade.ok ? 'ok' : 'failed',
+        rows_written: comtrade.rows.length,
+        note: comtrade.note,
+      }];
       sourceAttempts.push({
         source_id: null,
         source_ref: worldbank.source_ref,
-        role: usingNational || comtrade.ok ? 'validator' : 'fallback',
+        role: 'validator',
         parser_key: 'world-bank',
         url: 'https://api.worldbank.org/v2',
         status: worldbank.ok ? 'ok' : 'failed',
@@ -557,9 +659,10 @@ async function main() {
       });
 
       const sourceRefs = [
-        ...(comtrade.ok ? [comtrade.source_ref] : []),
+        comtrade.source_ref,
         ...(worldbank.ok ? [worldbank.source_ref] : []),
       ];
+      const classifications = await loadOpportunityClassifications(api, entity.slug);
       const bundle = analyse(
         entity.name,
         rows,
@@ -568,11 +671,12 @@ async function main() {
         comtrade.truncated_years ?? [],
         settings,
         entity.iso3 ?? null,
+        classifications,
       );
 
       const coverage =
-        (usingNational ? 0.6 : comtrade.ok ? 0.6 : 0) +
-        (worldbank.ok ? 0.25 : 0) +
+        (comtrade.ok ? 0.75 : 0) +
+        (worldbank.ok ? 0.10 : 0) +
         (bundle.yearly_trend.length >= 4 ? 0.15 : 0);
 
       if (cfg.dryRun) {

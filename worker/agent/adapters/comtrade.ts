@@ -1,21 +1,32 @@
 import type { Env } from '../../lib/db';
 import type { AdapterResult, FactRow } from '../types';
 import { ISO3_TO_M49, M49_TO_ISO3, hs2Label, hs2Sector, hs6Label } from '../codes';
-import { HS6_LABEL } from '../hs6-codes.generated';
 import { ISO3_NAME } from '../country-names';
-import { DEFAULTS, type Settings } from '../../lib/settings';
 
 const PREVIEW = 'https://comtradeapi.un.org/public/v1/preview/C/A/HS';
 const FULL = 'https://comtradeapi.un.org/data/v1/get/C/A/HS';
 const SOURCE_REF = 'un-comtrade';
+const MAX_RECORDS = 250_000;
 
-/**
- * Rows the keyless preview endpoint returns before it stops. A response of
- * exactly this length has been cut off rather than completed, and the rows
- * kept are not the largest ones, so anything derived from comparing two
- * capped responses is meaningless.
- */
-const PREVIEW_ROW_CAP = 500;
+export interface UnclassifiedTradeRow {
+  year: number;
+  flow: 'export' | 'import';
+  partner_iso3: string;
+  partner_name: string;
+  value_usd: number;
+  qty: number | null;
+  qty_unit: 'kg' | null;
+  source_ref: string;
+}
+
+export interface ComtradeAdapterResult extends AdapterResult {
+  /**
+   * Partner-level Comtrade observations reported as HS 999999 / 9999
+   * ("Commodities not specified according to kind"). These are retained
+   * separately from analytical HS6 facts because they do not identify a product.
+   */
+  unclassified_trade: UnclassifiedTradeRow[];
+}
 
 interface ComtradeRow {
   refYear?: number;
@@ -41,31 +52,34 @@ const FLOWS = [
 ] as const;
 
 /**
- * UN Comtrade is the harmonised backbone.
+ * UN Comtrade is the primary trade-data source for Tereflow.
  *
- * National statistical offices publish in ~90 different shapes, half of them
- * PDF and several in languages the pipeline cannot parse. Those stay as
- * citations and get health-checked weekly. Comtrade puts every country on the
- * same HS classification and the same USD basis, which is the only honest way
- * to compare markets side by side.
+ * Important API behaviour:
+ *   - partnerCode omitted => individual partner rows
+ *   - partnerCode=0        => World aggregate
+ *   - cmdCode=AG6          => HS6 product data
+ *   - getFinalData supports up to 250,000 returned records
  *
- * Two things the API will bite you on, both handled here:
- *  1. The keyless preview endpoint accepts exactly ONE period per call.
- *  2. Every figure repeats across customs procedures and modes of transport.
- *     Without pinning customsCode=C00 and motCode=0 you multiply every number.
+ * We therefore request HS6 product data for ALL partners in one request per
+ * country/year/flow whenever it fits under the API record ceiling. This is
+ * fundamentally different from the old chapter-by-chapter / World-only
+ * strategy and gives Tereflow the partner × product grain it needs.
+ *
+ * World totals are retained only as headline/validation rows. Product and
+ * partner analysis is based on the individual partner observations.
  */
 export async function fetchComtrade(
   env: Env,
   iso3: string,
   years: number[],
   perCallDelayMs = 0,
-  /** Chapter coverage settings from code_setup. Falls back to the shipped values. */
-  settings: Pick<Settings, 'chapterCoverageTarget' | 'maxDetailChapters'> = DEFAULTS,
-): Promise<AdapterResult> {
+  _settings?: unknown,
+): Promise<ComtradeAdapterResult> {
   const reporter = ISO3_TO_M49[iso3?.toUpperCase()];
   if (!reporter) {
     return {
       rows: [],
+      unclassified_trade: [],
       source_ref: SOURCE_REF,
       ok: false,
       note: `No UN M49 code known for ${iso3}; skipped Comtrade.`,
@@ -73,22 +87,29 @@ export async function fetchComtrade(
   }
 
   const hasKey = Boolean(env.COMTRADE_API_KEY);
+  if (!hasKey) {
+    return {
+      rows: [],
+      unclassified_trade: [],
+      source_ref: SOURCE_REF,
+      ok: false,
+      note: 'COMTRADE_API_KEY is required for complete partner-level ingestion.',
+    };
+  }
+
   const rows: FactRow[] = [];
+  const unclassified_trade: UnclassifiedTradeRow[] = [];
   const seenRows = new Set<string>();
   const notes: string[] = [];
-  const yearsWithData = new Set<number>();
-  // Track per flow so the product pass only targets years that reported both
-  // sides. A year with exports but no imports makes a nonsense trade balance.
-  const yearsByFlow: Record<'export' | 'import', Set<number>> = {
-    export: new Set(),
-    import: new Set(),
+  let callsMade = 0;
+  let truncated = false;
+
+  const paced = async (params: Record<string, string | number | boolean>) => {
+    if (perCallDelayMs > 0 && callsMade > 0) await sleep(perCallDelayMs);
+    callsMade++;
+    return call(env, true, params);
   };
 
-  // Defensive: aggregatesOnly() only dedupes within one response. Nothing
-  // upstream currently produces overlapping periods across calls, but a
-  // duplicate row here would silently double-count a country's whole trade
-  // total, so the cheapest possible guard is applied at the point everything
-  // funnels through anyway.
   const pushRow = (row: FactRow) => {
     const key = `${row.year}|${row.flow}|${row.partner_iso3 ?? ''}|${row.hs_code ?? ''}`;
     if (seenRows.has(key)) return;
@@ -96,134 +117,38 @@ export async function fetchComtrade(
     rows.push(row);
   };
 
-  let callsMade = 0;
-  const paced = async (params: Record<string, string | number>) => {
-    if (perCallDelayMs > 0 && callsMade > 0) await sleep(perCallDelayMs);
-    callsMade++;
-    return call(env, hasKey, params);
-  };
-
-  // Pass 1 — country totals and partner mix per year.
-  // This also tells us which years actually have data.
+  // Headline totals. These are NOT the analytical product dataset; they are
+  // retained because the existing analysis layer uses them for country totals
+  // and they provide a useful reconciliation check against summed partners.
   for (const [flowCode, flow] of FLOWS) {
-    const periods = hasKey ? [years.join(',')] : years.map(String);
-    for (const period of periods) {
+    for (const year of years) {
       const res = await paced({
         reporterCode: reporter,
-        period,
+        period: String(year),
         cmdCode: 'TOTAL',
         flowCode,
+        partnerCode: 0,
       });
       if (res.error) {
-        notes.push(`${flow} totals ${period}: ${res.error}`);
+        notes.push(`${flow} total ${year}: ${res.error}`);
         continue;
       }
       for (const r of aggregatesOnly(res.data)) {
+        if (Number(r.partnerCode ?? -1) !== 0) continue;
         const value = Number(r.primaryValue ?? 0);
-        const year = Number(r.refYear ?? r.period ?? 0);
-        if (!(value > 0) || !year) continue;
-
-        const partnerCode = Number(r.partnerCode ?? -1);
-        const isWorld = partnerCode === 0;
-        const partnerIso = isWorld
-          ? null
-          : r.partnerISO || M49_TO_ISO3[partnerCode] || null;
-
-        // Comtrade reports aggregates like "Areas, nes" and free-trade zones
-        // that have no ISO3. They must never fall through to the world row —
-        // doing so corrupts the country total the whole trend hangs off.
-        if (!isWorld && !partnerIso) continue;
-
-        yearsWithData.add(year);
-        if (isWorld) yearsByFlow[flow].add(year);
+        const reportedYear = Number(r.refYear ?? r.period ?? 0);
+        if (!(value > 0) || !reportedYear) continue;
         pushRow({
-          year,
-          flow,
-          stream: 'goods',
-          partner_iso3: partnerIso,
-          partner_name: isWorld
-            ? null
-            : r.partnerDesc || (partnerIso ? ISO3_NAME[partnerIso] : null) || partnerIso,
-          hs_code: null,
-          product_name: null,
-          sector: null,
-          value_usd: value,
-          source_ref: SOURCE_REF,
-        });
-      }
-    }
-  }
-
-  // Pass 2 — product mix, at two levels of detail.
-  //
-  // AG2 (~97 chapters) always fits inside the keyless 500-row preview cap, so
-  // it is complete and safe to compute totals, shares and concentration from.
-  //
-  // AG6 is the specific tradeable line ("guavas, mangoes and mangosteens",
-  // not "Fruit & nuts") and is the whole reason somebody opens this app. A
-  // country reports thousands of those, and a plain cmdCode=AG6 request comes
-  // back cut off at the cap, in an arbitrary order that differs year to year.
-  // Comparing two such slices produces invented growth rates.
-  //
-  // So AG6 is requested one HS chapter at a time, passing that chapter's
-  // explicit code list. A single chapter holds at most a few hundred lines, so
-  // each response is complete, and the same chapter is comparable across
-  // years. Chapters are taken in descending order of value until the covered
-  // share passes CHAPTER_COVERAGE_TARGET, which keeps the call count bounded
-  // while still covering what the country actually trades.
-  const completeYears = [...yearsByFlow.export]
-    .filter((y) => yearsByFlow.import.has(y))
-    .sort((a, b) => b - a);
-  const available = completeYears.length
-    ? completeYears
-    : [...yearsWithData].sort((a, b) => b - a);
-  const latest = available[0];
-  const productYears = hasKey
-    ? years.filter((y) => yearsWithData.has(y))
-    : latest
-      ? [...new Set([latest, latest - 1, latest - 3])].filter((y) => yearsWithData.has(y))
-      : [];
-
-  const truncatedYears = new Set<number>();
-
-  // Pass 2a — chapters. Complete, and it tells us where the trade actually is.
-  const chapterValue = new Map<string, number>();
-  for (const [flowCode, flow] of FLOWS) {
-    const periods = hasKey ? [productYears.join(',')] : productYears.map(String);
-    for (const period of periods) {
-      if (!period) continue;
-      const res = await paced({
-        reporterCode: reporter,
-        period,
-        partnerCode: '0',
-        cmdCode: 'AG2',
-        flowCode,
-      });
-      if (res.error) {
-        notes.push(`${flow} chapters ${period}: ${res.error}`);
-        continue;
-      }
-      for (const r of aggregatesOnly(res.data)) {
-        const value = Number(r.primaryValue ?? 0);
-        const year = Number(r.refYear ?? r.period ?? 0);
-        if (!(value > 0) || !year) continue;
-        const hs = hs2CodeOf(r.cmdCode);
-        if (!hs) continue;
-        if (year === latest) chapterValue.set(hs, (chapterValue.get(hs) ?? 0) + value);
-        pushRow({
-          year,
+          year: reportedYear,
           flow,
           stream: 'goods',
           partner_iso3: null,
           partner_name: null,
-          hs_code: hs,
-          product_name: hs2Label(hs, r.cmdDesc || null),
-          sector: hs2Sector(hs),
+          hs_code: null,
+          product_name: null,
+          sector: null,
           value_usd: value,
           qty: r.netWgt ?? null,
-          // netWgt is kilograms by definition. qtyUnitAbbr is absent on the
-          // preview tier, and storing null there left every quantity
-          // unitless, which makes a unit value impossible to compute.
           qty_unit: r.netWgt != null ? 'kg' : null,
           source_ref: SOURCE_REF,
         });
@@ -231,130 +156,176 @@ export async function fetchComtrade(
     }
   }
 
-  // Pass 2b — specific lines, chapter by chapter.
-  //
-  // Only the two years the growth rate is measured between. The intermediate
-  // year is used for the year-on-year figure, which is only ever shown at
-  // chapter level, so fetching it per chapter would add a third of the calls
-  // in this pass for nothing.
-  const detailYears = hasKey
-    ? productYears
-    : productYears.filter((y) => y === latest || y === Math.min(...productYears));
-  const chapters = chaptersToDetail(chapterValue, settings);
-  for (const chapter of chapters) {
-    const codes = hs6CodesInChapter(chapter);
-    if (!codes.length) continue;
-    for (const [flowCode, flow] of FLOWS) {
-      const periods = hasKey ? [detailYears.join(',')] : detailYears.map(String);
-      for (const period of periods) {
-        if (!period) continue;
-        const res = await paced({
-          reporterCode: reporter,
-          period,
-          partnerCode: '0',
-          cmdCode: codes.join(','),
-          flowCode,
-        });
-        if (res.error) {
-          notes.push(`${flow} chapter ${chapter} ${period}: ${res.error}`);
-          continue;
-        }
-        // A chapter should never fill the cap. If one does, its lines were cut
-        // off and the year is not comparable for that chapter.
-        if (res.data.length >= PREVIEW_ROW_CAP) {
-          for (const y of period.split(',')) truncatedYears.add(Number(y));
-        }
-        for (const r of aggregatesOnly(res.data)) {
+  // Product-level dataset: HS6 × individual partner. No partnerCode is sent.
+  // The official Comtrade client documents this exact pattern as the way to
+  // retrieve final data from all partners.
+  for (const [flowCode, flow] of FLOWS) {
+    for (const year of years) {
+      const res = await paced({
+        reporterCode: reporter,
+        period: String(year),
+        cmdCode: 'AG6',
+        flowCode,
+        maxRecords: MAX_RECORDS,
+        breakdownMode: 'classic',
+        includeDesc: true,
+      });
+
+      if (res.error) {
+        notes.push(`${flow} HS6 ${year}: ${res.error}`);
+        continue;
+      }
+
+      if (res.data.length >= MAX_RECORDS) {
+        truncated = true;
+        notes.push(`${flow} HS6 ${year}: response reached the ${MAX_RECORDS.toLocaleString()}-row API ceiling`);
+      }
+
+      // Diagnostic only: for the historical years where the final partner × HS6
+      // value does not reconcile to the World headline, inspect the response
+      // before any Tereflow normalization/filtering/deduplication. This lets us
+      // distinguish a Comtrade response/query issue from a Tereflow transformation.
+      if (flow === 'import' && [2021, 2023, 2024].includes(year)) {
+        const sumValue = (items: ComtradeRow[]) =>
+          items.reduce((sum, r) => sum + Number(r.primaryValue ?? 0), 0);
+        const rawPartner = res.data.filter((r) => Number(r.partnerCode ?? -1) > 0);
+        const rawPartnerHs6 = rawPartner.filter((r) => Boolean(hs6CodeOf(r.cmdCode)));
+        const rawPartnerHs6Positive = rawPartnerHs6.filter((r) => Number(r.primaryValue ?? 0) > 0);
+        const filtered = aggregatesOnly(res.data);
+        const filteredPartner = filtered.filter((r) => Number(r.partnerCode ?? -1) > 0);
+        const filteredPartnerHs6 = filteredPartner.filter((r) => Boolean(hs6CodeOf(r.cmdCode)));
+        const candidate = filteredPartnerHs6.filter((r) => {
           const value = Number(r.primaryValue ?? 0);
-          const year = Number(r.refYear ?? r.period ?? 0);
-          if (!(value > 0) || !year) continue;
+          const yearValue = Number(r.refYear ?? r.period ?? 0);
           const hs = hs6CodeOf(r.cmdCode);
-          if (!hs) continue;
-          pushRow({
-            year,
+          const partnerCode = Number(r.partnerCode ?? -1);
+          const partnerIso = r.partnerISO || M49_TO_ISO3[partnerCode] || null;
+          return value > 0 && Boolean(yearValue) && Boolean(hs) && partnerCode > 0 && Boolean(partnerIso);
+        });
+        const candidateKeys = new Set<string>();
+        let duplicateCandidateCount = 0;
+        let duplicateCandidateValue = 0;
+        for (const r of candidate) {
+          const hs = hs6CodeOf(r.cmdCode);
+          const partnerCode = Number(r.partnerCode ?? -1);
+          const yearValue = Number(r.refYear ?? r.period ?? 0);
+          const key = `${yearValue}|${flow}|${partnerCode}|${hs}`;
+          const value = Number(r.primaryValue ?? 0);
+          if (candidateKeys.has(key)) {
+            duplicateCandidateCount++;
+            duplicateCandidateValue += value;
+          } else {
+            candidateKeys.add(key);
+          }
+        }
+
+        console.log('');
+        console.log(`RAW COMTRADE DIAGNOSTIC — ${year} IMPORT`);
+        console.log('------------------------------------------');
+        console.log(`Raw API records:                 ${res.data.length.toLocaleString()}`);
+        console.log(`Raw API primaryValue:             $${(sumValue(res.data) / 1e9).toFixed(2)}bn`);
+        console.log(`Raw partnerCode > 0:              ${rawPartner.length.toLocaleString()} | $${(sumValue(rawPartner) / 1e9).toFixed(2)}bn`);
+        console.log(`Raw partner + HS6:                ${rawPartnerHs6.length.toLocaleString()} | $${(sumValue(rawPartnerHs6) / 1e9).toFixed(2)}bn`);
+        console.log(`Raw partner + HS6 + value > 0:    ${rawPartnerHs6Positive.length.toLocaleString()} | $${(sumValue(rawPartnerHs6Positive) / 1e9).toFixed(2)}bn`);
+        console.log(`After aggregatesOnly:              ${filtered.length.toLocaleString()}`);
+        console.log(`After aggregate + partner + HS6:   ${filteredPartnerHs6.length.toLocaleString()} | $${(sumValue(filteredPartnerHs6) / 1e9).toFixed(2)}bn`);
+        console.log(`Final candidates before pushRow:   ${candidate.length.toLocaleString()} | $${(sumValue(candidate) / 1e9).toFixed(2)}bn`);
+        console.log(`Duplicate candidate rows:          ${duplicateCandidateCount.toLocaleString()} | $${(duplicateCandidateValue / 1e9).toFixed(2)}bn`);
+      }
+
+      for (const r of aggregatesOnly(res.data)) {
+        const value = Number(r.primaryValue ?? 0);
+        const yearValue = Number(r.refYear ?? r.period ?? 0);
+        const rawHs = String(r.cmdCode ?? '').trim().padStart(6, '0');
+        const hs = hs6CodeOf(r.cmdCode);
+        const partnerCode = Number(r.partnerCode ?? -1);
+        const partnerIso = r.partnerISO || M49_TO_ISO3[partnerCode] || null;
+
+        if (!(value > 0) || !yearValue || partnerCode <= 0 || !partnerIso) continue;
+
+        if (rawHs === '999999') {
+          unclassified_trade.push({
+            year: yearValue,
             flow,
-            stream: 'goods',
-            partner_iso3: null,
-            partner_name: null,
-            hs_code: hs,
-            product_name: hs6Label(hs, r.cmdDesc || null),
-            sector: hs2Sector(hs),
+            partner_iso3: partnerIso,
+            partner_name: r.partnerDesc || ISO3_NAME[partnerIso] || partnerIso,
             value_usd: value,
             qty: r.netWgt ?? null,
             qty_unit: r.netWgt != null ? 'kg' : null,
             source_ref: SOURCE_REF,
           });
+          continue;
         }
+
+        if (!hs) continue;
+
+        pushRow({
+          year: yearValue,
+          flow,
+          stream: 'goods',
+          partner_iso3: partnerIso,
+          partner_name: r.partnerDesc || ISO3_NAME[partnerIso] || partnerIso,
+          hs_code: hs,
+          product_name: hs6Label(hs, r.cmdDesc || null),
+          sector: hs2Sector(hs),
+          value_usd: value,
+          qty: r.netWgt ?? null,
+          qty_unit: r.netWgt != null ? 'kg' : null,
+          source_ref: SOURCE_REF,
+        });
       }
     }
   }
 
-  const coveredShare = shareCovered(chapterValue, chapters);
-  const truncationNote = truncatedYears.size
-    ? ` Specific-product detail was capped by the source in ${[...truncatedYears].sort().join(', ')}.`
-    : '';
-  const coverageNote = chapters.length
-    ? ` Specific products cover the ${chapters.length} largest chapters, ${(coveredShare * 100).toFixed(0)}% of goods trade.`
-    : '';
+  // Build complete HS2 chapter rows from the partner-level HS6 dataset. This
+  // avoids a second product API pass while keeping the existing analysis layer
+  // able to calculate chapter concentration correctly.
+  const chapters = new Map<string, FactRow>();
+  for (const row of rows) {
+    if (!row.hs_code || row.hs_code.length !== 6 || !row.partner_iso3) continue;
+    const chapter = row.hs_code.slice(0, 2);
+    const key = `${row.year}|${row.flow}|${chapter}`;
+    const existing = chapters.get(key);
+    if (existing) {
+      existing.value_usd += row.value_usd;
+      if (row.qty != null) existing.qty = (existing.qty ?? 0) + row.qty;
+    } else {
+      chapters.set(key, {
+        year: row.year,
+        flow: row.flow,
+        stream: 'goods',
+        partner_iso3: null,
+        partner_name: null,
+        hs_code: chapter,
+        product_name: hs2Label(chapter, null),
+        sector: hs2Sector(chapter),
+        value_usd: row.value_usd,
+        qty: row.qty ?? null,
+        qty_unit: row.qty != null ? 'kg' : null,
+        source_ref: SOURCE_REF,
+      });
+    }
+  }
+
+  for (const row of chapters.values()) rows.push(row);
+
+  const productRows = rows.filter((r) => r.hs_code?.length === 6 && r.partner_iso3);
+  const partnerCount = new Set(productRows.map((r) => r.partner_iso3)).size;
+  const productCount = new Set(productRows.map((r) => r.hs_code)).size;
+  const availableYears = [...new Set(productRows.map((r) => r.year))].sort((a, b) => a - b);
 
   return {
     rows,
+    unclassified_trade,
     source_ref: SOURCE_REF,
-    ok: rows.length > 0,
-    truncated_years: [...truncatedYears].sort(),
-    note: rows.length
-      ? `${rows.length} rows from UN Comtrade covering ${available.join(', ') || 'no years'}` +
-        (notes.length ? ` (${notes.length} partial failures)` : '') +
-        coverageNote +
-        truncationNote
-      : notes.join('; ') || 'no rows returned',
+    ok: productRows.length > 0,
+    truncated_years: truncated ? availableYears : [],
+    note: productRows.length
+      ? `${productRows.length} partner-product rows from UN Comtrade; ${productCount} HS6 products across ${partnerCount} partners; years ${availableYears.join(', ') || 'none'}` +
+        (notes.length ? ` (${notes.length} request notes)` : '')
+      : notes.join('; ') || 'no partner-product rows returned',
   };
 }
-
-/**
- * How much of a country's goods trade the specific-product pass tries to
- * cover, and the hard ceiling on how many chapters that is allowed to cost.
- *
- * Each chapter is one API call per year per flow, so the ceiling is what keeps
- * a diversified economy from turning into hundreds of calls. Concentrated
- * economies reach the target in a handful of chapters and stop early.
- *
- * Both live in code_setup as CHAPTER_COVERAGE_TARGET and MAX_DETAIL_CHAPTERS.
- */
-function chaptersToDetail(
-  chapterValue: Map<string, number>,
-  settings: Pick<Settings, 'chapterCoverageTarget' | 'maxDetailChapters'>,
-): string[] {
-  const total = [...chapterValue.values()].reduce((s, v) => s + v, 0);
-  if (total <= 0) return [];
-  const ranked = [...chapterValue.entries()].sort((a, b) => b[1] - a[1]);
-  const picked: string[] = [];
-  let running = 0;
-  for (const [chapter, value] of ranked) {
-    if (picked.length >= settings.maxDetailChapters) break;
-    picked.push(chapter);
-    running += value;
-    if (running / total >= settings.chapterCoverageTarget) break;
-  }
-  return picked;
-}
-
-function shareCovered(chapterValue: Map<string, number>, chapters: string[]): number {
-  const total = [...chapterValue.values()].reduce((s, v) => s + v, 0);
-  if (total <= 0) return 0;
-  return chapters.reduce((s, c) => s + (chapterValue.get(c) ?? 0), 0) / total;
-}
-
-/** Every HS6 code belonging to one chapter, from the static HS reference. */
-function hs6CodesInChapter(chapter: string): string[] {
-  const cached = CHAPTER_CODES.get(chapter);
-  if (cached) return cached;
-  const codes = Object.keys(HS6_LABEL).filter((c) => c.startsWith(chapter));
-  CHAPTER_CODES.set(chapter, codes);
-  return codes;
-}
-
-const CHAPTER_CODES = new Map<string, string[]>();
 
 export interface ComtradeProbe {
   ok: boolean;
@@ -363,13 +334,6 @@ export interface ComtradeProbe {
   import_usd: number | null;
 }
 
-/**
- * A cheap stand-in for the full fetch above, used to decide whether a country
- * needs the full fetch at all (see local/pipeline.ts). Tries the most recent
- * candidate year first (world totals only, both flows = 2 calls) and falls
- * back one year if that's empty, so it costs 2-4 calls instead of the ~18 a
- * full fetchComtrade() makes keyless.
- */
 export async function probeComtrade(
   env: Env,
   iso3: string,
@@ -378,15 +342,17 @@ export async function probeComtrade(
   const reporter = ISO3_TO_M49[iso3?.toUpperCase()];
   if (!reporter) return { ok: false, year: null, export_usd: null, import_usd: null };
   const hasKey = Boolean(env.COMTRADE_API_KEY);
+  if (!hasKey) return { ok: false, year: null, export_usd: null, import_usd: null };
 
   for (const year of candidateYearsDescending.slice(0, 2)) {
     const totals: Partial<Record<'export' | 'import', number>> = {};
     for (const [flowCode, flow] of FLOWS) {
-      const res = await call(env, hasKey, {
+      const res = await call(env, true, {
         reporterCode: reporter,
         period: String(year),
         cmdCode: 'TOTAL',
         flowCode,
+        partnerCode: 0,
       });
       if (res.error) continue;
       for (const r of aggregatesOnly(res.data)) {
@@ -402,46 +368,14 @@ export async function probeComtrade(
   return { ok: false, year: null, export_usd: null, import_usd: null };
 }
 
-/**
- * Chapter code from an AG2 response. A blank code must never be padded into
- * "00", which is not a real chapter, or unclassified trade would be filed
- * under live animals.
- */
-function hs2CodeOf(cmdCode: string | undefined): string | null {
-  const raw = String(cmdCode ?? '').trim();
-  if (!raw || raw.toUpperCase() === 'TOTAL') return null;
-  const hs = raw.padStart(2, '0').slice(0, 2);
-  return /^\d{2}$/.test(hs) && hs !== '00' ? hs : null;
-}
-
-/**
- * A missing/empty cmdCode must never be treated as chapter "00" -- that
- * chapter doesn't exist, so a blank code silently masquerading as it would
- * corrupt the product mix with a fake category. Also reject anything that
- * isn't a genuine 6-digit leaf code (a shorter code here would mean the API
- * handed back a parent/aggregate row instead of the specific line asked for).
- */
 function hs6CodeOf(cmdCode: string | undefined): string | null {
   const raw = String(cmdCode ?? '').trim();
-  if (!raw || raw === 'TOTAL') return null;
+  if (!raw || raw.toUpperCase() === 'TOTAL') return null;
   const hs = raw.padStart(6, '0');
-  if (!/^\d{6}$/.test(hs) || hs.startsWith('00')) return null;
-  // 999999 is Comtrade's "commodities not specified according to kind" --
-  // real in the totals but not an actual product anyone is shopping for.
-  if (hs === '999999') return null;
+  if (!/^\d{6}$/.test(hs) || hs.startsWith('00') || hs === '999999') return null;
   return hs;
 }
 
-/**
- * Keep only the fully aggregated slice: all customs procedures (C00), all modes
- * of transport (0), and all second partners (0).
- *
- * Comtrade repeats the same value across each of those sub-dimensions. Skipping
- * any one of them silently corrupts the totals — Germany, for instance, files
- * imports broken down by country of origin as well as country of consignment,
- * so without pinning partner2Code the world total falls off the end of the
- * response and the country appears to import almost nothing.
- */
 function aggregatesOnly(rows: ComtradeRow[]): ComtradeRow[] {
   const filtered = rows.filter(
     (r) =>
@@ -459,24 +393,9 @@ function aggregatesOnly(rows: ComtradeRow[]): ComtradeRow[] {
   });
 }
 
-/**
- * Thrown when the source refuses further requests for now.
- *
- * A 429 is not a failure of one call that retrying past will fix. Comtrade's
- * keyless tier allows on the order of a hundred requests an hour, and one
- * country costs more than that once specific products are fetched per chapter,
- * so once it starts refusing it will keep refusing for the rest of the hour.
- *
- * Continuing at that point does real harm: every subsequent country records a
- * partial fetch, which looks like data but is a country with most of its
- * products missing. Stopping and saying so is the honest outcome.
- */
 export class RateLimited extends Error {
   constructor(public readonly retryAfterSeconds: number | null) {
-    super(
-      'UN Comtrade is rate limiting this address. The keyless tier allows roughly a hundred requests an hour, ' +
-        'and one country needs more than that. Add a free COMTRADE_API_KEY, or run fewer countries per hour.',
-    );
+    super('UN Comtrade is rate limiting this address.');
     this.name = 'RateLimited';
   }
 }
@@ -484,29 +403,24 @@ export class RateLimited extends Error {
 async function call(
   env: Env,
   hasKey: boolean,
-  params: Record<string, string | number>,
+  params: Record<string, string | number | boolean>,
 ): Promise<{ data: ComtradeRow[]; error?: string }> {
   const url = new URL(hasKey ? FULL : PREVIEW);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
-  // Pin the fully aggregated slice server-side. Without these the 500-row
-  // preview cap is spent on sub-breakdowns and the world total can be cut off.
   url.searchParams.set('customsCode', 'C00');
   url.searchParams.set('motCode', '0');
   url.searchParams.set('partner2Code', '0');
 
-  // Comtrade occasionally drops a request under load. A single dropped call
-  // silently punches a hole in the trend line, so transient failures retry.
-  // Rate limiting is not transient and is handled separately above.
   let lastError = 'unknown';
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await sleep(600 * attempt);
+    if (attempt > 0) await sleep(700 * attempt);
     try {
       const res = await fetch(url, {
         headers: {
           accept: 'application/json',
           ...(hasKey ? { 'Ocp-Apim-Subscription-Key': env.COMTRADE_API_KEY! } : {}),
         },
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(60_000),
       });
       if (res.status === 429) {
         const retryAfter = Number(res.headers.get('retry-after'));
@@ -516,7 +430,10 @@ async function call(
         lastError = `HTTP ${res.status}`;
         continue;
       }
-      if (!res.ok) return { data: [], error: `HTTP ${res.status}` };
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        return { data: [], error: `HTTP ${res.status}${body ? `: ${body.slice(0, 180)}` : ''}` };
+      }
       const body = (await res.json()) as { data?: ComtradeRow[]; error?: string };
       if (body?.error) return { data: [], error: String(body.error) };
       return { data: Array.isArray(body?.data) ? body.data : [] };
@@ -529,5 +446,5 @@ async function call(
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

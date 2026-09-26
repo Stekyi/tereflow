@@ -100,9 +100,11 @@ export function dominantCodes(
 
 /** hsCode may be a specific HS6 product line or a bare HS2 chapter (the product
  *  search can pass a chapter) -- classification always resolves at chapter level. */
+export type ClassificationRule = Pick<ExportClassification, 'category'>;
+
 export function classify(
   hsCode: string | null,
-  resolved: Map<string, ExportClassification>,
+  resolved: Map<string, ClassificationRule>,
   dominant: Set<string>,
 ): ExportCategory {
   if (!hsCode) return 'non_traditional';

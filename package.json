@@ -44,7 +44,8 @@
     "test:context": "node scripts/e2e-context.mjs",
     "test:runs": "node scripts/e2e-run-progress.mjs && node scripts/e2e-run-queue.mjs",
     "agent": "node local/ghana.mjs --watch",
-    "test:insight": "node scripts/test-insight-parts.mjs && node scripts/test-blue-oceans.mjs && node scripts/test-market-context.mjs && node scripts/test-families.mjs && node scripts/test-search-terms.mjs && node scripts/test-discover.mjs && node scripts/test-pdf-trade.mjs"
+    "test:insight": "node scripts/test-insight-parts.mjs && node scripts/test-blue-oceans.mjs && node scripts/test-market-context.mjs && node scripts/test-families.mjs && node scripts/test-search-terms.mjs && node scripts/test-discover.mjs && node scripts/test-pdf-trade.mjs",
+    "activated_countries": "node local/build.mjs && node local/dist/pipeline.mjs"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

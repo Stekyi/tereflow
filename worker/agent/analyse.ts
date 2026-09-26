@@ -8,6 +8,8 @@ import type { FactRow } from './types';
 import type { WorldBankContext } from './adapters/worldbank';
 import { DEFAULTS, type Settings } from '../lib/settings';
 import { hs2Sector } from './codes';
+import { classify, dominantCodes } from '../lib/classify';
+import type { ExportClassification } from '../../shared/types';
 
 export interface AnalysisBundle {
   overview: Overview;
@@ -143,6 +145,7 @@ export function analyse(
    * a ranking with one odd row than by no ranking at all.
    */
   reporterIso3: string | null = null,
+  classifications: Map<string, Pick<ExportClassification, 'category'>> = new Map(),
 ): AnalysisBundle {
   active = settings;
 
@@ -224,9 +227,35 @@ export function analyse(
     coverage_note: buildCoverageNote(years, latest, productYear),
   };
 
+  // One classification layer is used by every opportunity-producing path.
+  // Explicit admin classifications win; otherwise the country-level dominant
+  // export chapter heuristic marks a legacy commodity as traditional.
+  const dominant = dominantCodes(exportChapterShares, active.dominantShareThreshold);
+  const opportunityImports = topImports.filter((p) =>
+    isOpportunityEligible(p.code, classifications, dominant),
+  );
+
   const signals = [
-    ...detectSignals(rows, 'export', productYears, topExports, truncated, reporterIso3),
-    ...detectSignals(rows, 'import', productYears, topImports, truncated, reporterIso3),
+    ...detectSignals(
+      rows,
+      'export',
+      productYears,
+      topExports,
+      truncated,
+      reporterIso3,
+      classifications,
+      dominant,
+    ),
+    ...detectSignals(
+      rows,
+      'import',
+      productYears,
+      topImports,
+      truncated,
+      reporterIso3,
+      classifications,
+      dominant,
+    ),
   ]
     .sort((a, b) => b.momentum - a.momentum)
     .slice(0, active.signalsPerCountry);
@@ -236,6 +265,7 @@ export function analyse(
     overview,
     topExports,
     topImports,
+    opportunityImports,
     partnersExport,
     partnersImport,
     signals,
@@ -689,6 +719,18 @@ function buildCoverageNote(
 
 // --- the premium signal engine ---------------------------------------------
 
+// Central opportunity eligibility rule. Product/headline analytics keep
+// traditional goods visible; only opportunity-producing paths call this.
+function isOpportunityEligible(
+  hsCode: string | null,
+  classifications: Map<string, Pick<ExportClassification, 'category'>>,
+  dominant: Set<string>,
+): boolean {
+  if (!hsCode || hsCode === '99' || hsCode.startsWith('99')) return false;
+  return classify(hsCode, classifications, dominant) !== 'traditional';
+}
+
+
 /**
  * An opportunity is a product that is growing fast, is not yet a headline
  * export, and is big enough to be real. Cocoa pod husk before it becomes a
@@ -701,6 +743,8 @@ function detectSignals(
   currentTop: RankedItem[],
   truncatedYears: Set<number>,
   reporterIso3: string | null = null,
+  classifications: Map<string, Pick<ExportClassification, 'category'>> = new Map(),
+  dominant: Set<string> = new Set(),
 ): SignalDraft[] {
   if (years.length < 3) return [];
   const latest = years[years.length - 1];
@@ -709,7 +753,11 @@ function detectSignals(
   const span = latest - base;
   if (span < 2) return [];
 
-  const { rows: current, level } = productRows(rows, flow, latest);
+  const product = productRows(rows, flow, latest);
+  const current = product.rows.filter((r) =>
+    isOpportunityEligible(r.hs_code, classifications, dominant),
+  );
+  const level = product.level;
   const total = current.reduce((s, r) => s + r.value_usd, 0);
   if (total <= 0) return [];
 
@@ -722,7 +770,13 @@ function detectSignals(
     level === SPECIFIC_LEN && (truncatedYears.has(latest) || truncatedYears.has(base));
   const working = specificTruncated
     ? atLevel(
-        rows.filter((r) => r.year === latest && r.flow === flow && r.stream === 'goods'),
+        rows.filter(
+          (r) =>
+            r.year === latest &&
+            r.flow === flow &&
+            r.stream === 'goods' &&
+            isOpportunityEligible(r.hs_code, classifications, dominant),
+        ),
         CHAPTER_LEN,
       )
     : current;
@@ -746,10 +800,6 @@ function detectSignals(
   const drafts: SignalDraft[] = [];
 
   for (const r of working) {
-    // HS 99 is "commodities not elsewhere specified". It is real in the totals
-    // but meaningless as an investment signal, so it never gets surfaced.
-    if (r.hs_code === '99' || r.hs_code?.startsWith('99')) continue;
-
     const past = valueOf(rows, base, flow, r.hs_code);
     const growth = growthFrom(past, r.value_usd, span, floor.valueUsd);
     if (growth == null) continue;
@@ -905,6 +955,7 @@ function recommend(
   overview: Overview,
   topExports: RankedItem[],
   topImports: RankedItem[],
+  opportunityImports: RankedItem[],
   partnersExport: RankedItem[],
   partnersImport: RankedItem[],
   signals: SignalDraft[],
@@ -950,6 +1001,7 @@ function recommend(
   // 2. Import gaps — what the country buys is what you could sell it.
   // 10%/yr = "clearly rising" floor; top 3 keeps the headline scannable.
   const risingImports = topImports
+    .filter((p) => opportunityImports.some((o) => o.code === p.code))
     .filter((p) => (p.cagr_3y ?? 0) > 10)
     .slice(0, 3);
   if (risingImports.length) {

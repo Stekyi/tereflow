@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Skeletons } from './components/ui';
 import { Logo } from './components/Brand';
@@ -24,6 +24,7 @@ const Feed = lazy(() => import('./pages/Feed'));
 const Playbooks = lazy(() => import('./pages/Playbooks'));
 const PlaybookDetail = lazy(() => import('./pages/PlaybookDetail'));
 const Upgrade = lazy(() => import('./pages/Upgrade'));
+const TradeSandbox = lazy(() => import('./pages/TradeSandbox'));
 
 const TITLES: Record<string, string> = {
   '/': 'Tereflow',
@@ -35,6 +36,7 @@ const TITLES: Record<string, string> = {
   '/feed': 'Your feed',
   '/playbooks': 'How to start',
   '/upgrade': 'Premium',
+  '/sandbox': 'Trade sandbox',
   '/registry': 'Data registry',
   '/admin': 'Owner portal',
   '/admin/new': 'New record',
@@ -51,6 +53,11 @@ export default function App() {
   // change unmounts the old page, whose cleanup clears the name, so a page that
   // reports nothing falls back to its static label below.
   const [pageTitle, setPageTitle] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
 
   const isRoot = ROOTS.has(location.pathname);
   const title = pageTitle ?? TITLES[location.pathname] ?? 'Tereflow';
@@ -59,6 +66,17 @@ export default function App() {
     <PageTitleContext.Provider value={setPageTitle}>
     <div className="app">
       <header className="topbar">
+        <button
+          className="menu-btn"
+          type="button"
+          onClick={() => setMenuOpen(true)}
+          aria-label="Open navigation"
+          aria-expanded={menuOpen}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
         {isRoot ? (
           <span className="brand-mark">
             <span className="brand-dot">
@@ -81,6 +99,24 @@ export default function App() {
         </NavLink>
       </header>
 
+      {menuOpen && <button className="nav-scrim" type="button" aria-label="Close navigation" onClick={() => setMenuOpen(false)} />}
+      <aside className={`app-drawer ${menuOpen ? 'open' : ''}`} aria-hidden={!menuOpen}>
+        <div className="drawer-head">
+          <span className="drawer-title">Navigation</span>
+          <button className="drawer-close" type="button" onClick={() => setMenuOpen(false)} aria-label="Close navigation">×</button>
+        </div>
+        <nav className="drawer-nav" aria-label="Main navigation">
+          <DrawerLink to="/" label="Products" d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z" />
+          <DrawerLink to="/countries" label="Countries" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 0v20M2 12h20M12 2c3 3 3 17 0 20M12 2C9 5 9 19 12 22" stroke />
+          <DrawerLink to="/sandbox" label="Trade Sandbox" d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5" stroke />
+          <DrawerLink to="/opportunities" label="Opportunities" d="M4 19 10 13l4 3 6-8" stroke />
+          <DrawerLink to="/network" label="Network" d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 13a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm0 1.5c-3 0-6 1.5-6 3.5v2h12v-2c0-2-3-3.5-6-3.5zm8-1c-.9 0-1.8.14-2.6.4 1.6.9 2.6 2.2 2.6 3.6v2h6v-2c0-2-3-4-6-4z" />
+          <DrawerLink to="/feed" label="Feed" d="M5 5h14v14H5zM8 9h8M8 12h8M8 15h5" stroke />
+          <DrawerLink to="/playbooks" label="How to start" d="M6 3h12v18H6zM9 7h6M9 11h6M9 15h4" stroke />
+          <DrawerLink to="/me" label="Me" d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm0 2c-4 0-8 2-8 5v2h16v-2c0-3-4-5-8-5z" />
+        </nav>
+      </aside>
+
       <main>
         <Suspense fallback={<Skeletons n={5} />}>
           <Routes>
@@ -101,6 +137,7 @@ export default function App() {
             <Route path="/playbooks" element={<Playbooks />} />
             <Route path="/playbooks/:slug" element={<PlaybookDetail />} />
             <Route path="/upgrade" element={<Upgrade />} />
+            <Route path="/sandbox" element={<TradeSandbox />} />
 
             <Route path="/admin" element={<Portal />} />
             <Route path="/admin/new" element={<AdminForm />} />
@@ -123,9 +160,8 @@ export default function App() {
         </Suspense>
       </main>
 
-      {/* Four tabs, not six. Marketplace and Explore both duplicated Home, which already
-          browses the same products, and Messages moved to the top bar. */}
-      <nav className="tabbar">
+      {/* Primary navigation: mobile app-style bottom bar. Desktop uses the hamburger drawer above. */}
+      <nav className="tabbar" aria-label="Primary navigation">
         <Tab
           to="/"
           label="Products"
@@ -136,6 +172,12 @@ export default function App() {
           to="/countries"
           label="Countries"
           d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 0v20M2 12h20M12 2c3 3 3 17 0 20M12 2C9 5 9 19 12 22"
+          stroke
+        />
+        <Tab
+          to="/sandbox"
+          label="Sandbox"
+          d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5"
           stroke
         />
         <Tab
@@ -153,6 +195,35 @@ export default function App() {
       <FeedbackButton />
     </div>
     </PageTitleContext.Provider>
+  );
+}
+
+function DrawerLink({
+  to,
+  label,
+  d,
+  stroke,
+}: {
+  to: string;
+  label: string;
+  d: string;
+  stroke?: boolean;
+}) {
+  return (
+    <NavLink to={to} end={to === '/'} className={({ isActive }) => (isActive ? 'drawer-link active' : 'drawer-link')}>
+      <svg
+        viewBox="0 0 24 24"
+        fill={stroke ? 'none' : 'currentColor'}
+        stroke={stroke ? 'currentColor' : 'none'}
+        strokeWidth={stroke ? 1.7 : 0}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        <path d={d} />
+      </svg>
+      <span>{label}</span>
+    </NavLink>
   );
 }
 

@@ -5,7 +5,7 @@ import { requireAdmin } from '../lib/auth';
 import { currentUser } from '../lib/session';
 import { discoverCountryConfig, dominanceCandidates } from '../providers/discover';
 import { loadSettings } from '../lib/settings';
-import { dominantCodes, loadClassifications, resolveAll } from '../lib/classify';
+import { dominantCodes, loadClassifications, resolveAll, resolveProducts } from '../lib/classify';
 import { loadResult } from './public';
 import {
   BLUE_OCEAN_VISIBILITIES,
@@ -224,7 +224,7 @@ admin.patch('/entities/:slug/activation', async (c) => {
   return json({ slug: c.req.param('slug'), is_active: body.is_active });
 });
 
-/** Bulk tick â€” activate or deactivate a whole continent or kind at once. */
+/** Bulk tick — activate or deactivate a whole continent or kind at once. */
 admin.post('/entities/activation/bulk', async (c) => {
   const body = (await c.req.json()) as { slugs: string[]; is_active: boolean };
   if (!Array.isArray(body.slugs) || body.slugs.length === 0) return bad('slugs[] required');
@@ -377,13 +377,12 @@ admin.get('/classifications', async (c) => {
     entityId === '*' ? null : await loadResult<Overview>(c.env.DB, entityId, 'overview');
   const settings = await loadSettings(c.env);
 
-  return json({
-    entity_id: entityId,
-    rows: resolveAll(
-      resolved,
-      dominantCodes(overview?.export_chapter_shares, settings.dominantShareThreshold),
-    ),
-  });
+  const dominant = dominantCodes(overview?.export_chapter_shares, settings.dominantShareThreshold);
+  const rows = entityId === '*'
+    ? resolveAll(resolved, dominant)
+    : await resolveProducts(c.env.DB, entityId, resolved, dominant);
+
+  return json({ entity_id: entityId, rows });
 });
 
 admin.put('/classifications', async (c) => {
@@ -397,7 +396,7 @@ admin.put('/classifications', async (c) => {
   };
 
   const hsCode = String(body.hs_code ?? '').padStart(2, '0');
-  if (!/^\d{2}$/.test(hsCode)) return bad('hs_code must be a 2-digit HS chapter code');
+  if (!/^\d{2}(?:\d{2}){0,4}$/.test(hsCode)) return bad('hs_code must contain 2, 4, 6, 8, or 10 digits');
   if (!['traditional', 'non_traditional'].includes(body.category)) return bad('Invalid category');
 
   let entityId = '*';
@@ -584,15 +583,7 @@ admin.post('/ingest/product-analytics', async (c) => {
       c.env.DB.prepare(
         `INSERT INTO product_analytics
            (hs_code, entity_id, flow, year, value_usd, qty_kg, unit_value_usd_t, cagr_pct, share)
-         VALUES ${values}
-         ON CONFLICT (hs_code, entity_id, flow) DO UPDATE SET
-           year = excluded.year,
-           value_usd = excluded.value_usd,
-           qty_kg = excluded.qty_kg,
-           unit_value_usd_t = excluded.unit_value_usd_t,
-           cagr_pct = excluded.cagr_pct,
-           share = excluded.share,
-           computed_at = datetime('now')`,
+         VALUES ${values}`,
       ).bind(...binds),
     );
   }
@@ -670,6 +661,109 @@ admin.post('/ingest/price-ratios', async (c) => {
     priced: (counted?.n ?? 0) - (dropped.meta?.changes ?? 0),
     implausible_weights_dropped: dropped.meta?.changes ?? 0,
   });
+});
+
+/** Persistent Comtrade availability/ingestion state for incremental runs. */
+admin.get('/ingest/comtrade-state/:slug', async (c) => {
+  const entity = await resolveEntity(c, c.req.param('slug'));
+  if (!entity) return bad(`Unknown entity: ${c.req.param('slug')}`, 404);
+  const rows = await c.env.DB.prepare(
+    `SELECT year, classification_code, length_cmd_code, total_records,
+            dataset_checksum, last_released, dataset_kind AS source_kind,
+            0 AS ingested_rows, fetched_at AS checked_at, fetched_at AS ingested_at
+       FROM comtrade_ingestion_state
+      WHERE entity_id = ?
+      ORDER BY year`,
+  ).bind(entity.id).all();
+  return json({ state: rows.results ?? [] });
+});
+
+admin.post('/ingest/comtrade-state', async (c) => {
+  const body = (await c.req.json()) as {
+    slug: string;
+    state: { year: number; classification_code?: string | null; length_cmd_code?: number | null; total_records?: number | null; dataset_checksum?: string | null; last_released?: string | null; source_kind?: string; ingested_rows?: number }[];
+  };
+  const entity = await resolveEntity(c, body.slug);
+  if (!entity) return bad(`Unknown entity: ${body.slug}`, 404);
+  if (!Array.isArray(body.state)) return bad('state[] required');
+  for (const row of body.state) {
+    await c.env.DB.prepare(
+      `INSERT INTO comtrade_ingestion_state
+         (entity_id, year, dataset_kind, classification_code, length_cmd_code,
+          total_records, dataset_checksum, last_released, fetched_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT (entity_id, year, dataset_kind) DO UPDATE SET
+         classification_code = excluded.classification_code,
+         length_cmd_code = excluded.length_cmd_code,
+         total_records = excluded.total_records,
+         dataset_checksum = excluded.dataset_checksum,
+         last_released = excluded.last_released,
+         fetched_at = excluded.fetched_at`,
+    ).bind(entity.id, row.year, row.source_kind ?? 'final', row.classification_code ?? null,
+      row.length_cmd_code ?? null, row.total_records ?? null, row.dataset_checksum ?? null,
+      row.last_released ?? null).run();
+  }
+  return json({ ok: true, written: body.state.length });
+});
+
+/** Years currently stored in trade_facts for a country. */
+admin.get('/ingest/fact-years/:slug', async (c) => {
+  const entity = await resolveEntity(c, c.req.param('slug'));
+  if (!entity) return bad(`Unknown entity: ${c.req.param('slug')}`, 404);
+  const rows = await c.env.DB.prepare(
+    `SELECT year, COUNT(*) AS rows
+       FROM trade_facts
+      WHERE entity_id = ?
+      GROUP BY year
+      ORDER BY year`,
+  ).bind(entity.id).all<{ year: number; rows: number }>();
+  const years = (rows.results ?? []).map((r) => Number(r.year));
+  return json({ slug: entity.slug, years, facts: rows.results ?? [] });
+});
+
+/** Replace only one year's facts; historical unchanged years remain intact. */
+admin.post('/ingest/facts/year', async (c) => {
+  const body = (await c.req.json()) as { slug: string; year: number; facts: IngestFact[] };
+  const entity = await resolveEntity(c, body.slug);
+  if (!entity) return bad(`Unknown entity: ${body.slug}`, 404);
+  if (!Number.isInteger(body.year)) return bad('year required');
+  if (!Array.isArray(body.facts)) return bad('facts[] required');
+
+  // Replace exactly one year. Use json_each so one SQL statement carries the
+  // whole batch as a single bound JSON value instead of creating thousands of
+  // tiny INSERT statements. This is materially faster on D1 and avoids the
+  // request timing out on a 70k+ row year.
+  await c.env.DB.prepare(
+    'DELETE FROM trade_facts WHERE entity_id = ? AND year = ?',
+  ).bind(entity.id, body.year).run();
+
+  const BATCH_ROWS = 1000;
+  const INSERT_SQL = `INSERT INTO trade_facts
+    (entity_id, year, flow, stream, partner_iso3, partner_name, hs_code,
+     product_name, sector, value_usd, qty, qty_unit, source_ref)
+    SELECT ?,
+           json_extract(value, '$.year'),
+           json_extract(value, '$.flow'),
+           json_extract(value, '$.stream'),
+           json_extract(value, '$.partner_iso3'),
+           json_extract(value, '$.partner_name'),
+           json_extract(value, '$.hs_code'),
+           json_extract(value, '$.product_name'),
+           json_extract(value, '$.sector'),
+           json_extract(value, '$.value_usd'),
+           json_extract(value, '$.qty'),
+           json_extract(value, '$.qty_unit'),
+           json_extract(value, '$.source_ref')
+      FROM json_each(?)`;
+
+  for (let i = 0; i < body.facts.length; i += BATCH_ROWS) {
+    const slice = body.facts.slice(i, i + BATCH_ROWS);
+    await c.env.DB.prepare(INSERT_SQL)
+      .bind(entity.id, JSON.stringify(slice))
+      .run();
+  }
+
+  return json({ written: body.facts.length, batches: Math.ceil(body.facts.length / BATCH_ROWS) });
 });
 
 /**

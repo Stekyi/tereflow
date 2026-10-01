@@ -14,9 +14,8 @@ import { HS2_LABEL } from '../agent/codes';
 const DOMINANT_SHARE_THRESHOLD = 0.25;
 
 /** Product rows are stored at the specific HS6 line; classification and the
- *  dominant-commodity heuristic both operate one level up, at the HS2
- *  chapter, since that's the level "traditional vs non-traditional" and
- *  "this is the country's headline commodity" are actually about. */
+ *  dominant-commodity heuristic use the HS2 chapter as a fallback. Exact
+ *  product rules may be stored at HS6/HS8/HS10 and always take precedence. */
 function chapterOf(hsCode: string): string {
   return hsCode.slice(0, 2);
 }
@@ -100,17 +99,21 @@ export function dominantCodes(
 
 /** hsCode may be a specific HS6 product line or a bare HS2 chapter (the product
  *  search can pass a chapter) -- classification always resolves at chapter level. */
-export type ClassificationRule = Pick<ExportClassification, 'category'>;
-
 export function classify(
   hsCode: string | null,
-  resolved: Map<string, ClassificationRule>,
+  resolved: Map<string, Pick<ExportClassification, 'category'>>,
   dominant: Set<string>,
 ): ExportCategory {
   if (!hsCode) return 'non_traditional';
+
+  // Exact product classification wins. This is the admin control for HS6
+  // products and deliberately sits above the broader chapter rule.
+  const exact = resolved.get(hsCode);
+  if (exact) return exact.category;
+
   const chapter = chapterOf(hsCode);
-  const row = resolved.get(chapter);
-  if (row) return row.category;
+  const chapterRow = resolved.get(chapter);
+  if (chapterRow) return chapterRow.category;
   return dominant.has(chapter) ? 'traditional' : 'non_traditional';
 }
 
@@ -119,6 +122,8 @@ function classificationSource(
   resolved: Map<string, ExportClassification>,
   dominant: Set<string>,
 ): ResolvedClassification['source'] {
+  const exact = resolved.get(hsCode);
+  if (exact) return exact.entity_id === '*' ? 'default' : 'override';
   const chapter = chapterOf(hsCode);
   const row = resolved.get(chapter);
   if (row) return row.entity_id === '*' ? 'default' : 'override';
@@ -140,4 +145,37 @@ export function resolveAll(
       override: row && row.entity_id !== '*' ? row : null,
     };
   });
+}
+
+/** Product-level rows for the admin curation screen. The country selector
+ * exposes the HS6 products actually reported by that country; exact product
+ * overrides then take precedence over chapter defaults. */
+export async function resolveProducts(
+  db: D1Database,
+  entityId: string,
+  resolved: Map<string, ExportClassification>,
+  dominant: Set<string>,
+): Promise<ResolvedClassification[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT hs_code, MAX(product_name) AS product_name, MAX(year) AS latest_year
+         FROM trade_facts
+        WHERE entity_id = ?
+          AND hs_code IS NOT NULL
+          AND LENGTH(hs_code) >= 6
+        GROUP BY hs_code
+        ORDER BY hs_code`,
+    )
+    .bind(entityId)
+    .all<{ hs_code: string; product_name: string | null; latest_year: number | null }>();
+
+  return (results ?? []).map((r) => ({
+    hs_code: r.hs_code,
+    label: r.product_name || `HS ${r.hs_code}`,
+    category: classify(r.hs_code, resolved, dominant),
+    source: classificationSource(r.hs_code, resolved, dominant),
+    override: resolved.get(r.hs_code)?.entity_id === entityId
+      ? resolved.get(r.hs_code)!
+      : null,
+  }));
 }

@@ -89,6 +89,108 @@ function countryCodeFor(slug: string | null | undefined): string {
   return known[slug] ?? '';
 }
 
+
+async function loadTradeFactPartners(
+  env: Env,
+  entityId: string,
+  entityName: string,
+  hs: string,
+  flow: 'import' | 'export',
+): Promise<PartnerBreakdown | null> {
+  const chapter = hs.slice(0, 2);
+
+  async function query(productCode: string) {
+    const latest = await env.DB.prepare(
+      `SELECT MAX(year) AS y
+         FROM trade_facts
+        WHERE entity_id = ? AND flow = ? AND stream = 'goods'
+          AND hs_code = ? AND partner_iso3 IS NOT NULL`,
+    ).bind(entityId, flow, productCode).first<{ y: number | null }>();
+    if (!latest?.y) return null;
+
+    const { results } = await env.DB.prepare(
+      `SELECT partner_iso3, MAX(partner_name) AS partner_name,
+              SUM(value_usd) AS value_usd, SUM(qty) AS qty
+         FROM trade_facts
+        WHERE entity_id = ? AND flow = ? AND stream = 'goods'
+          AND hs_code = ? AND partner_iso3 IS NOT NULL AND year = ?
+        GROUP BY partner_iso3
+        HAVING SUM(value_usd) > 0
+        ORDER BY value_usd DESC`,
+    ).bind(entityId, flow, productCode, latest.y).all<{
+      partner_iso3: string;
+      partner_name: string | null;
+      value_usd: number;
+      qty: number | null;
+    }>();
+    const rows = results ?? [];
+    if (!rows.length) return null;
+    const total = rows.reduce((sum, r) => sum + Number(r.value_usd || 0), 0);
+    return {
+      country_code: entityId,
+      country_name: entityName,
+      product_code: productCode,
+      classification_level: productCode.length === 6 ? 'HS6' : 'HS2',
+      trade_flow: flow,
+      year: latest.y,
+      total_usd: total,
+      partner_count: rows.length,
+      source: 'UN Comtrade',
+      is_chapter_level: productCode !== hs,
+      requested_code: hs,
+      partners: rows.map((r) => ({
+        partner: r.partner_name ?? r.partner_iso3,
+        iso3: r.partner_iso3,
+        value_usd: Number(r.value_usd || 0),
+        share_pct: total > 0 ? Number(r.value_usd || 0) / total * 100 : 0,
+        net_weight_kg: r.qty && r.qty > 0 ? r.qty : null,
+        unit_value_usd_per_kg: r.qty && r.qty > 0 ? Number(r.value_usd || 0) / r.qty : null,
+      })),
+    };
+  }
+
+  const exact = await query(hs);
+  if (exact) return exact;
+  if (chapter !== hs) return query(chapter);
+  return null;
+}
+
+async function loadFocusedSeries(
+  env: Env,
+  entityId: string,
+  hs: string,
+  flow: 'import' | 'export',
+) {
+  const query = async (partnered: boolean) => {
+    const condition = partnered ? 'partner_iso3 IS NOT NULL' : 'partner_iso3 IS NULL';
+    const { results } = await env.DB.prepare(
+      `SELECT year, SUM(value_usd) AS value_usd, SUM(qty) AS qty_kg
+         FROM trade_facts
+        WHERE entity_id = ? AND flow = ? AND stream = 'goods'
+          AND hs_code = ? AND ${condition}
+        GROUP BY year
+        ORDER BY year`,
+    ).bind(entityId, flow, hs).all<{ year: number; value_usd: number; qty_kg: number | null }>();
+    return results ?? [];
+  };
+
+  let rows = await query(true);
+  if (!rows.length) rows = await query(false);
+  return rows.map((r, i) => {
+    const qty = r.qty_kg && r.qty_kg > 0 ? Number(r.qty_kg) : null;
+    const unit = qty ? Number(r.value_usd) / (qty / 1000) : null;
+    const prev = i > 0 ? Number(rows[i - 1].value_usd) : null;
+    const yoy = prev && prev > 0 ? (Number(r.value_usd) - prev) / prev * 100 : null;
+    return {
+      year: Number(r.year),
+      value_usd: Number(r.value_usd || 0),
+      qty_kg: qty,
+      unit_value_usd_t: unit,
+      yoy_pct: yoy,
+    };
+  });
+}
+
 export async function buildProductInsight(
   env: Env,
   hs: string,
@@ -218,13 +320,25 @@ export async function buildProductInsight(
   // have the breakdown, so the question the caption was dodging can now be
   // answered for those countries and is still honestly refused for the others.
   const partnerDetail: PartnerBreakdown | null = focus
-    ? await loadPartnerBreakdown(env, {
+    ? await loadTradeFactPartners(
+        env,
+        focus.entity_id,
+        focus.name,
+        hs,
+        (focusFlow ?? focus.flow) === 'export' ? 'export' : 'import',
+      )
+      ?? await loadPartnerBreakdown(env, {
         countryCode: countryCodeFor(focus.slug),
         countryName: focus.name,
         hs,
         flow: (focusFlow ?? focus.flow) === 'export' ? 'export' : 'import',
       })
     : null;
+
+  const focusedFlow = (focusFlow ?? focus?.flow ?? 'export') as 'export' | 'import';
+  const timeSeries = focus
+    ? await loadFocusedSeries(env, focus.entity_id, hs, focusedFlow)
+    : [];
 
   const covered = await env.DB.prepare(
     `SELECT COUNT(DISTINCT a.entity_id) AS n
@@ -285,7 +399,10 @@ export async function buildProductInsight(
 
     score,
     score_from_name: signal?.name ?? null,
-    growth_pct: headline?.cagr_pct ?? null,
+    growth_pct:
+      headline && headline.value_usd >= settings.noiseFloorHs6Usd
+        ? headline.cagr_pct ?? null
+        : null,
     value_usd: headline?.value_usd ?? 0,
     year: headline?.year ?? null,
     unit_value_usd_t: unitValue,
@@ -304,6 +421,7 @@ export async function buildProductInsight(
 
     sellers,
     buyers,
+    time_series: timeSeries,
     target_markets: targetMarkets,
     related: (relatedRows ?? []).map((r) => ({
       hs_code: r.hs_code,

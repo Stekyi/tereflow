@@ -2,8 +2,9 @@ import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { attachSources, bad, getEntityBySlug, json } from '../lib/db';
 import { currentUser, isEntitled } from '../lib/session';
-import { hs2Label, hs2Sector, hs6Label } from '../agent/codes';
+import { hs2Label, hs2Sector, hs6Label, HS6_LABEL } from '../agent/codes';
 import { shortProductName } from '../../shared/product-name';
+import { ISO3_NAME } from '../../shared/country-names';
 import { expandQuery, scoreMatch, typedWords } from '../../shared/search-terms';
 import { opportunityScore, scoreBand } from '../../shared/opportunity';
 import { budgetFit } from '../../shared/budget';
@@ -19,6 +20,7 @@ import {
   loadClassificationsBulk,
   resolveForEntity,
 } from '../lib/classify';
+import type { TradeSandboxResponse, TradeSandboxProduct, TradeSandboxPartner, TradeSandboxProductTotal } from '../../shared/trade-sandbox';
 import type {
   CountryDashboard,
   CountrySummary,
@@ -349,6 +351,177 @@ pub.get('/dashboard/:slug/products/:flow/:hsCode', async (c) => {
   return json(response, 200, { 'cache-control': 'private, max-age=300' });
 });
 
+/**
+ * Bilateral trade sandbox. The primary country is the reporter on the left;
+ * selected countries on the right are its partners. The comparison countries
+ * do not need to be active: this route always queries the primary reporter's
+ * stored partner-level observations. If none exist, the result is explicitly
+ * shown as no stored trade transaction. We do not substitute mirror data.
+ * Classification level is preserved rather than pretending a national tariff
+ * line is globally interchangeable with another country's tariff line.
+ */
+pub.post('/trade/sandbox', async (c) => {
+  const emptyBody: { primary?: string; partners?: string[] } = {};
+  const body = await c.req.json<{ primary?: string; partners?: string[] }>().catch(() => emptyBody);
+  const primarySlug = String(body.primary ?? '').trim();
+  const partnerIso3s: string[] = [...new Set(
+    (body.partners ?? []).map((x) => String(x).trim().toUpperCase()).filter((iso3) => iso3.length > 0),
+  )].slice(0, 12);
+  if (!primarySlug) return bad('primary country is required', 400);
+  if (!partnerIso3s.length) return bad('select at least one partner country', 400);
+
+  const primary = await c.env.DB.prepare(
+    `SELECT id, slug, name, iso3 FROM entities WHERE kind='country' AND is_active=1 AND slug=?`,
+  ).bind(primarySlug).first<{ id: string; slug: string; name: string; iso3: string | null }>();
+  if (!primary?.iso3) return bad('Primary country is not an active country with an ISO3 code', 400);
+
+  const primaryIso3 = primary.iso3.toUpperCase();
+  if (partnerIso3s.includes(primaryIso3)) return bad('primary country cannot also be a partner', 400);
+
+  const unknown = partnerIso3s.filter((iso3) => !ISO3_NAME[iso3]);
+  if (unknown.length) return bad(`Unknown partner ISO3: ${unknown.join(', ')}`, 400);
+
+  const years = Array.from({ length: 5 }, (_, i) => new Date().getUTCFullYear() - 1 - (4 - i));
+
+  // One grouped read for every selected partner. Comparison countries do not
+  // need to be activated. Rows come only from the primary reporter; mirror
+  // data is never substituted. Multiple raw facts for the same year, flow,
+  // partner and HS code collapse here.
+  type PartnerFact = {
+    year: number;
+    flow: 'export' | 'import';
+    partner_iso3: string;
+    hs_code: string;
+    product_name: string | null;
+    value_usd: number;
+    qty_kg: number | null;
+  };
+  const partnerHolders = partnerIso3s.map(() => '?').join(',');
+  const { results: availableLevels } = await c.env.DB.prepare(
+    `SELECT year, flow, MAX(length(hs_code)) AS classification_length
+       FROM trade_facts
+      WHERE entity_id = ?
+        AND stream = 'goods'
+        AND partner_iso3 IS NOT NULL
+        AND hs_code IS NOT NULL
+        AND length(hs_code) IN (6,8,10)
+        AND year IN (?,?,?,?,?)
+      GROUP BY year, flow`,
+  ).bind(primary.id, ...years).all<{ year: number; flow: 'export' | 'import'; classification_length: number }>();
+  const levelByYearFlow = new Map(
+    (availableLevels ?? []).map((row) => [`${row.year}|${row.flow}`, Number(row.classification_length)]),
+  );
+  const { results: ownRows } = await c.env.DB.prepare(
+    `SELECT year, flow, UPPER(partner_iso3) AS partner_iso3, hs_code, MAX(product_name) AS product_name,
+            SUM(value_usd) AS value_usd, SUM(qty) AS qty_kg
+       FROM trade_facts
+      WHERE entity_id=? AND stream='goods'
+        AND UPPER(partner_iso3) IN (${partnerHolders})
+        AND hs_code IS NOT NULL AND length(hs_code) IN (6,8,10)
+        AND year IN (?,?,?,?,?)
+      GROUP BY year, flow, UPPER(partner_iso3), hs_code
+      ORDER BY partner_iso3, year, flow, hs_code`,
+  ).bind(primary.id, ...partnerIso3s, ...years).all<PartnerFact>();
+
+  const rowsByPartner = new Map<string, PartnerFact[]>();
+  for (const row of ownRows ?? []) {
+    // A reporter can have more than one stored product depth after an
+    // incremental import. Keep the deepest level available for this year and
+    // flow, rather than summing overlapping HS6 and HS8/HS10 rows.
+    if (row.hs_code.length !== levelByYearFlow.get(`${row.year}|${row.flow}`)) continue;
+    const iso = String(row.partner_iso3).toUpperCase();
+    const list = rowsByPartner.get(iso) ?? [];
+    list.push(row);
+    rowsByPartner.set(iso, list);
+  }
+
+  const flowTotal = (rows: PartnerFact[], year: number, flow: 'export' | 'import'): number | null => {
+    const matched = rows.filter((row) => Number(row.year) === year && row.flow === flow);
+    if (!matched.length) return null;
+    return matched.reduce((sum, row) => sum + Number(row.value_usd || 0), 0);
+  };
+
+  const partners: TradeSandboxPartner[] = partnerIso3s.map((partnerIso3) => {
+    const rows = rowsByPartner.get(partnerIso3) ?? [];
+    const level = rows.length
+      ? (Math.max(...rows.map((r) => r.hs_code.length)) === 10 ? 'HS10' : Math.max(...rows.map((r) => r.hs_code.length)) === 8 ? 'HS8' : 'HS6')
+      : null;
+    const products: TradeSandboxProduct[] = rows.map((r) => ({
+      hs_code: r.hs_code,
+      product_name: r.product_name ?? r.hs_code,
+      flow: r.flow,
+      year: Number(r.year),
+      value_usd: Number(r.value_usd || 0),
+      qty_kg: r.qty_kg == null ? null : Number(r.qty_kg),
+      classification_level: r.hs_code.length === 10 ? 'HS10' : r.hs_code.length === 8 ? 'HS8' : 'HS6',
+      reporter: primary.iso3!,
+      partner_iso3: partnerIso3,
+    }));
+    return {
+      slug: partnerIso3.toLowerCase(),
+      name: ISO3_NAME[partnerIso3],
+      iso3: partnerIso3,
+      classification_level: level as TradeSandboxPartner['classification_level'],
+      reporter_basis: rows.length ? 'primary' : 'none',
+      years,
+      totals: years.map((year) => ({
+        year,
+        export_usd: flowTotal(rows, year, 'export'),
+        import_usd: flowTotal(rows, year, 'import'),
+      })),
+      products,
+    };
+  });
+
+  // Product totals sum every stored partner for the primary reporter.
+  // partner_iso3 IS NOT NULL keeps out the headline world row. The sum is
+  // not limited to the partners selected above.
+  const productCodes = [...new Set(
+    partners.flatMap((p) => p.products.map((row) => row.hs_code)),
+  )];
+
+  const primaryProductTotals: TradeSandboxProductTotal[] = [];
+
+  if (productCodes.length) {
+    const needed = new Set(productCodes);
+    // One aggregation across every partner. Filtering the HS list in SQL
+    // with a large json_each join scans the fact table once per code.
+    const { results } = await c.env.DB.prepare(
+      `SELECT year, flow, hs_code, SUM(value_usd) AS value_usd
+         FROM trade_facts
+        WHERE entity_id = ?
+          AND stream = 'goods'
+          AND partner_iso3 IS NOT NULL
+          AND hs_code IS NOT NULL
+          AND length(hs_code) IN (6,8,10)
+          AND year IN (?,?,?,?,?)
+        GROUP BY year, flow, hs_code`,
+    )
+      .bind(primary.id, ...years)
+      .all<TradeSandboxProductTotal>();
+
+    for (const row of results ?? []) {
+      if (row.hs_code.length !== levelByYearFlow.get(`${row.year}|${row.flow}`)) continue;
+      if (!needed.has(row.hs_code)) continue;
+      primaryProductTotals.push({
+        year: Number(row.year),
+        flow: row.flow,
+        hs_code: row.hs_code,
+        value_usd: Number(row.value_usd || 0),
+      });
+    }
+  }
+
+  const response: TradeSandboxResponse = {
+    primary: { slug: primary.slug, name: primary.name, iso3: primaryIso3 },
+    partners,
+    years,
+    primary_product_totals: primaryProductTotals,
+    note: "All comparisons use the primary country's stored partner-level trade facts. Comparison countries do not need to be activated. No stored rows means no recorded transaction. Each product total sums every partner for that product, year and flow. It is not the headline world row and not the sum of only the selected partners.",
+  };
+  return json(response, 200, { 'cache-control': 'no-store' });
+});
+
 /** Cross-country league table for the explore screen. */
 pub.get('/rankings', async (c) => {
   const metric = c.req.query('metric') ?? 'export';
@@ -411,87 +584,146 @@ pub.get('/products', async (c) => {
   const slug = c.req.query('country');
   const includeTraditional = c.req.query('all') === '1';
   const limit = Math.min(Number(c.req.query('limit') ?? PRODUCT_PAGE) || PRODUCT_PAGE, 120);
-
-  const clauses = ['e.is_active = 1', 's.hs_code IS NOT NULL'];
-  const binds: unknown[] = [];
-  // Expansion, as on the HS code lookup: the tariff writes "Cocoa; powder" and
-  // says photovoltaic where a trader says solar panel. Each word is matched
-  // separately in SQL and the full test runs in code below, because a single
-  // LIKE on the raw query cannot cross the tariff's punctuation.
-  const expanded = q ? expandQuery(q) : { tokens: [], codes: [], note: null };
-  const typedQ = q ? typedWords(q) : [];
-  if (q) {
-    const parts: string[] = [];
-    for (const token of expanded.tokens.slice(0, 6)) {
-      parts.push('s.product_name LIKE ?');
-      binds.push(`%${token}%`);
-    }
-    for (const code of expanded.codes.slice(0, 8)) {
-      parts.push('s.hs_code = ?');
-      binds.push(code);
-    }
-    parts.push('s.hs_code LIKE ?');
-    binds.push(`${q}%`);
-    clauses.push(`(${parts.join(' OR ')})`);
-  }
-  if (flow === 'export' || flow === 'import') {
-    clauses.push('s.flow = ?');
-    binds.push(flow);
-  }
-  if (continent) {
-    clauses.push('e.continent = ?');
-    binds.push(continent);
-  }
-  if (slug) {
-    clauses.push('e.slug = ?');
-    binds.push(slug);
-  }
-
-  /*
-   * No page cap on the query.
-   *
-   * Signals are capped at SIGNALS_PER_COUNTRY when they are written, so the
-   * whole table is a few hundred rows and would be a few thousand at ninety
-   * countries. Fetching all of them and paging in memory costs nothing and
-   * buys two things the previous LIMIT could not give: a `count` that is the
-   * real total rather than the size of the page, and a summary that counts
-   * every match rather than whatever happened to land in the first slice.
-   */
-  const { results } = await c.env.DB.prepare(
-    `SELECT s.entity_id, s.hs_code, s.product_name, s.flow, s.year, s.value_usd,
-            s.cagr_3y, s.momentum, s.confidence, s.best_market, s.best_market_iso3,
-            s.best_market_product_specific,
-            a.unit_value_usd_t, a.price_ratio,
-            e.slug, e.name AS country, e.iso3, e.continent
-       FROM opportunity_signals s
-       JOIN entities e ON e.id = s.entity_id
-       LEFT JOIN product_analytics a
-              ON a.hs_code = s.hs_code AND a.entity_id = s.entity_id AND a.flow = s.flow
-      WHERE ${clauses.join(' AND ')}
-      ORDER BY s.momentum DESC, s.cagr_3y DESC`,
-  )
-    .bind(...binds)
-    .all<SignalRow>();
-
-  const classifications = await loadClassificationsBulk(
-    c.env.DB,
-    (results ?? []).map((r) => r.entity_id),
-  );
-
   const settings = await loadSettings(c.env);
   const budget = Number(c.req.query('budget') ?? 0);
 
+  const expanded = q ? expandQuery(q) : { tokens: [], codes: [], note: null };
+  const typedQ = q ? typedWords(q) : [];
+  const searchClauses: string[] = [];
+  const searchBinds: unknown[] = [];
+  if (q) {
+    for (const token of expanded.tokens.slice(0, 6)) {
+      searchClauses.push('f.product_name LIKE ?');
+      searchBinds.push(`%${token}%`);
+    }
+    for (const code of expanded.codes.slice(0, 8)) {
+      searchClauses.push('f.hs_code = ?');
+      searchBinds.push(code);
+    }
+
+    // Some stored facts were ingested before product_name was populated from
+    // the HS6 reference table. Search the canonical HS6 catalogue as well, so
+    // a product remains discoverable even when its fact rows have a null or
+    // incomplete description. This is what makes searches such as "mango" and
+    // "pineapple" resolve to their real HS6 codes (080450 and 080430).
+    const catalogueMatches = Object.entries(HS6_LABEL)
+      .map(([code, label]) => ({
+        code,
+        quality: scoreMatch(label, typedQ, expanded.tokens.filter((t) => !typedQ.includes(t))),
+      }))
+      .filter((x) => x.quality > 0)
+      .sort((a, b) => b.quality - a.quality)
+      .slice(0, 40)
+      .map((x) => x.code);
+    for (const code of catalogueMatches) {
+      searchClauses.push('f.hs_code = ?');
+      searchBinds.push(code);
+    }
+
+    searchClauses.push('f.hs_code LIKE ?');
+    searchBinds.push(`${q}%`);
+  }
+
+  // Search mode is intentionally broader than the opportunity feed. A reader
+  // asking for "mango" is looking for the product, even when that product has
+  // not earned an opportunity signal yet.
+  let rows: SignalRow[] = [];
+  if (q) {
+    const clauses = [
+      'f.stream = \'goods\'',
+      'length(f.hs_code) = 6',
+      'f.partner_iso3 IS NOT NULL',
+      `(${searchClauses.join(' OR ')})`,
+    ];
+    if (flow === 'export' || flow === 'import') {
+      clauses.push('f.flow = ?');
+      searchBinds.push(flow);
+    }
+    if (continent) {
+      clauses.push('e.continent = ?');
+      searchBinds.push(continent);
+    }
+    if (slug) {
+      clauses.push('e.slug = ?');
+      searchBinds.push(slug);
+    }
+
+    const { results } = await c.env.DB.prepare(
+      `WITH latest AS (
+         SELECT f.entity_id, f.hs_code, f.flow, MAX(f.year) AS year
+           FROM trade_facts f
+           JOIN entities e ON e.id = f.entity_id AND e.is_active = 1
+          WHERE ${clauses.join(' AND ')}
+          GROUP BY f.entity_id, f.hs_code, f.flow
+       )
+       SELECT l.entity_id, l.hs_code,
+              MAX(f.product_name) AS product_name,
+              l.flow, l.year, SUM(f.value_usd) AS value_usd,
+              s.cagr_3y, s.momentum, s.confidence,
+              s.best_market, s.best_market_iso3, s.best_market_product_specific,
+              a.unit_value_usd_t, a.price_ratio,
+              e.slug, e.name AS country, e.iso3, e.continent
+         FROM latest l
+         JOIN trade_facts f
+           ON f.entity_id = l.entity_id AND f.hs_code = l.hs_code
+          AND f.flow = l.flow AND f.year = l.year
+          AND f.stream = 'goods' AND f.partner_iso3 IS NOT NULL
+         JOIN entities e ON e.id = l.entity_id AND e.is_active = 1
+         LEFT JOIN opportunity_signals s
+           ON s.entity_id = l.entity_id AND s.hs_code = l.hs_code AND s.flow = l.flow
+         LEFT JOIN product_analytics a
+           ON a.entity_id = l.entity_id AND a.hs_code = l.hs_code AND a.flow = l.flow
+        GROUP BY l.entity_id, l.hs_code, l.flow, l.year,
+                 s.cagr_3y, s.momentum, s.confidence,
+                 s.best_market, s.best_market_iso3, s.best_market_product_specific,
+                 a.unit_value_usd_t, a.price_ratio,
+                 e.slug, e.name, e.iso3, e.continent
+        ORDER BY value_usd DESC`)
+      .bind(...searchBinds)
+      .all<SignalRow>();
+    rows = results ?? [];
+  } else {
+    const clauses = ['e.is_active = 1', 's.hs_code IS NOT NULL'];
+    const binds: unknown[] = [];
+    if (flow === 'export' || flow === 'import') {
+      clauses.push('s.flow = ?');
+      binds.push(flow);
+    }
+    if (continent) {
+      clauses.push('e.continent = ?');
+      binds.push(continent);
+    }
+    if (slug) {
+      clauses.push('e.slug = ?');
+      binds.push(slug);
+    }
+    const { results } = await c.env.DB.prepare(
+      `SELECT s.entity_id, s.hs_code, s.product_name, s.flow, s.year, s.value_usd,
+              s.cagr_3y, s.momentum, s.confidence, s.best_market, s.best_market_iso3,
+              s.best_market_product_specific,
+              a.unit_value_usd_t, a.price_ratio,
+              e.slug, e.name AS country, e.iso3, e.continent
+         FROM opportunity_signals s
+         JOIN entities e ON e.id = s.entity_id
+         LEFT JOIN product_analytics a
+                ON a.hs_code = s.hs_code AND a.entity_id = s.entity_id AND a.flow = s.flow
+        WHERE ${clauses.join(' AND ')}
+        ORDER BY s.momentum DESC, s.cagr_3y DESC`)
+      .bind(...binds)
+      .all<SignalRow>();
+    rows = results ?? [];
+  }
+
+  const classifications = await loadClassificationsBulk(
+    c.env.DB,
+    rows.map((r) => r.entity_id),
+  );
+
   const synonymsQ = expanded.tokens.filter((t) => !typedQ.includes(t));
   const mappedQ = new Set(expanded.codes);
-
-  const matched = (results ?? [])
+  const matched = rows
     .map((r) => toProductCard(r, classifications, settings))
     .filter((p) => includeTraditional || p.category !== 'traditional')
-    // SQL widened the net with OR so no candidate is missed; this narrows it
-    // back and ranks by how well each answers the query. Matched against the
-    // full description, not the shortened display name: the shortener drops
-    // qualifiers to fit a label, so searching the short form would miss the
-    // words it removed.
     .map((p) => ({
       p,
       quality: !q
@@ -501,48 +733,22 @@ pub.get('/products', async (c) => {
           : scoreMatch(p.name_full || p.name, typedQ, synonymsQ),
     }))
     .filter((x) => x.quality > 0)
-    // How well it answers the query first, then how strong the opening is.
-    // Opportunity score alone would put a big unrelated line above an exact
-    // match for what somebody actually typed.
-    .sort((a, b) => b.quality - a.quality || b.p.score - a.p.score)
+    .sort((a, b) => b.quality - a.quality || b.p.score - a.p.score || b.p.value_usd - a.p.value_usd)
     .map((x) => x.p);
 
-  /*
-   * The figures the home page leads with.
-   *
-   * These follow the same filters as the list below them, so a reader who
-   * narrows to Africa sees how many openings are in Africa, not a global
-   * number sitting above an African list.
-   *
-   * within_budget is counted here rather than in the browser for the same
-   * reason: the other four describe every match, and a fifth that quietly
-   * described only the visible page would be read as the same kind of number.
-   * Null when no budget was given, which the UI shows as absent rather than
-   * as none.
-   */
   const summary = {
     total: matched.length,
     exports: matched.filter((p) => p.flow === 'export').length,
     imports: matched.filter((p) => p.flow === 'import').length,
-    strong: matched.filter((p) => p.score >= settings.scoreBandStrong).length,
+    strong: matched.filter((p) => p.has_signal && p.score >= settings.scoreBandStrong).length,
     markets: new Set(matched.map((p) => p.slug)).size,
-    /** Biggest single line in view, so the scale of the list is visible. */
     largest_usd: matched.length ? Math.max(...matched.map((p) => p.value_usd)) : 0,
     within_budget:
-      budget > 0
-        ? matched.filter((p) => budgetFit(budget, p.unit_value_usd_t).fits).length
-        : null,
-    /** How many could be judged at all, so a low count is not read as a verdict. */
+      budget > 0 ? matched.filter((p) => budgetFit(budget, p.unit_value_usd_t).fits).length : null,
     priced: matched.filter((p) => p.unit_value_usd_t != null).length,
   };
 
-  return json({
-    products: matched.slice(0, limit),
-    count: matched.length,
-    summary,
-    // Set when the search went somewhere the reader did not type.
-    note: expanded.note,
-  });
+  return json({ products: matched.slice(0, limit), count: matched.length, summary, note: expanded.note });
 });
 
 interface SignalRow {
@@ -586,27 +792,31 @@ function toProductCard(
     year: r.year ?? 0,
     value_usd: r.value_usd ?? 0,
     growth_pct: r.cagr_3y,
-    score: opportunityScore({
-      cagr_3y: r.cagr_3y,
-      momentum: r.momentum,
-      confidence: r.confidence,
-      value_usd: r.value_usd,
-    }),
+    score: r.momentum == null && r.cagr_3y == null && r.confidence == null
+      ? 0
+      : opportunityScore({
+          cagr_3y: r.cagr_3y,
+          momentum: r.momentum,
+          confidence: r.confidence,
+          value_usd: r.value_usd,
+        }),
     best_market: r.best_market,
     best_market_iso3: r.best_market_iso3,
     best_market_product_specific: r.best_market_product_specific === 1,
     unit_value_usd_t: r.unit_value_usd_t,
     band: scoreBand(
-      opportunityScore({
-        cagr_3y: r.cagr_3y,
-        momentum: r.momentum,
-        confidence: r.confidence,
-        value_usd: r.value_usd,
-      }),
+      r.momentum == null && r.cagr_3y == null && r.confidence == null
+        ? 0
+        : opportunityScore({
+            cagr_3y: r.cagr_3y,
+            momentum: r.momentum,
+            confidence: r.confidence,
+            value_usd: r.value_usd,
+          }),
       settings.scoreBandStrong,
       settings.scoreBandModerate,
     ),
-    has_signal: true,
+    has_signal: r.momentum != null || r.cagr_3y != null || r.confidence != null,
     // A signal is only written when the years were comparable, so anything
     // reaching here already passed the truncation check in analyse.ts.
     partial_coverage: r.cagr_3y == null,

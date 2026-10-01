@@ -672,6 +672,15 @@ export interface ProductInsight {
   sellers: ProductCountryRow[];
   buyers: ProductCountryRow[];
 
+  /** Historical series for the focused country/product/flow. */
+  time_series: {
+    year: number;
+    value_usd: number;
+    qty_kg: number | null;
+    unit_value_usd_t: number | null;
+    yoy_pct: number | null;
+  }[];
+
   /**
    * Where the demand is growing. Importing countries ranked by growth rather
    * than size, which is the question somebody choosing a market is asking.

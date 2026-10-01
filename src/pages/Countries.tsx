@@ -38,6 +38,7 @@ export default function Countries() {
       <div className="hero tight">
         <h2>Countries on record</h2>
         <p>Summary trade figures for every market. Tap an active country for its full read.</p>
+        <div style={{ marginTop: 10 }}><Link className="btn" to="/sandbox">Open Trade Sandbox</Link></div>
       </div>
 
       <div className="typeahead">

@@ -307,24 +307,57 @@ function buildProductAnalytics(
     const { rows: current, level } = productRows(rows, flow, latest);
     if (!current.length) continue;
 
-    const reported = totalFor(rows, latest, flow);
-    const total = reported > 0 ? reported : current.reduce((s, r) => s + r.value_usd, 0);
-    const floors = floorsFrom(active);
-  const floor = level === SPECIFIC_LEN ? floors.hs6 : floors.hs2;
-    const comparable =
-      level !== SPECIFIC_LEN ||
-      (!truncatedYears.has(latest) && threeBack != null && !truncatedYears.has(threeBack));
+    // Multiple source rows can represent the same HS code.
+    // Aggregate them before building the one-row-per-product analytics snapshot.
+    const byHs = new Map<string, FactRow>();
 
     for (const r of current) {
       if (!r.hs_code) continue;
 
-      // netWgt is kilograms, so a tonne is a thousand of them. Left null
-      // rather than zero when there is no weight: "no price reported" and "a
-      // price of nothing" are different claims and only one of them is true.
+      const existing = byHs.get(r.hs_code);
+
+      if (!existing) {
+        byHs.set(r.hs_code, { ...r });
+        continue;
+      }
+
+      existing.value_usd += r.value_usd;
+
+      if (existing.qty != null && r.qty != null) {
+        existing.qty += r.qty;
+      } else if (existing.qty == null) {
+        existing.qty = r.qty ?? null;
+      }
+    }
+
+    const products = [...byHs.values()].filter(
+      (r): r is FactRow & { hs_code: string } => typeof r.hs_code === 'string',
+    );
+
+    const reported = totalFor(rows, latest, flow);
+    const total =
+      reported > 0
+        ? reported
+        : products.reduce((s, r) => s + r.value_usd, 0);
+
+    const floors = floorsFrom(active);
+    const floor = isSpecificLevel(level) ? floors.hs6 : floors.hs2;
+
+    const comparable =
+      !isSpecificLevel(level) ||
+      (!truncatedYears.has(latest) &&
+        threeBack != null &&
+        !truncatedYears.has(threeBack));
+
+    for (const r of products) {
+      // netWgt is kilograms, so a tonne is a thousand of them.
       const tonnes = r.qty && r.qty > 0 ? r.qty / 1000 : null;
       const unitValue = tonnes ? r.value_usd / tonnes : null;
 
-      const past = threeBack != null ? valueOf(rows, threeBack, flow, r.hs_code) : undefined;
+      const past =
+        threeBack != null
+          ? valueOf(rows, threeBack, flow, r.hs_code)
+          : undefined;
 
       out.push({
         hs_code: r.hs_code,
@@ -335,7 +368,12 @@ function buildProductAnalytics(
         unit_value_usd_t: unitValue,
         cagr_pct:
           comparable && threeBack != null
-            ? growthFrom(past, r.value_usd, latest - threeBack, floor.valueUsd)
+            ? growthFrom(
+                past,
+                r.value_usd,
+                latest - threeBack,
+                floor.valueUsd,
+              )
             : null,
         share: total > 0 ? r.value_usd / total : null,
       });
@@ -348,23 +386,33 @@ function buildProductAnalytics(
 // --- building blocks --------------------------------------------------------
 
 /**
- * The adapter now stores two levels of product detail for the same trade:
- * complete HS2 chapters, and best-effort HS6 specific lines. Every row carries
- * a real value, so any function that sums or ranks across `hs_code IS NOT NULL`
- * without choosing a level counts the same dollar twice.
+ * The adapter stores complete HS2 chapter rows plus the most detailed
+ * partner/product rows available: HS10/HS8 tariff lines when Comtrade publishes
+ * them, otherwise HS6. Every row carries a real value, so any function that
+ * sums or ranks across `hs_code IS NOT NULL` without choosing a level counts
+ * the same dollar twice.
  *
  * Rules applied consistently below:
- *   - chapter structure, shares and concentration  -> HS2 (complete)
- *   - product ranking, signals, product detail     -> HS6 when present, else HS2
+ *   - chapter structure, shares and concentration  -> HS2
+ *   - product ranking, signals, product detail     -> deepest available tariffline/HS6 level, else HS2
  */
 const CHAPTER_LEN = 2;
-const SPECIFIC_LEN = 6;
+const SPECIFIC_LENGTHS = [10, 8, 6] as const;
 
 function atLevel(rows: FactRow[], level: number): FactRow[] {
   return rows.filter((r) => (r.hs_code ?? '').length === level);
 }
 
-/** HS6 rows for the year if the source provided any, otherwise HS2. */
+function isSpecificLevel(level: number): boolean {
+  return (SPECIFIC_LENGTHS as readonly number[]).includes(level);
+}
+
+/**
+ * Use the most detailed product level actually extracted for this flow/year.
+ * Tariffline ingestion can produce HS8/HS10; countries without tariffline
+ * detail fall back to HS6. HS2 remains the last resort when no specific
+ * product rows exist at all.
+ */
 function productRows(
   rows: FactRow[],
   flow: 'export' | 'import',
@@ -373,10 +421,11 @@ function productRows(
   const inScope = rows.filter(
     (r) => r.year === year && r.flow === flow && r.stream === 'goods' && r.hs_code,
   );
-  const specific = atLevel(inScope, SPECIFIC_LEN);
-  return specific.length
-    ? { rows: specific, level: SPECIFIC_LEN }
-    : { rows: atLevel(inScope, CHAPTER_LEN), level: CHAPTER_LEN };
+  for (const level of SPECIFIC_LENGTHS) {
+    const specific = atLevel(inScope, level);
+    if (specific.length) return { rows: specific, level };
+  }
+  return { rows: atLevel(inScope, CHAPTER_LEN), level: CHAPTER_LEN };
 }
 
 function buildTrend(rows: FactRow[], years: number[]): TrendPoint[] {
@@ -439,10 +488,10 @@ function rankProducts(
   // than any change in trade. detectSignals already refuses to do this; the
   // headline product list was still doing it.
   const comparable =
-    level !== SPECIFIC_LEN || (!truncatedYears.has(latest) && threeBack != null && !truncatedYears.has(threeBack));
+    !isSpecificLevel(level) || (!truncatedYears.has(latest) && threeBack != null && !truncatedYears.has(threeBack));
 
   const floors = floorsFrom(active);
-  const floor = level === SPECIFIC_LEN ? floors.hs6 : floors.hs2;
+  const floor = isSpecificLevel(level) ? floors.hs6 : floors.hs2;
 
   return current
     .sort((a, b) => b.value_usd - a.value_usd)
@@ -767,7 +816,7 @@ function detectSignals(
   // measures which rows the API returned, not any change in trade. Detecting
   // at the chapter level instead is honest; inventing a rate is not.
   const specificTruncated =
-    level === SPECIFIC_LEN && (truncatedYears.has(latest) || truncatedYears.has(base));
+    isSpecificLevel(level) && (truncatedYears.has(latest) || truncatedYears.has(base));
   const working = specificTruncated
     ? atLevel(
         rows.filter(
@@ -795,7 +844,7 @@ function detectSignals(
 
   // Floors follow the level actually being scored, not a build-time guess.
   const floors = floorsFrom(active);
-  const floor = workingLevel === SPECIFIC_LEN ? floors.hs6 : floors.hs2;
+  const floor = isSpecificLevel(workingLevel) ? floors.hs6 : floors.hs2;
 
   const drafts: SignalDraft[] = [];
 

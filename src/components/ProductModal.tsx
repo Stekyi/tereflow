@@ -6,6 +6,8 @@ import {
   CartesianGrid,
   Cell,
   LabelList,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -114,11 +116,11 @@ export function ProductCardRow({
         )}
       </span>
       <span className="product-row-score" style={{ flex: 'none', textAlign: 'right' }}>
-        <span className={`badge ${band}`} title={SCORE_BASIS}>
-          {product.score}/100
+        <span className={`badge ${band}`} title={product.has_signal ? SCORE_BASIS : 'This product was found in the trade data but has not been ranked as an opportunity.'}>
+          {product.has_signal ? `${product.score}/100` : 'Not scored'}
         </span>
         <span className="tiny dim" style={{ display: 'block', marginTop: 4 }}>
-          {SCORE_BAND_LABEL[band]}
+          {product.has_signal ? SCORE_BAND_LABEL[band] : 'Trade data found'}
         </span>
       </span>
     </button>
@@ -498,6 +500,38 @@ function CountryTable({ title, rows }: { title: string; rows: ProductCountryRow[
   );
 }
 
+/* ---------- focused product history ---------- */
+
+function ProductHistoryChart({ rows }: { rows: NonNullable<ProductInsight['time_series']> }) {
+  if (rows.length < 2) {
+    return (
+      <p className="tiny dim" style={{ margin: 0 }}>
+        Not enough annual observations to draw a trend.
+      </p>
+    );
+  }
+  return (
+    <div style={{ height: 220, margin: '0 -8px' }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={rows} margin={{ top: 8, right: 18, left: 4, bottom: 0 }}>
+          <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" />
+          <XAxis dataKey="year" stroke={CHART.axis} tick={{ fontSize: 10 }} />
+          <YAxis
+            stroke={CHART.axis}
+            tick={{ fontSize: 10 }}
+            tickFormatter={(v: number) => fmtUsd(v)}
+          />
+          <Tooltip
+            formatter={(value: number) => [fmtUsd(value), 'Trade value']}
+            labelFormatter={(year) => String(year)}
+          />
+          <Line type="monotone" dataKey="value_usd" stroke={CHART.brand} strokeWidth={2} dot={{ r: 3 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 /* ---------- modal ---------- */
 
 export default function ProductModal({
@@ -781,7 +815,7 @@ export default function ProductModal({
                     }
                   />
                   <Tile
-                    k="YoY growth"
+                    k="3-year growth"
                     v={growth.text}
                     s={growthWhose ? `For ${growthWhose}` : undefined}
                     tone={growth.tone}
@@ -837,6 +871,16 @@ export default function ProductModal({
                     shown is {insight.price_from_name}'s. It stands in for the price here rather
                     than being left blank, but it belongs to {insight.price_from_name}.
                   </p>
+                )}
+
+                {insight.focus_slug && (
+                  <div className="card" style={{ marginTop: 16 }}>
+                    <p className="card-title">Product performance over time</p>
+                    <p className="tiny dim" style={{ margin: '0 0 8px' }}>
+                      {insight.focus_name} {insight.focus_flow}s of HS {insight.hs_code}, by year.
+                    </p>
+                    <ProductHistoryChart rows={insight.time_series} />
+                  </div>
                 )}
 
                 <div className="product-summary">
@@ -1007,6 +1051,13 @@ export default function ProductModal({
 
                 <Link
                   className="btn primary block"
+                  to={focusSlug ? `/sandbox?primary=${encodeURIComponent(focusSlug)}` : '/sandbox'}
+                >
+                  Compare Markets in Sandbox
+                </Link>
+
+                <Link
+                  className="btn block"
                   to={`/network?q=${encodeURIComponent(insight.name)}`}
                 >
                   Find partners for this product

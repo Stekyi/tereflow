@@ -35,6 +35,7 @@ import type {
 } from '../../shared/types';
 import type { Severity, ValidationReport } from '../../shared/csv/validate';
 import type { DatasetCode } from '../../shared/csv/schema';
+import type { TradeSandboxResponse } from '../../shared/trade-sandbox';
 
 const ADMIN_TOKEN_KEY = 'tf_admin_token';
 
@@ -691,6 +692,12 @@ export const api = {
   },
 
   /** Countries index: summary figures only, no product lists. */
+  tradeSandbox: (primary: string, partners: string[]) =>
+    req<TradeSandboxResponse>('/api/trade/sandbox', {
+      method: 'POST',
+      body: JSON.stringify({ primary, partners }),
+    }),
+
   countries: (params: { continent?: string; q?: string } = {}) => {
     const qs = new URLSearchParams();
     if (params.continent) qs.set('continent', params.continent);

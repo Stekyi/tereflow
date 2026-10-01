@@ -280,7 +280,7 @@ export default function Country() {
       />
       <p className="tiny dim" style={{ margin: '-6px 0 14px' }}>
         Trade figures for {o.year}
-        {o.coverage_note ? ` Ãƒâ€šÃ‚Â· ${o.coverage_note}` : ''}
+        {o.coverage_note ? ` · ${o.coverage_note}` : ''}
       </p>
       {t.node}
       {modal && (
@@ -560,7 +560,7 @@ export default function Country() {
             )
           ) : (
             <div className="locked">
-              <div style={{ fontSize: 26 }}>ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬â„¢</div>
+              <div style={{ fontSize: 26 }}>🔒</div>
               <h3>
                 {data.opportunities_locked} emerging{' '}
                 {data.opportunities_locked === 1 ? 'signal' : 'signals'} detected
@@ -752,7 +752,7 @@ function Ranked({
               {i.share_pct.toFixed(1)}% share
               {i.cagr_3y != null && (
                 <>
-                  {' Ãƒâ€šÃ‚Â· '}
+                  {' · '}
                   <span className={i.cagr_3y >= 0 ? 'up' : 'down'}>
                     <Term k="cagr" tone="quiet">
                       {fmtPct(i.cagr_3y, 0)}/yr
@@ -762,7 +762,7 @@ function Ranked({
               )}
               {partnerDest && (
                 <>
-                  {' Ãƒâ€šÃ‚Â· '}
+                  {' · '}
                   <span className="u">View market {'\u203a'}</span>
                 </>
               )}
@@ -793,7 +793,7 @@ function Rec({ rec }: { rec: Recommendation }) {
       {rec.evidence.length > 0 && (
         <div className="evidence">
           {rec.evidence.map((e, i) => (
-            <div key={i}>ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {e}</div>
+            <div key={i}>• {e}</div>
           ))}
         </div>
       )}
@@ -1167,8 +1167,8 @@ function BlueOceanCard({ o }: { o: BlueOcean }) {
         <div>
           <strong style={{ fontSize: 15 }}>{shortProductName(o.product_name)}</strong>
           <div className="tiny dim" style={{ marginTop: 2 }}>
-            {o.kind === 'concentrated_supply' ? 'Supply held by few' : 'Growing and unserved'} Ã‚Â·{' '}
-            {o.trade_flow} Ã‚Â· HS {o.product_code}
+            {o.kind === 'concentrated_supply' ? 'Supply held by few' : 'Growing and unserved'} ·{' '}
+            {o.trade_flow} · HS {o.product_code}
           </div>
         </div>
         <span className="badge" title="Opportunity score from Ghana's own statistics: market size, growth, import dependency, stability and supplier concentration. Not the same scale as the momentum score shown against products.">
@@ -1264,7 +1264,7 @@ function MarketContextPanel({ context }: { context: MarketContext }) {
                 <span className="context-value">{formatContext(f.value, f.unit)}</span>
                 <span className="tiny dim">
                   {f.year}
-                  {f.stale_note && ' Â·  older'}
+                  {f.stale_note && ' ·  older'}
                 </span>
               </button>
             ))}

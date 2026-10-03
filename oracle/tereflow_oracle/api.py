@@ -10,7 +10,9 @@ import oracledb
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-from . import db, opportunity
+import time
+
+from . import db, opportunity, dashboard as dash
 from .config import load_env, need
 
 load_env()
@@ -184,3 +186,46 @@ def opportunities(iso3: str, flow: str | None = None, include_excluded: bool = F
         "latest_year": int(r[4]), "opportunity_score": float(r[5]), "signal_type": r[6], "data_confidence": r[7],
         "explanation": rd(r[8]), "evidence": json.loads(rd(r[9])), "limitations": json.loads(rd(r[10])),
         "is_excluded": bool(r[11]), "excluded_reason": r[12]} for r in rows]}
+
+
+_cache: dict[tuple, tuple[float, object]] = {}
+CACHE_TTL_S = 300
+
+
+def cached(key: tuple, fn):
+    hit = _cache.get(key)
+    if hit and time.monotonic() - hit[0] < CACHE_TTL_S:
+        return hit[1]
+    val = fn()
+    _cache[key] = (time.monotonic(), val)
+    return val
+
+
+@app.get("/api/dashboard/{iso3}")
+def dashboard(iso3: str, _=Depends(auth)):
+    """Trade-derived dashboard figures (overview, ranked products and partners, trend)."""
+    iso3 = iso3.upper()
+
+    def run():
+        with pool().acquire() as c:
+            return dash.read_cached(c, iso3, "dashboard") or dash.load_dashboard(c, iso3)
+    d = cached(("dash", iso3), run)
+    if d is None:
+        raise HTTPException(404, f"No stored trade facts for {iso3}")
+    return d
+
+
+@app.get("/api/lines/{iso3}")
+def lines(iso3: str, flow: str = "M", _=Depends(auth)):
+    """Product lines for the latest year of a flow; the Worker groups them into families."""
+    if flow not in ("X", "M"):
+        raise HTTPException(400, "flow must be X or M")
+    iso3 = iso3.upper()
+
+    def run():
+        with pool().acquire() as c:
+            return dash.read_cached(c, iso3, f"lines_{flow}") or dash.load_lines(c, iso3, flow)
+    d = cached(("lines", iso3, flow), run)
+    if d is None:
+        raise HTTPException(404, f"No stored trade facts for {iso3}")
+    return d

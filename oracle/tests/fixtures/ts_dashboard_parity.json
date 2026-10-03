@@ -1,0 +1,2007 @@
+{
+ "facts": [
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "181000",
+   "desc": "Product 0 (18)",
+   "value": 36023363
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "851037",
+   "desc": "Product 1 (85)",
+   "value": 32737520
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "871074",
+   "desc": "Product 2 (87)",
+   "value": 40531125
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "101111",
+   "desc": "Product 3 (10)",
+   "value": 52393613
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "271148",
+   "desc": "Product 4 (27)",
+   "value": 4673581
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "841185",
+   "desc": "Product 5 (84)",
+   "value": 12778030
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "181222",
+   "desc": "Product 6 (18)",
+   "value": 59765607
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "851259",
+   "desc": "Product 7 (85)",
+   "value": 23243868
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "871296",
+   "desc": "Product 8 (87)",
+   "value": 4519610
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "101333",
+   "desc": "Product 9 (10)",
+   "value": 55640810
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "271370",
+   "desc": "Product 10 (27)",
+   "value": 44673422
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "841407",
+   "desc": "Product 11 (84)",
+   "value": 37287120
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "181444",
+   "desc": "Product 12 (18)",
+   "value": 12433920
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "851481",
+   "desc": "Product 13 (85)",
+   "value": 4334786
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "871518",
+   "desc": "Product 14 (87)",
+   "value": 8980651
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "101555",
+   "desc": "Product 15 (10)",
+   "value": 43189298
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "271592",
+   "desc": "Product 16 (27)",
+   "value": 51992769
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "841629",
+   "desc": "Product 17 (84)",
+   "value": 50351114
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "181666",
+   "desc": "Product 18 (18)",
+   "value": 2371874
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "851703",
+   "desc": "Product 19 (85)",
+   "value": 9216435
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "871740",
+   "desc": "Product 20 (87)",
+   "value": 23184657
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "101777",
+   "desc": "Product 21 (10)",
+   "value": 47611156
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "271814",
+   "desc": "Product 22 (27)",
+   "value": 52666927
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "code": "841851",
+   "desc": "Product 23 (84)",
+   "value": 12233806
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "181000",
+   "desc": "Product 0 (18)",
+   "value": 36010121
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "851037",
+   "desc": "Product 1 (85)",
+   "value": 43984362
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "871074",
+   "desc": "Product 2 (87)",
+   "value": 45176051
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "101111",
+   "desc": "Product 3 (10)",
+   "value": 68513205
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "271148",
+   "desc": "Product 4 (27)",
+   "value": 6303196
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "841185",
+   "desc": "Product 5 (84)",
+   "value": 12096671
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "181222",
+   "desc": "Product 6 (18)",
+   "value": 52564871
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "851259",
+   "desc": "Product 7 (85)",
+   "value": 20108892
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "871296",
+   "desc": "Product 8 (87)",
+   "value": 5364064
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "101333",
+   "desc": "Product 9 (10)",
+   "value": 69817498
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "271370",
+   "desc": "Product 10 (27)",
+   "value": 39395547
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "841407",
+   "desc": "Product 11 (84)",
+   "value": 40940485
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "181444",
+   "desc": "Product 12 (18)",
+   "value": 16116343
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "851481",
+   "desc": "Product 13 (85)",
+   "value": 5424405
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "871518",
+   "desc": "Product 14 (87)",
+   "value": 7755715
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "101555",
+   "desc": "Product 15 (10)",
+   "value": 52664768
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "271592",
+   "desc": "Product 16 (27)",
+   "value": 65449031
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "841629",
+   "desc": "Product 17 (84)",
+   "value": 61491480
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "181666",
+   "desc": "Product 18 (18)",
+   "value": 2418137
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "851703",
+   "desc": "Product 19 (85)",
+   "value": 10870115
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "871740",
+   "desc": "Product 20 (87)",
+   "value": 23177838
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "101777",
+   "desc": "Product 21 (10)",
+   "value": 47917988
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "271814",
+   "desc": "Product 22 (27)",
+   "value": 59463236
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "code": "841851",
+   "desc": "Product 23 (84)",
+   "value": 13224779
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "181000",
+   "desc": "Product 0 (18)",
+   "value": 35996883
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "851037",
+   "desc": "Product 1 (85)",
+   "value": 59095012
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "871074",
+   "desc": "Product 2 (87)",
+   "value": 50353293
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "101111",
+   "desc": "Product 3 (10)",
+   "value": 89592203
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "271148",
+   "desc": "Product 4 (27)",
+   "value": 8501036
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "841185",
+   "desc": "Product 5 (84)",
+   "value": 11451644
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "181222",
+   "desc": "Product 6 (18)",
+   "value": 46231700
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "851259",
+   "desc": "Product 7 (85)",
+   "value": 17396741
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "871296",
+   "desc": "Product 8 (87)",
+   "value": 6366297
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "101333",
+   "desc": "Product 9 (10)",
+   "value": 87606256
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "271370",
+   "desc": "Product 10 (27)",
+   "value": 34741218
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "841407",
+   "desc": "Product 11 (84)",
+   "value": 44951805
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "181444",
+   "desc": "Product 12 (18)",
+   "value": 20889352
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "851481",
+   "desc": "Product 13 (85)",
+   "value": 6787918
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "871518",
+   "desc": "Product 14 (87)",
+   "value": 6697857
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "101555",
+   "desc": "Product 15 (10)",
+   "value": 64219100
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "271592",
+   "desc": "Product 16 (27)",
+   "value": 82387912
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "841629",
+   "desc": "Product 17 (84)",
+   "value": 75096692
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "181666",
+   "desc": "Product 18 (18)",
+   "value": 2465302
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "851703",
+   "desc": "Product 19 (85)",
+   "value": 12820511
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "871740",
+   "desc": "Product 20 (87)",
+   "value": 23171021
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "101777",
+   "desc": "Product 21 (10)",
+   "value": 48226798
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "271814",
+   "desc": "Product 22 (27)",
+   "value": 67136562
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "code": "841851",
+   "desc": "Product 23 (84)",
+   "value": 14296023
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "181000",
+   "desc": "Product 0 (18)",
+   "value": 35983650
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "851037",
+   "desc": "Product 1 (85)",
+   "value": 79396864
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "871074",
+   "desc": "Product 2 (87)",
+   "value": 56123855
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "101111",
+   "desc": "Product 3 (10)",
+   "value": 117156436
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "271148",
+   "desc": "Product 4 (27)",
+   "value": 11465233
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "841185",
+   "desc": "Product 5 (84)",
+   "value": 10841012
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "181222",
+   "desc": "Product 6 (18)",
+   "value": 40661569
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "851259",
+   "desc": "Product 7 (85)",
+   "value": 15050386
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "871296",
+   "desc": "Product 8 (87)",
+   "value": 7555789
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "101333",
+   "desc": "Product 9 (10)",
+   "value": 109927400
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "271370",
+   "desc": "Product 10 (27)",
+   "value": 30636768
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "841407",
+   "desc": "Product 11 (84)",
+   "value": 49356150
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "181444",
+   "desc": "Product 12 (18)",
+   "value": 27075932
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "851481",
+   "desc": "Product 13 (85)",
+   "value": 8494172
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "871518",
+   "desc": "Product 14 (87)",
+   "value": 5784287
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "101555",
+   "desc": "Product 15 (10)",
+   "value": 78308381
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "271592",
+   "desc": "Product 16 (27)",
+   "value": 103710748
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "841629",
+   "desc": "Product 17 (84)",
+   "value": 91712106
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "181666",
+   "desc": "Product 18 (18)",
+   "value": 2513387
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "851703",
+   "desc": "Product 19 (85)",
+   "value": 15120861
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "871740",
+   "desc": "Product 20 (87)",
+   "value": 23164206
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "101777",
+   "desc": "Product 21 (10)",
+   "value": 48537598
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "271814",
+   "desc": "Product 22 (27)",
+   "value": 75800078
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "code": "841851",
+   "desc": "Product 23 (84)",
+   "value": 15454041
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "181000",
+   "desc": "Product 0 (18)",
+   "value": 61239717
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "851037",
+   "desc": "Product 1 (85)",
+   "value": 55653784
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "871074",
+   "desc": "Product 2 (87)",
+   "value": 68902913
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "101111",
+   "desc": "Product 3 (10)",
+   "value": 89069142
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "271148",
+   "desc": "Product 4 (27)",
+   "value": 7945088
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "841185",
+   "desc": "Product 5 (84)",
+   "value": 21722651
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "181222",
+   "desc": "Product 6 (18)",
+   "value": 101601532
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "851259",
+   "desc": "Product 7 (85)",
+   "value": 39514576
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "871296",
+   "desc": "Product 8 (87)",
+   "value": 7683337
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "101333",
+   "desc": "Product 9 (10)",
+   "value": 94589377
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "271370",
+   "desc": "Product 10 (27)",
+   "value": 75944817
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "841407",
+   "desc": "Product 11 (84)",
+   "value": 63388104
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "181444",
+   "desc": "Product 12 (18)",
+   "value": 21137664
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "851481",
+   "desc": "Product 13 (85)",
+   "value": 7369136
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "871518",
+   "desc": "Product 14 (87)",
+   "value": 15267107
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "101555",
+   "desc": "Product 15 (10)",
+   "value": 73421807
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "271592",
+   "desc": "Product 16 (27)",
+   "value": 88387707
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "841629",
+   "desc": "Product 17 (84)",
+   "value": 85596894
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "181666",
+   "desc": "Product 18 (18)",
+   "value": 4032186
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "851703",
+   "desc": "Product 19 (85)",
+   "value": 15667940
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "871740",
+   "desc": "Product 20 (87)",
+   "value": 39413917
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "101777",
+   "desc": "Product 21 (10)",
+   "value": 80938965
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "271814",
+   "desc": "Product 22 (27)",
+   "value": 89533776
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "code": "841851",
+   "desc": "Product 23 (84)",
+   "value": 20797470
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "181000",
+   "desc": "Product 0 (18)",
+   "value": 61217205
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "851037",
+   "desc": "Product 1 (85)",
+   "value": 74773416
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "871074",
+   "desc": "Product 2 (87)",
+   "value": 76799287
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "101111",
+   "desc": "Product 3 (10)",
+   "value": 116472448
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "271148",
+   "desc": "Product 4 (27)",
+   "value": 10715433
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "841185",
+   "desc": "Product 5 (84)",
+   "value": 20564341
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "181222",
+   "desc": "Product 6 (18)",
+   "value": 89360280
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "851259",
+   "desc": "Product 7 (85)",
+   "value": 34185117
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "871296",
+   "desc": "Product 8 (87)",
+   "value": 9118908
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "101333",
+   "desc": "Product 9 (10)",
+   "value": 118689746
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "271370",
+   "desc": "Product 10 (27)",
+   "value": 66972429
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "841407",
+   "desc": "Product 11 (84)",
+   "value": 69598825
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "181444",
+   "desc": "Product 12 (18)",
+   "value": 27397784
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "851481",
+   "desc": "Product 13 (85)",
+   "value": 9221489
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "871518",
+   "desc": "Product 14 (87)",
+   "value": 13184715
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "101555",
+   "desc": "Product 15 (10)",
+   "value": 89530106
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "271592",
+   "desc": "Product 16 (27)",
+   "value": 111263353
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "841629",
+   "desc": "Product 17 (84)",
+   "value": 104535516
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "181666",
+   "desc": "Product 18 (18)",
+   "value": 4110833
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "851703",
+   "desc": "Product 19 (85)",
+   "value": 18479196
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "871740",
+   "desc": "Product 20 (87)",
+   "value": 39402325
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "101777",
+   "desc": "Product 21 (10)",
+   "value": 81460580
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "271814",
+   "desc": "Product 22 (27)",
+   "value": 101087501
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "code": "841851",
+   "desc": "Product 23 (84)",
+   "value": 22482124
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "181000",
+   "desc": "Product 0 (18)",
+   "value": 61194701
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "851037",
+   "desc": "Product 1 (85)",
+   "value": 100461520
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "871074",
+   "desc": "Product 2 (87)",
+   "value": 85600599
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "101111",
+   "desc": "Product 3 (10)",
+   "value": 152306746
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "271148",
+   "desc": "Product 4 (27)",
+   "value": 14451761
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "841185",
+   "desc": "Product 5 (84)",
+   "value": 19467795
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "181222",
+   "desc": "Product 6 (18)",
+   "value": 78593890
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "851259",
+   "desc": "Product 7 (85)",
+   "value": 29574460
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "871296",
+   "desc": "Product 8 (87)",
+   "value": 10822704
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "101333",
+   "desc": "Product 9 (10)",
+   "value": 148930634
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "271370",
+   "desc": "Product 10 (27)",
+   "value": 59060070
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "841407",
+   "desc": "Product 11 (84)",
+   "value": 76418068
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "181444",
+   "desc": "Product 12 (18)",
+   "value": 35511898
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "851481",
+   "desc": "Product 13 (85)",
+   "value": 11539460
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "871518",
+   "desc": "Product 14 (87)",
+   "value": 11386356
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "101555",
+   "desc": "Product 15 (10)",
+   "value": 109172470
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "271592",
+   "desc": "Product 16 (27)",
+   "value": 140059450
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "841629",
+   "desc": "Product 17 (84)",
+   "value": 127664376
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "181666",
+   "desc": "Product 18 (18)",
+   "value": 4191014
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "851703",
+   "desc": "Product 19 (85)",
+   "value": 21794868
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "871740",
+   "desc": "Product 20 (87)",
+   "value": 39390736
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "101777",
+   "desc": "Product 21 (10)",
+   "value": 81985557
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "271814",
+   "desc": "Product 22 (27)",
+   "value": 114132155
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "code": "841851",
+   "desc": "Product 23 (84)",
+   "value": 24303239
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "181000",
+   "desc": "Product 0 (18)",
+   "value": 61172206
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "851037",
+   "desc": "Product 1 (85)",
+   "value": 134974669
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "871074",
+   "desc": "Product 2 (87)",
+   "value": 95410553
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "101111",
+   "desc": "Product 3 (10)",
+   "value": 199165941
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "271148",
+   "desc": "Product 4 (27)",
+   "value": 19490895
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "841185",
+   "desc": "Product 5 (84)",
+   "value": 18429720
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "181222",
+   "desc": "Product 6 (18)",
+   "value": 69124667
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "851259",
+   "desc": "Product 7 (85)",
+   "value": 25585657
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "871296",
+   "desc": "Product 8 (87)",
+   "value": 12844841
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "101333",
+   "desc": "Product 9 (10)",
+   "value": 186876580
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "271370",
+   "desc": "Product 10 (27)",
+   "value": 52082506
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "841407",
+   "desc": "Product 11 (84)",
+   "value": 83905456
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "181444",
+   "desc": "Product 12 (18)",
+   "value": 46029084
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "851481",
+   "desc": "Product 13 (85)",
+   "value": 14440092
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "871518",
+   "desc": "Product 14 (87)",
+   "value": 9833289
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "101555",
+   "desc": "Product 15 (10)",
+   "value": 133124248
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "271592",
+   "desc": "Product 16 (27)",
+   "value": 176308272
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "841629",
+   "desc": "Product 17 (84)",
+   "value": 155910580
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "181666",
+   "desc": "Product 18 (18)",
+   "value": 4272758
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "851703",
+   "desc": "Product 19 (85)",
+   "value": 25705463
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "871740",
+   "desc": "Product 20 (87)",
+   "value": 39379151
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "101777",
+   "desc": "Product 21 (10)",
+   "value": 82513917
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "271814",
+   "desc": "Product 22 (27)",
+   "value": 128860133
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "code": "841851",
+   "desc": "Product 23 (84)",
+   "value": 26271870
+  }
+ ],
+ "partnerFacts": [
+  {
+   "flow": "X",
+   "year": 2021,
+   "iso3": "USA",
+   "value": 252992271.69999996
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "iso3": "CHN",
+   "value": 180708765.5
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "iso3": "DEU",
+   "value": 108425259.29999998
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "iso3": "NGA",
+   "value": 79511856.82000001
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "iso3": "IND",
+   "value": 65055155.57999999
+  },
+  {
+   "flow": "X",
+   "year": 2021,
+   "iso3": "GHA",
+   "value": 36141753.1
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "iso3": "USA",
+   "value": 282187079.29999995
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "iso3": "CHN",
+   "value": 201562199.5
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "iso3": "DEU",
+   "value": 120937319.7
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "iso3": "NGA",
+   "value": 88687367.77999999
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "iso3": "IND",
+   "value": 72562391.82000001
+  },
+  {
+   "flow": "X",
+   "year": 2022,
+   "iso3": "GHA",
+   "value": 40312439.900000006
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "iso3": "USA",
+   "value": 320767697.59999996
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "iso3": "CHN",
+   "value": 229119784
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "iso3": "DEU",
+   "value": 137471870.39999998
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "iso3": "NGA",
+   "value": 100812704.96000001
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "iso3": "IND",
+   "value": 82483122.24
+  },
+  {
+   "flow": "X",
+   "year": 2023,
+   "iso3": "GHA",
+   "value": 45823956.8
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "iso3": "USA",
+   "value": 370940818.1500001
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "iso3": "CHN",
+   "value": 264957727.25
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "iso3": "DEU",
+   "value": 158974636.35
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "iso3": "NGA",
+   "value": 116581399.99
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "iso3": "IND",
+   "value": 95384781.80999999
+  },
+  {
+   "flow": "X",
+   "year": 2024,
+   "iso3": "GHA",
+   "value": 52991545.44999999
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "iso3": "USA",
+   "value": 430086862.4499999
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "iso3": "CHN",
+   "value": 307204901.75
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "iso3": "DEU",
+   "value": 184322941.05
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "iso3": "NGA",
+   "value": 135170156.76999998
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "iso3": "IND",
+   "value": 110593764.62999997
+  },
+  {
+   "flow": "M",
+   "year": 2021,
+   "iso3": "GHA",
+   "value": 61440980.35000001
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "iso3": "USA",
+   "value": 479718034.9499999
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "iso3": "CHN",
+   "value": 342655739.25
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "iso3": "DEU",
+   "value": 205593443.54999998
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "iso3": "NGA",
+   "value": 150768525.26999998
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "iso3": "IND",
+   "value": 123356066.13000001
+  },
+  {
+   "flow": "M",
+   "year": 2022,
+   "iso3": "GHA",
+   "value": 68531147.85000001
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "iso3": "USA",
+   "value": 545305084.45
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "iso3": "CHN",
+   "value": 389503631.75
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "iso3": "DEU",
+   "value": 233702179.04999998
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "iso3": "NGA",
+   "value": 171381597.97
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "iso3": "IND",
+   "value": 140221307.42999998
+  },
+  {
+   "flow": "M",
+   "year": 2023,
+   "iso3": "GHA",
+   "value": 77900726.35
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "iso3": "USA",
+   "value": 630599391.8
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "iso3": "CHN",
+   "value": 450428137
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "iso3": "DEU",
+   "value": 270256882.2
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "iso3": "NGA",
+   "value": 198188380.28000003
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "iso3": "IND",
+   "value": 162154129.32000002
+  },
+  {
+   "flow": "M",
+   "year": 2024,
+   "iso3": "GHA",
+   "value": 90085627.40000002
+  }
+ ],
+ "thisYear": 2026,
+ "expected": {
+  "overview": {
+   "year": 2024,
+   "export_usd": 1059830909,
+   "import_usd": 1801712548,
+   "balance_usd": -741881639,
+   "total_trade_usd": 2861543457,
+   "export_yoy_pct": 15.641575172748942,
+   "import_yoy_pct": 15.641575657785891,
+   "export_concentration": 0.21027844504058965,
+   "export_chapter_shares": {
+    "10": 0.33394932341985506,
+    "18": 0.10023725209169192,
+    "27": 0.20910206063824094,
+    "84": 0.157915104738656,
+    "85": 0.11139728233761108,
+    "87": 0.08739897677394498
+   },
+   "partner_count": 6,
+   "product_count": 30,
+   "services_export_usd": null,
+   "services_import_usd": null,
+   "data_sources": [
+    "un-comtrade"
+   ],
+   "coverage_note": null
+  },
+  "top_exports": [
+   {
+    "rank": 1,
+    "code": "101111",
+    "name": "Product 3 (10)",
+    "value_usd": 117156436,
+    "share_pct": 11.05425733530857,
+    "cagr_3y": 30.76632978145719,
+    "yoy_pct": 30.766330190585894
+   },
+   {
+    "rank": 2,
+    "code": "101333",
+    "name": "Product 9 (10)",
+    "value_usd": 109927400,
+    "share_pct": 10.37216399960647,
+    "cagr_3y": 25.478938906794113,
+    "yoy_pct": 25.478938399102457
+   },
+   {
+    "rank": 3,
+    "code": "271592",
+    "name": "Product 16 (27)",
+    "value_usd": 103710748,
+    "share_pct": 9.785593826269508,
+    "cagr_3y": 25.88102572270794,
+    "yoy_pct": 25.881024876561987
+   },
+   {
+    "rank": 4,
+    "code": "841629",
+    "name": "Product 17 (84)",
+    "value_usd": 91712106,
+    "share_pct": 8.653465870941117,
+    "cagr_3y": 22.125361117180333,
+    "yoy_pct": 22.125360728272824
+   },
+   {
+    "rank": 5,
+    "code": "851037",
+    "name": "Product 1 (85)",
+    "value_usd": 79396864,
+    "share_pct": 7.491465225798581,
+    "cagr_3y": 34.354594995347696,
+    "yoy_pct": 34.35459493603284
+   },
+   {
+    "rank": 6,
+    "code": "101555",
+    "name": "Product 15 (10)",
+    "value_usd": 78308381,
+    "share_pct": 7.388761767090528,
+    "cagr_3y": 21.939394274835312,
+    "yoy_pct": 21.939393420337563
+   },
+   {
+    "rank": 7,
+    "code": "271814",
+    "name": "Product 22 (27)",
+    "value_usd": 75800078,
+    "share_pct": 7.15209165502834,
+    "cagr_3y": 12.904319590883539,
+    "yoy_pct": 12.904318812154845
+   },
+   {
+    "rank": 8,
+    "code": "871074",
+    "name": "Product 2 (87)",
+    "value_usd": 56123855,
+    "share_pct": 5.295548046712044,
+    "cagr_3y": 11.460147091320838,
+    "yoy_pct": 11.460148197258917
+   },
+   {
+    "rank": 9,
+    "code": "841407",
+    "name": "Product 11 (84)",
+    "value_usd": 49356150,
+    "share_pct": 4.6569834471585505,
+    "cagr_3y": 9.797928101149967,
+    "yoy_pct": 9.797926913057218
+   },
+   {
+    "rank": 10,
+    "code": "101777",
+    "name": "Product 21 (10)",
+    "value_usd": 48537598,
+    "share_pct": 4.579749239979941,
+    "cagr_3y": 0.6444547502614473,
+    "yoy_pct": 0.6444549770855614
+   },
+   {
+    "rank": 11,
+    "code": "181222",
+    "name": "Product 6 (18)",
+    "value_usd": 40661569,
+    "share_pct": 3.8366090906299473,
+    "cagr_3y": -12.04829438558832,
+    "yoy_pct": -12.048293703238254
+   },
+   {
+    "rank": 12,
+    "code": "181000",
+    "name": "Product 0 (18)",
+    "value_usd": 35983650,
+    "share_pct": 3.395225568006151,
+    "cagr_3y": -0.036760960249226926,
+    "yoy_pct": -0.0367615162679502
+   }
+  ],
+  "top_imports": [
+   {
+    "rank": 1,
+    "code": "101111",
+    "name": "Product 3 (10)",
+    "value_usd": 199165941,
+    "share_pct": 11.054257307642395,
+    "cagr_3y": 30.766329786624013,
+    "yoy_pct": 30.76632928655701
+   },
+   {
+    "rank": 2,
+    "code": "101333",
+    "name": "Product 9 (10)",
+    "value_usd": 186876580,
+    "share_pct": 10.372163984063011,
+    "cagr_3y": 25.478938906794113,
+    "yoy_pct": 25.47893941014177
+   },
+   {
+    "rank": 3,
+    "code": "271592",
+    "name": "Product 16 (27)",
+    "value_usd": 176308272,
+    "share_pct": 9.785593833806168,
+    "cagr_3y": 25.881025960324756,
+    "yoy_pct": 25.88102552166241
+   },
+   {
+    "rank": 4,
+    "code": "841629",
+    "name": "Product 17 (84)",
+    "value_usd": 155910580,
+    "share_pct": 8.653465846872706,
+    "cagr_3y": 22.12536096984341,
+    "yoy_pct": 22.125360954257122
+   },
+   {
+    "rank": 5,
+    "code": "851037",
+    "name": "Product 1 (85)",
+    "value_usd": 134974669,
+    "share_pct": 7.491465225672614,
+    "cagr_3y": 34.3545950617081,
+    "yoy_pct": 34.35459567006352
+   },
+   {
+    "rank": 6,
+    "code": "101555",
+    "name": "Product 15 (10)",
+    "value_usd": 133124248,
+    "share_pct": 7.388761772668745,
+    "cagr_3y": 21.93939414499266,
+    "yoy_pct": 21.939393695132114
+   },
+   {
+    "rank": 7,
+    "code": "271814",
+    "name": "Product 22 (27)",
+    "value_usd": 128860133,
+    "share_pct": 7.1520916665115,
+    "cagr_3y": 12.904319665673004,
+    "yoy_pct": 12.904319558322545
+   },
+   {
+    "rank": 8,
+    "code": "871074",
+    "name": "Product 2 (87)",
+    "value_usd": 95410553,
+    "share_pct": 5.295548011024898,
+    "cagr_3y": 11.460146627011403,
+    "yoy_pct": 11.460146441264973
+   },
+   {
+    "rank": 9,
+    "code": "841407",
+    "name": "Product 11 (84)",
+    "value_usd": 83905456,
+    "share_pct": 4.656983495682464,
+    "cagr_3y": 9.797928537347001,
+    "yoy_pct": 9.797928940051193
+   },
+   {
+    "rank": 10,
+    "code": "101777",
+    "name": "Product 21 (10)",
+    "value_usd": 82513917,
+    "share_pct": 4.579749255317946,
+    "cagr_3y": 0.6444549957891343,
+    "yoy_pct": 0.6444549739413249
+   },
+   {
+    "rank": 11,
+    "code": "181222",
+    "name": "Product 6 (18)",
+    "value_usd": 69124667,
+    "share_pct": 3.8366090682296785,
+    "cagr_3y": -12.048294541679782,
+    "yoy_pct": -12.048294084947315
+   },
+   {
+    "rank": 12,
+    "code": "181000",
+    "name": "Product 0 (18)",
+    "value_usd": 61172206,
+    "share_pct": 3.3952256184209024,
+    "cagr_3y": -0.036760361128862495,
+    "yoy_pct": -0.03675971878676227
+   }
+  ],
+  "partners_export": [
+   {
+    "rank": 1,
+    "code": "USA",
+    "name": "United States",
+    "value_usd": 370940818.1500001,
+    "share_pct": 36.842105263157904,
+    "cagr_3y": 13.605438826902837,
+    "yoy_pct": 15.641575172748984
+   },
+   {
+    "rank": 2,
+    "code": "CHN",
+    "name": "China",
+    "value_usd": 264957727.25,
+    "share_pct": 26.31578947368421,
+    "cagr_3y": 13.605438826902816,
+    "yoy_pct": 15.641575172748942
+   },
+   {
+    "rank": 3,
+    "code": "DEU",
+    "name": "Germany",
+    "value_usd": 158974636.35,
+    "share_pct": 15.789473684210526,
+    "cagr_3y": 13.605438826902816,
+    "yoy_pct": 15.641575172748956
+   },
+   {
+    "rank": 4,
+    "code": "NGA",
+    "name": "Nigeria",
+    "value_usd": 116581399.99,
+    "share_pct": 11.578947368421051,
+    "cagr_3y": 13.605438826902816,
+    "yoy_pct": 15.641575172748926
+   },
+   {
+    "rank": 5,
+    "code": "IND",
+    "name": "India",
+    "value_usd": 95384781.80999999,
+    "share_pct": 9.473684210526313,
+    "cagr_3y": 13.605438826902816,
+    "yoy_pct": 15.641575172748933
+   }
+  ],
+  "partners_import": [
+   {
+    "rank": 1,
+    "code": "USA",
+    "name": "United States",
+    "value_usd": 630599391.8,
+    "share_pct": 36.84210526315789,
+    "cagr_3y": 13.605438834344419,
+    "yoy_pct": 15.641575657785872
+   },
+   {
+    "rank": 2,
+    "code": "CHN",
+    "name": "China",
+    "value_usd": 450428137,
+    "share_pct": 26.315789473684216,
+    "cagr_3y": 13.605438834344419,
+    "yoy_pct": 15.641575657785891
+   },
+   {
+    "rank": 3,
+    "code": "DEU",
+    "name": "Germany",
+    "value_usd": 270256882.2,
+    "share_pct": 15.789473684210526,
+    "cagr_3y": 13.605438834344419,
+    "yoy_pct": 15.641575657785895
+   },
+   {
+    "rank": 4,
+    "code": "NGA",
+    "name": "Nigeria",
+    "value_usd": 198188380.28000003,
+    "share_pct": 11.578947368421055,
+    "cagr_3y": 13.605438834344419,
+    "yoy_pct": 15.64157565778591
+   },
+   {
+    "rank": 5,
+    "code": "IND",
+    "name": "India",
+    "value_usd": 162154129.32000002,
+    "share_pct": 9.473684210526317,
+    "cagr_3y": 13.60543883434444,
+    "yoy_pct": 15.641575657785928
+   }
+  ],
+  "trend": [
+   {
+    "year": 2021,
+    "export_usd": 722835062,
+    "import_usd": 1228819607,
+    "balance_usd": -505984545
+   },
+   {
+    "year": 2022,
+    "export_usd": 806248798,
+    "import_usd": 1370622957,
+    "balance_usd": -564374159
+   },
+   {
+    "year": 2023,
+    "export_usd": 916479136,
+    "import_usd": 1558014527,
+    "balance_usd": -641535391
+   },
+   {
+    "year": 2024,
+    "export_usd": 1059830909,
+    "import_usd": 1801712548,
+    "balance_usd": -741881639
+   }
+  ]
+ }
+}

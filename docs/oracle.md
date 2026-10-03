@@ -57,6 +57,16 @@ Deliberate differences, all marked `DIFF` in code: HS8 tariff-line levels count 
 - `GET /api/blue-oceans/{iso3}`: the Worker still applies the visibility and tier gate, then calls this.
 - `python -m tereflow_oracle analytics --country GHA` rebuilds metrics and opportunities (about 70 s for Ghana).
 
+## Country dashboard
+
+`dashboard.py` ports the trade-derived parts of `worker/agent/analyse.ts`: overview, ranked products, ranked partners, yearly trend. `scripts/gen-oracle-dashboard-parity.mjs` generates a fixture from the TypeScript and `tests/test_dashboard_parity.py` requires the Python to match.
+
+- Totals: a product's total is Comtrade's World row for it (partner WLD), falling back to the sum of its partner rows. A country's total is the sum over products, which includes the unclassified 999999 line. This replaces the separate TOTAL query the D1 pipeline used.
+- Deliberate differences: the partner count excludes the reporter trading with itself (the D1 count included it, though its ranking excluded it); the product count counts product lines only (D1 also counted every chapter row).
+- Payloads are precomputed into `tf_dashboard_cache` after each ingest (`analytics` and `ingest` both do it), so a request reads one row (~0.1 s) instead of aggregating 400,000 facts (~11 s).
+- `GET /api/dashboard/{iso3}` and `GET /api/lines/{iso3}?flow=M`. The Worker groups the lines into product families with the same `buildFamilies` code the D1 path uses.
+- In the Worker, an Oracle outage returns 502, and a country with no Oracle data shows empty trade sections instead of stale D1 figures.
+
 ## Scheduling
 
 Weekly is enough: unchanged years cost two availability calls. Windows: `schedule-oracle.ps1`. OCI VM: `0 3 * * 1 cd /opt/tereflow/oracle && PYTHONPATH=. python -m tereflow_oracle ingest`.
@@ -68,7 +78,7 @@ Weekly is enough: unchanged years cost two availability calls. Windows: `schedul
 ## Known gaps
 
 - Active countries: `sync-countries` needs a Cloudflare token with D1 read on account 959613069119a4056537a3f89f8d91ac. The current token is rejected (403 / 7403), so pass `--country` or insert into `tf_country` until that is fixed.
-- Only the trade sandbox is served from Oracle so far (see API below). Everything else still reads D1.
+- Served from Oracle: the trade sandbox, Blue Ocean, and the trade-derived part of the country dashboard. Still D1: services figures, market context, recommendations (computed from the old overview, so they can disagree with the Oracle numbers shown beside them), the momentum signals, rankings and the explore pages.
 - The D1 analytics stay in place for countries not yet on Oracle. Oracle scoring needs an entry in `data/country_config.json` (only GHA so far).
 - Oracle has 2020 Ghana recorded as NO_DATA (Comtrade reports none), so five-year views start in 2021.
 - HS6 requests use one AG6 call per flow/year. A reporter above 250,000 rows per flow fails loudly; chunking is needed for those.

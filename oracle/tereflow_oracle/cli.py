@@ -10,7 +10,7 @@ from pathlib import Path
 import requests
 
 from .config import load_env, need
-from . import db, analytics, opportunity
+from . import db, analytics, opportunity, dashboard
 from .ingest import Ingestor, ISO3_M49, default_years
 from .comtrade import Comtrade
 
@@ -59,7 +59,7 @@ def cmd_create_app_user(conn, _a):
     cur.execute(f'CREATE USER tereflow_app IDENTIFIED BY "{pw}" QUOTA UNLIMITED ON DATA')
     cur.execute("GRANT CREATE SESSION TO tereflow_app")
     for obj in ("tf_country", "tf_ingest_run", "tf_comtrade_availability", "tf_ingest_state", "tf_ingest_error",
-                "tf_trade_facts", "tf_trade_stage", "tf_product_metrics", "tf_opportunity"):
+                "tf_trade_facts", "tf_trade_stage", "tf_product_metrics", "tf_opportunity", "tf_dashboard_cache"):
         cur.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON {obj} TO tereflow_app")
     for v in ("v_sandbox_product_totals", "v_market_share", "v_world_reconciliation"):
         cur.execute(f"GRANT SELECT ON {v} TO tereflow_app")
@@ -82,6 +82,7 @@ def cmd_ingest(conn, a):
             print(f"metrics {c}: {analytics.refresh_metrics(conn, c):,} products")
             if c in opportunity.CONFIG:
                 print(f"opportunities {c}: {opportunity.refresh_opportunities(conn, c):,} scored")
+            print(f"dashboard {c}: {dashboard.refresh_dashboard(conn, c)} payloads cached")
     sys.exit(0 if s.status in ("SUCCESS",) else 2)
 
 
@@ -90,6 +91,7 @@ def cmd_analytics(conn, a):
         print(f"metrics {c}: {analytics.refresh_metrics(conn, c):,} products")
         if c in opportunity.CONFIG:
             print(f"opportunities {c}: {opportunity.refresh_opportunities(conn, c):,} scored")
+        print(f"dashboard {c}: {dashboard.refresh_dashboard(conn, c)} payloads cached")
 
 
 def cmd_status(conn, _a):

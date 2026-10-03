@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Area,
   AreaChart,
@@ -93,6 +93,7 @@ function sectorFor(code: string | null | undefined): Sector {
 
 export default function Country() {
   const { slug = '' } = useParams();
+  const [searchParams] = useSearchParams();
   const [data, setData] = useState<(CountryDashboard & { inactive?: boolean; message?: string }) | null>(
     null,
   );
@@ -190,6 +191,17 @@ export default function Country() {
       .finally(() => setLoading(false));
     api.dashboardSources(slug).then(setSources).catch(() => undefined);
   }, [slug]);
+
+  useEffect(() => {
+    const hs = searchParams.get('product');
+    if (!hs || !data || data.inactive) return;
+    const flow = searchParams.get('flow');
+    setModal({
+      hs,
+      slug,
+      flow: flow === 'import' || flow === 'export' ? flow : undefined,
+    });
+  }, [data, searchParams, slug]);
 
   // Build the ISO3 -> slug map once, from the countries that actually have a
   // page (active only), so a trading partner links through when we cover it and
@@ -1149,8 +1161,8 @@ function BlueOceans({
             Lines where supply sits with one or two partners, or where demand is growing and this
             country is not the one meeting it. Each says what the finding rests on.
           </p>
-          {rows.map((o) => (
-            <BlueOceanCard key={`${o.trade_flow}-${o.product_code}`} o={o} />
+            {rows.map((o) => (
+            <BlueOceanCard key={`${o.trade_flow}-${o.product_code}`} o={o} slug={slug} />
           ))}
         </>
       )}
@@ -1159,7 +1171,7 @@ function BlueOceans({
 }
 
 /** One blue ocean, with its reasoning open and its caveats attached. */
-function BlueOceanCard({ o }: { o: BlueOcean }) {
+function BlueOceanCard({ o, slug }: { o: BlueOcean; slug: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="card">
@@ -1177,6 +1189,21 @@ function BlueOceanCard({ o }: { o: BlueOcean }) {
       </div>
 
       <p style={{ marginBottom: 6 }}>{o.reason}</p>
+
+      <Link
+        className="btn ghost sm"
+        to={`/country/${slug}?product=${encodeURIComponent(o.product_code)}&flow=${encodeURIComponent(o.trade_flow)}`}
+      >
+        View Product
+      </Link>
+      {o.partner_iso3 && (
+        <Link
+          className="btn ghost sm"
+          to={`/sandbox?primary=${encodeURIComponent(slug)}&hs=${encodeURIComponent(o.product_code)}&flow=${encodeURIComponent(o.trade_flow)}&partner=${encodeURIComponent(o.partner_iso3)}`}
+        >
+          Compare Market
+        </Link>
+      )}
 
       <button className="btn ghost tiny" onClick={() => setOpen((v) => !v)}>
         {open ? 'Hide the working' : 'Show the working'}

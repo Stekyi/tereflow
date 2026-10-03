@@ -802,14 +802,12 @@ export const api = {
         products_considered: number;
       }>(`/api/admin/entities/${slug}/dominance?threshold=${threshold}`),
 
-    /** Ask for a run. Queues it; an agent on the operator's machine does the work. */
+    /** Legacy queued runner retained for compatibility; local/pipeline.ts is authoritative. */
     requestRun: (country: string, flow: 'import' | 'export') =>
       req<{ run_id: string; status: string; already_pending: boolean; message?: string }>(
         '/api/ghana/runs/request',
         { method: 'POST', body: JSON.stringify({ country, flow }) },
       ),
-
-    /** Whether anything is listening, so a queued run can be told from a stuck one. */
     agentStatus: (country: string) =>
       req<{
         country: string;
@@ -817,13 +815,10 @@ export const api = {
         agent_last_claimed_at: string | null;
         agent_recently_active: boolean;
       }>(`/api/ghana/runs/agent?country=${country}`),
-
-    /** One run, small enough to poll every couple of seconds. */
     runProgress: (runId: string) => req<RunProgress>(`/api/ghana/runs/${runId}`),
-
-    /** Recent runs for a country, newest first, with progress fields. */
     countryRuns: (country: string) =>
       req<{ country: string; runs: RunProgress[] }>(`/api/ghana/runs?country=${country}`),
+
     bulkActive: (slugs: string[], is_active: boolean) =>
       req<{ updated: number }>('/api/admin/entities/activation/bulk', {
         method: 'POST',

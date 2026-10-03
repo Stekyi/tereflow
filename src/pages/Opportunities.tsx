@@ -12,6 +12,7 @@
  * though they were current.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, type OpportunityFeed, type TradeOpportunity } from '../lib/api';
 import { usePageTitle } from '../lib/pageTitle';
 
@@ -186,6 +187,14 @@ function OpportunityCard({
 
       <p style={{ marginTop: 10 }}>{o.explanation}</p>
 
+      <Link
+        className="btn ghost sm"
+        to={`/country/ghana?product=${encodeURIComponent(o.product_code)}&flow=${encodeURIComponent(o.trade_flow)}`}
+        style={{ marginTop: 8 }}
+      >
+        View Product Detail
+      </Link>
+
       <button type="button" className="link-button tiny" onClick={onToggle} style={{ marginTop: 8 }}>
         {open ? 'Hide the evidence' : 'Show the evidence and the limits'}
       </button>
@@ -215,6 +224,16 @@ function OpportunityCard({
                   {o.partner_count} reporting partners.
                 </p>
               )}
+            </Section>
+          )}
+
+          {o.score_breakdown && (
+            <Section title="How the score is composed">
+              <ul className="tiny">
+                {Object.entries(o.score_breakdown).map(([component, value]) => (
+                  <li key={component}>{component.replaceAll('_', ' ')}: {value.toFixed(2)}</li>
+                ))}
+              </ul>
             </Section>
           )}
 

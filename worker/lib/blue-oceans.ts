@@ -70,6 +70,7 @@ export interface BlueOcean {
   /** What the figures do not cover. Travels with the row, never separately. */
   limitations: string[];
   top_partner: string | null;
+  partner_iso3: string | null;
   top_partner_share_pct: number | null;
   supplier_hhi: number | null;
   value_usd: number | null;
@@ -91,6 +92,7 @@ export interface BlueOceanResult {
 }
 
 interface OpportunityRow {
+  metric_id: string;
   product_code: string;
   product_name: string;
   trade_flow: string;
@@ -100,6 +102,7 @@ interface OpportunityRow {
   evidence_json: string | null;
   limitations_json: string | null;
   data_confidence: number | null;
+  partner_shares_json: string | null;
 }
 
 function parseJson<T>(raw: string | null, fallback: T): T {
@@ -171,8 +174,10 @@ export async function loadBlueOceans(
   const { results } = await db
     .prepare(
       `SELECT product_code, product_name, trade_flow, opportunity_score, signal_type,
-              score_breakdown_json, evidence_json, limitations_json, data_confidence
-       FROM opportunities
+          score_breakdown_json, evidence_json, limitations_json, data_confidence,
+          metric_id, m.partner_shares_json
+        FROM opportunities o
+        LEFT JOIN opportunity_metrics m ON m.id = o.metric_id
        WHERE country_code = ?1
          AND is_excluded = 0
          AND opportunity_score >= ?2
@@ -191,6 +196,10 @@ export async function loadBlueOceans(
     const hhi = numberOrNull(fromEvidence(evidence, /supplier concentration \(HHI\): ([\d.]+)/i));
     const partnerLine = fromEvidence(evidence, /top partner: (.+?) at [\d.]+%/i);
     const partnerShare = numberOrNull(fromEvidence(evidence, /top partner: .+? at ([\d.]+)%/i));
+    const partnerShares = parseJson<Array<{ partner: string; iso3: string | null; share_pct: number }>>(row.partner_shares_json, []);
+    const partnerIso3 = partnerLine
+      ? partnerShares.find((partner) => partner.partner === partnerLine)?.iso3 ?? null
+      : null;
     const value = numberOrNull(fromEvidence(evidence, /\((\d+) USD\)/));
     const cagr = numberOrNull(fromEvidence(evidence, /3 year CAGR: (-?[\d.]+)%/i));
 
@@ -241,6 +250,7 @@ export async function loadBlueOceans(
         ...limitations,
       ],
       top_partner: partnerLine,
+      partner_iso3: partnerIso3,
       top_partner_share_pct: partnerShare,
       supplier_hhi: hhi,
       value_usd: value,

@@ -36,9 +36,14 @@ function observed(value: number | null): string {
 export default function TradeSandbox() {
   usePageTitle('Trade sandbox');
   const [searchParams] = useSearchParams();
+  const requestedHs = searchParams.get('hs');
+  const requestedPartner = searchParams.get('partner')?.toUpperCase() ?? '';
+  const requestedFlow = searchParams.get('flow') === 'import' || searchParams.get('flow') === 'export'
+    ? searchParams.get('flow') as 'import' | 'export'
+    : null;
   const [countries, setCountries] = useState<Entity[]>([]);
   const [primary, setPrimary] = useState(searchParams.get('primary') ?? '');
-  const [partners, setPartners] = useState<string[]>([]);
+  const [partners, setPartners] = useState<string[]>(requestedPartner ? [requestedPartner] : []);
   const [partnerSearch, setPartnerSearch] = useState('');
   const [result, setResult] = useState<TradeSandboxResponse | null>(null);
   const [loadingCountries, setLoadingCountries] = useState(true);
@@ -167,6 +172,8 @@ export default function TradeSandbox() {
               partner={partner}
               primaryName={result.primary.name}
               primaryProductTotals={result.primary_product_totals ?? []}
+              requestedHs={requestedHs}
+              requestedFlow={requestedFlow}
             />
           ))}
         </div>
@@ -179,10 +186,14 @@ function PartnerResult({
   partner,
   primaryName,
   primaryProductTotals,
+  requestedHs,
+  requestedFlow,
 }: {
   partner: TradeSandboxPartner;
   primaryName: string;
   primaryProductTotals: TradeSandboxProductTotal[];
+  requestedHs: string | null;
+  requestedFlow: 'import' | 'export' | null;
 }) {
   const [flow, setFlow] = useState<'all' | 'export' | 'import'>('all');
   const [product, setProduct] = useState<ProductRow | null>(null);
@@ -190,6 +201,11 @@ function PartnerResult({
   const [selectedYear, setSelectedYear] = useState(
     observedYears.length ? Math.max(...observedYears) : partner.years[partner.years.length - 1],
   );
+  useEffect(() => {
+    if (product || !requestedHs || !requestedFlow) return;
+    const match = partner.products.find((row) => row.hs_code === requestedHs && row.flow === requestedFlow);
+    if (match) setSelectedYear(match.year);
+  }, [partner.products, product, requestedHs, requestedFlow]);
 
   const latest = partner.years[partner.years.length - 1];
   const previous = partner.years[0];
@@ -238,6 +254,12 @@ function PartnerResult({
       .sort((a, b) => b.value_usd - a.value_usd)
       .slice(0, 40);
   }, [partner.products, partner.iso3, flow, selectedYear, totalByKey]);
+
+  useEffect(() => {
+    if (product || !requestedHs || !requestedFlow) return;
+    const match = productRows.find((row) => row.hs_code === requestedHs && row.flow === requestedFlow);
+    if (match) setProduct(match);
+  }, [product, productRows, requestedHs, requestedFlow]);
 
   const chart = partner.totals.map((t) => ({ year: t.year, exports: t.export_usd, imports: t.import_usd }));
 

@@ -43,6 +43,7 @@ import { CODE_TO_KEY, DEFAULTS, type Settings } from '../worker/lib/settings';
 import type { FactRow } from '../worker/agent/types';
 import { fetchNationalSource } from './source-parsers';
 import type { EntitySource } from '../shared/types';
+import { bulkReplaceTradeFacts, expectedTradeSummary, readBulkImportConfig, validatePublishedTradeFacts, type BulkImportConfig } from './d1-bulk-import';
 
 /**
  * Fetch the tunable thresholds the app is currently running to.
@@ -96,6 +97,8 @@ interface Config {
   politenessMs: number;
   /** Pause between the ~18 calls that make up ONE country's Comtrade fetch. */
   callPaceMs: number;
+  /** Credentials/configuration for the direct Cloudflare D1 Import API. */
+  d1Bulk?: BulkImportConfig;
 }
 
 interface EntityRow {
@@ -196,6 +199,10 @@ function readConfig(): Config {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+function getBulkImportConfig(cfg: Config): BulkImportConfig {
+  return cfg.d1Bulk ?? (cfg.d1Bulk = readBulkImportConfig());
+}
+
 class Api {
   constructor(private cfg: Config) {}
 
@@ -246,6 +253,15 @@ class Api {
   }
   replaceYear(slug: string, year: number, facts: FactRow[]) {
     return this.call<{ written: number }>('/api/admin/ingest/facts/year', { method: 'POST', body: JSON.stringify({ slug, year, facts }) });
+  }
+  // Kept for compatibility with older callers. The active local pipeline
+  // does not use this large Worker write path anymore; trade_facts are pushed
+  // through Cloudflare's D1 Import API instead.
+  replaceYears(slug: string, years: number[], facts: FactRow[]) {
+    return this.call<{ written: number }>('/api/admin/ingest/facts/years', {
+      method: 'POST',
+      body: JSON.stringify({ slug, years, facts }),
+    });
   }
   start() {
     return this.call<{ run_id: string }>('/api/admin/ingest/start', { method: 'POST' });
@@ -382,6 +398,7 @@ async function main() {
   console.log('Tereflow pipeline');
   console.log(`  target      ${cfg.apiUrl}`);
   console.log(`  comtrade    ${cfg.comtradeKey ? 'keyed' : 'keyless (slower, fewer years)'}`);
+  if (!cfg.dryRun && !cfg.reanalyse) console.log('  publishing  Cloudflare D1 Import API (SQL file → R2 → D1)');
   if (cfg.dryRun) console.log('  mode        DRY RUN, nothing will be published');
   if (cfg.force) console.log('  mode        FORCE, ignoring the unchanged-since-last-check skip');
   console.log('');
@@ -577,22 +594,28 @@ async function main() {
         ? [...comtrade.rows, ...worldbankChangedRows]
         : [...(national.result?.rows ?? []), ...worldbankChangedRows];
 
-      if (newRows.length === 0) {
+      if (newRows.length === 0 || changedYears.some((year) => !newRows.some((row) => row.year === year))) {
         throw new Error(`no data for changed years. Comtrade: ${comtrade.note} | World Bank: ${worldbank.note}`);
       }
 
-      // In dry-run, reconstruct the complete dataset in memory so the analysis
-      // is representative, but do not write facts or cache state.
-      let rows: FactRow[];
-      if (cfg.dryRun) {
-        const existing = await api.storedFacts(entity.slug);
-        rows = [...existing.filter((row) => !changedSet.has(row.year)), ...newRows];
-      } else {
-        for (const year of changedYears) {
-          const yearRows = newRows.filter((row) => row.year === year);
-          await api.replaceYear(entity.slug, year, yearRows);
-        }
-        rows = await api.storedFacts(entity.slug);
+      // Read the current dataset before publishing. This gives the local
+      // analysis the complete post-refresh dataset without asking the Worker
+      // to perform the large write. The actual replacement is done directly
+      // against remote D1 through Cloudflare's SQL Import API below.
+      const existing = await api.storedFacts(entity.slug);
+      const unchangedRows = existing.filter((row) => !changedSet.has(row.year));
+      const rows: FactRow[] = [...unchangedRows, ...newRows];
+
+      // Local validation happens before any remote mutation. The bulk helper
+      // validates row shape, years, flows, HS codes, duplicate keys and the
+      // generated SQL size before it uploads anything to Cloudflare.
+      const expected = expectedTradeSummary(newRows, changedYears);
+      if (!cfg.dryRun) {
+        const bulk = getBulkImportConfig(cfg);
+        await bulkReplaceTradeFacts(bulk, entity.id, changedYears, newRows);
+        // Validate the committed D1 state before analysis/results are committed.
+        await validatePublishedTradeFacts(bulk, entity.id, changedYears, expected);
+        console.log(`  D1 bulk: validation passed for ${newRows.length.toLocaleString()} changed-year rows`);
       }
 
       const sourceAttempts: SourceAttempt[] = national.attempts.map((attempt) => ({
@@ -673,6 +696,9 @@ async function main() {
         const selected = selectedComtradeState(availability[year]);
         return selected ? { year, ...selected, ingested_rows: newRows.filter((r) => r.year === year).length } : null;
       }).filter(Boolean);
+      // Source state is updated last. A Comtrade checksum is only recorded
+      // after the facts were imported, D1 validation passed, analysis/results
+      // were committed, and product analytics were written successfully.
       if (cacheState.length) await api.saveComtradeState(entity.slug, cacheState);
 
       ok++;

@@ -143,6 +143,7 @@ console.log('---------------------------------------');
       ]),
       limitations_json: '["chapter level only"]',
       data_confidence: 0.8,
+      partner_shares_json: JSON.stringify([{ partner: 'United States', iso3: 'USA', share_pct: 27.5 }]),
     },
     {
       // Same signal, but supply is spread thin across many partners and no one
@@ -184,6 +185,7 @@ console.log('---------------------------------------');
 
   const vehicles = res.blue_oceans.find((o) => o.product_code === '87');
   check('the dominant partner is named', vehicles.top_partner === 'United States', vehicles.top_partner);
+  check('the dominant partner ISO3 is carried through', vehicles.partner_iso3 === 'USA', vehicles.partner_iso3);
   check('its share is carried through', vehicles.top_partner_share_pct === 27.5);
   check('concentration is carried through', vehicles.supplier_hhi === 0.16);
   check('the reason names the partner', /United States/.test(vehicles.reason), vehicles.reason);

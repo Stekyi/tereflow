@@ -69,7 +69,6 @@ export function CountryOnboarding({ t, onError }: { t: Toaster; onError: OnError
       </div>
 
       {slug && <ConfigPanel slug={slug} t={t} onError={onError} />}
-      {slug && <RunPanel slug={slug} country={countries.find((c) => c.slug === slug)} t={t} onError={onError} />}
       {slug && <ExclusionPanel slug={slug} t={t} onError={onError} />}
     </>
   );
@@ -330,7 +329,8 @@ function DimensionRow({
 
 // --- run ---------------------------------------------------------------------
 
-function RunPanel({
+/** Retained for compatibility; the Admin UI no longer mounts this legacy runner. */
+export function RunPanel({
   slug,
   country,
   t,

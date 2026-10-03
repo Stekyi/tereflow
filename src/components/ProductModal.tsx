@@ -707,6 +707,9 @@ export default function ProductModal({
 
   const band = insight?.score != null ? scoreBand(insight.score) : 'watch';
   const asideRows = asideFlow === 'import' ? (insight?.buyers ?? []) : (insight?.sellers ?? []);
+  const focusShare = focusSlug && focusFlow
+    ? (focusFlow === 'import' ? insight?.buyers : insight?.sellers)?.find((row) => row.slug === focusSlug)?.share ?? null
+    : null;
   // Against the unit value actually in view, so the number moves when the
   // reader rescopes to another country rather than staying on the first one.
   const modalFit = budgetFit(budget, insight?.unit_value_usd_t ?? null);
@@ -756,6 +759,7 @@ export default function ProductModal({
                 {insight.category === 'traditional' ? 'Traditional' : 'Non-traditional'}
               </span>
               <span className="partner-chip">HS {insight.hs_code}</span>
+              <span className="partner-chip">HS{insight.hs_code.length}</span>
               {user && (
                 <FollowButton
                   kind="hs_code"
@@ -849,6 +853,14 @@ export default function ProductModal({
                           : undefined
                     }
                   />
+                  {focusShare != null && insight.focus_name && insight.focus_flow && (
+                    <Tile
+                      k="Market share"
+                      v={fmtPct(focusShare * 100, 1)}
+                      s={`Share of ${insight.focus_name}'s reported ${insight.focus_flow} product trade`}
+                      text
+                    />
+                  )}
                   <Tile
                     k="Price premium"
                     v={PRICE_PREMIUM_LABEL[insight.price_premium]}
@@ -1051,7 +1063,13 @@ export default function ProductModal({
 
                 <Link
                   className="btn primary block"
-                  to={focusSlug ? `/sandbox?primary=${encodeURIComponent(focusSlug)}` : '/sandbox'}
+                  to={
+                    `/sandbox?${new URLSearchParams({
+                      ...(focusSlug ? { primary: focusSlug } : {}),
+                      hs: insight.hs_code,
+                      flow: insight.focus_flow,
+                    }).toString()}`
+                  }
                 >
                   Compare Markets in Sandbox
                 </Link>

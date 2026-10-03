@@ -11,6 +11,10 @@ sync-and-run.ps1
 vegetables_europe_2024.json
 vegetables_europe_2024_full.csv
 vegetables_europe_2024_top10.csv
+local/.d1-import/
+Wallet_tereflow/
+test_oracle_connect.py
+oci.md
 
 # Local pipeline: secrets, build output and run logs stay on the machine.
 # Every local env file, not just the default one. local/.env alone left

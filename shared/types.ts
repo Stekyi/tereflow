@@ -207,6 +207,7 @@ export interface BlueOcean {
   /** What the figures do not cover. Never separated from the row. */
   limitations: string[];
   top_partner: string | null;
+  partner_iso3: string | null;
   top_partner_share_pct: number | null;
   supplier_hhi: number | null;
   value_usd: number | null;

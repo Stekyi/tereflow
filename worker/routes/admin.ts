@@ -766,6 +766,55 @@ admin.post('/ingest/facts/year', async (c) => {
   return json({ written: body.facts.length, batches: Math.ceil(body.facts.length / BATCH_ROWS) });
 });
 
+/** Atomically replace all changed years for one country. */
+admin.post('/ingest/facts/years', async (c) => {
+  const body = (await c.req.json()) as { slug: string; years: number[]; facts: IngestFact[] };
+  const entity = await resolveEntity(c, body.slug);
+  if (!entity) return bad(`Unknown entity: ${body.slug}`, 404);
+  if (!Array.isArray(body.years) || !body.years.every((year) => Number.isInteger(year))) return bad('years[] required');
+  if (!Array.isArray(body.facts)) return bad('facts[] required');
+
+  const years = [...new Set(body.years)];
+  const changed = new Set(years);
+  if (body.facts.some((fact) => !changed.has(fact.year))) return bad('facts contain an unchanged year');
+
+  const insertSql = `INSERT INTO trade_facts
+    (entity_id, year, flow, stream, partner_iso3, partner_name, hs_code,
+     product_name, sector, value_usd, qty, qty_unit, source_ref)
+    SELECT ?,
+           json_extract(value, '$.year'), json_extract(value, '$.flow'),
+           json_extract(value, '$.stream'), json_extract(value, '$.partner_iso3'),
+           json_extract(value, '$.partner_name'), json_extract(value, '$.hs_code'),
+           json_extract(value, '$.product_name'), json_extract(value, '$.sector'),
+           json_extract(value, '$.value_usd'), json_extract(value, '$.qty'),
+           json_extract(value, '$.qty_unit'), json_extract(value, '$.source_ref')
+      FROM json_each(?)`;
+  const statements: D1PreparedStatement[] = [];
+  // Keep each json_each payload well below SQLite/D1's string/blob limit.
+  // Estonia's tariff-line year is large enough that one JSON value for the
+  // whole year raises SQLITE_TOOBIG before the statement can execute.
+  const FACTS_PER_JSON_BATCH = 100;
+  for (const year of years) {
+    statements.push(
+      c.env.DB.prepare('DELETE FROM trade_facts WHERE entity_id = ? AND year = ?').bind(entity.id, year),
+    );
+    const yearFacts = body.facts.filter((fact) => fact.year === year);
+    for (let i = 0; i < yearFacts.length; i += FACTS_PER_JSON_BATCH) {
+      statements.push(
+        c.env.DB.prepare(insertSql).bind(
+          entity.id,
+          JSON.stringify(yearFacts.slice(i, i + FACTS_PER_JSON_BATCH)),
+        ),
+      );
+    }
+  }
+
+  for (let i = 0; i < statements.length; i += 25) {
+    await c.env.DB.batch(statements.slice(i, i + 25));
+  }
+  return json({ written: body.facts.length, years: years.length });
+});
+
 /**
  * Read a country's stored facts back.
  *

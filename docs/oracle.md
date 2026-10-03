@@ -45,6 +45,18 @@ oracle/tereflow_oracle/api.py (FastAPI, bearer token ORACLE_API_TOKEN, app login
 - The Worker route proxies to it when ORACLE_API_URL and ORACLE_API_TOKEN are set (.dev.vars locally, wrangler secret put in production). If Oracle is down it answers 502 and does not fall back to stale D1 data. Unset the two variables to return to D1.
 - Cloudflare cannot reach a service on this PC. Production needs the API on a public host, such as the OCI VM behind HTTPS or a Cloudflare Tunnel.
 
+## Opportunities and Blue Ocean
+
+`opportunity.py` is a port of `worker/analytics/metrics.ts` and `opportunities.ts`: same constants, formulas and wording. `scripts/gen-oracle-parity.mjs` regenerates `oracle/tests/fixtures/ts_parity.json` from the TypeScript, and `tests/test_parity.py` requires the Python to match it exactly (scores, breakdowns, explanations, evidence, limitations).
+
+Deliberate differences, all marked `DIFF` in code: HS8 tariff-line levels count as product-level in the confidence rating (D1 called them chapter level); ties between equal partners break by ISO3 so reruns are stable; the config (weights, exclusions) is JSON per country.
+
+`tf_opportunity` keeps `metrics_json` for every score, so a result traces to the facts. Blue Ocean is read from structured metrics (`opportunity.blue_oceans`); the D1 version parsed numbers out of the evidence text with regular expressions.
+
+- `GET /api/opportunities/{iso3}?flow=M&include_excluded=false&limit=50`
+- `GET /api/blue-oceans/{iso3}`: the Worker still applies the visibility and tier gate, then calls this.
+- `python -m tereflow_oracle analytics --country GHA` rebuilds metrics and opportunities (about 70 s for Ghana).
+
 ## Scheduling
 
 Weekly is enough: unchanged years cost two availability calls. Windows: `schedule-oracle.ps1`. OCI VM: `0 3 * * 1 cd /opt/tereflow/oracle && PYTHONPATH=. python -m tereflow_oracle ingest`.
@@ -57,6 +69,7 @@ Weekly is enough: unchanged years cost two availability calls. Windows: `schedul
 
 - Active countries: `sync-countries` needs a Cloudflare token with D1 read on account 959613069119a4056537a3f89f8d91ac. The current token is rejected (403 / 7403), so pass `--country` or insert into `tf_country` until that is fixed.
 - Only the trade sandbox is served from Oracle so far (see API below). Everything else still reads D1.
-- Sandbox, Blue Ocean and opportunity scoring (`shared/opportunity.ts`, `worker/analytics`) still run on D1; the Oracle views and `tf_product_metrics` are the intended inputs.
+- The D1 analytics stay in place for countries not yet on Oracle. Oracle scoring needs an entry in `data/country_config.json` (only GHA so far).
+- Oracle has 2020 Ghana recorded as NO_DATA (Comtrade reports none), so five-year views start in 2021.
 - HS6 requests use one AG6 call per flow/year. A reporter above 250,000 rows per flow fails loudly; chunking is needed for those.
 - No OCI VM exists yet (needs a human to create it).

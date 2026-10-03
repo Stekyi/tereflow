@@ -1,0 +1,530 @@
+{
+ "scenarios": [
+  {
+   "flow": "M",
+   "code": "870323",
+   "desc": "Cars 1500-3000cc",
+   "years": {
+    "2020": 8000000,
+    "2021": 9000000,
+    "2022": 10500000,
+    "2023": 12000000,
+    "2024": 14000000
+   },
+   "weight": 4000000,
+   "partners": {
+    "USA": 5000000,
+    "CHN": 4000000,
+    "JPN": 3000000,
+    "DEU": 2000000
+   }
+  },
+  {
+   "flow": "M",
+   "code": "340111",
+   "desc": "Soap",
+   "years": {
+    "2021": 3000000,
+    "2022": 2500000,
+    "2023": 2000000,
+    "2024": 1600000
+   },
+   "weight": null,
+   "partners": {
+    "CHN": 1000000,
+    "IND": 600000
+   }
+  },
+  {
+   "flow": "M",
+   "code": "100630",
+   "desc": "Rice",
+   "years": {
+    "2020": 5000000,
+    "2021": 12000000,
+    "2022": 4000000,
+    "2023": 14000000,
+    "2024": 5000000
+   },
+   "weight": 9000000,
+   "partners": {
+    "VNM": 2000000,
+    "THA": 1500000,
+    "USA": 1000000,
+    "IND": 500000
+   }
+  },
+  {
+   "flow": "M",
+   "code": "430110",
+   "desc": "Furskins",
+   "years": {
+    "2022": 90000,
+    "2023": 100000,
+    "2024": 120000
+   },
+   "weight": 1000,
+   "partners": {
+    "ITA": 120000
+   }
+  },
+  {
+   "flow": "M",
+   "code": "271019",
+   "desc": "Petroleum oils",
+   "years": {
+    "2022": 1000000000,
+    "2023": 1200000000,
+    "2024": 1500000000
+   },
+   "weight": 2000000000,
+   "partners": {
+    "NLD": 1000000000,
+    "USA": 500000000
+   }
+  },
+  {
+   "flow": "M",
+   "code": "210690",
+   "desc": "Food prep",
+   "years": {
+    "2024": 6000000
+   },
+   "weight": 2000000,
+   "partners": {
+    "USA": 3100000,
+    "FRA": 2900000
+   }
+  },
+  {
+   "flow": "X",
+   "code": "180100",
+   "desc": "Cocoa beans",
+   "years": {
+    "2020": 1000000000,
+    "2021": 1100000000,
+    "2022": 1300000000,
+    "2023": 1500000000,
+    "2024": 2000000000
+   },
+   "weight": 500000000,
+   "partners": {
+    "NLD": 900000000,
+    "MYS": 600000000,
+    "USA": 500000000
+   }
+  },
+  {
+   "flow": "X",
+   "code": "200820",
+   "desc": "Pineapples prepared",
+   "years": {
+    "2021": 2000000,
+    "2022": 3000000,
+    "2023": 3200000,
+    "2024": 4500000
+   },
+   "weight": 1000000,
+   "partners": {
+    "GBR": 2000000,
+    "NLD": 1500000,
+    "FRA": 1000000
+   }
+  },
+  {
+   "flow": "M",
+   "code": "190590",
+   "desc": "Bakers wares",
+   "years": {
+    "2019": 1000000,
+    "2022": 5000000,
+    "2024": 7000000
+   },
+   "weight": 3000000,
+   "partners": {
+    "ZAF": 3000000,
+    "GBR": 2000000,
+    "TUR": 2000000
+   }
+  },
+  {
+   "flow": "M",
+   "code": "732393",
+   "desc": "Steel tableware",
+   "years": {
+    "2022": 4000000,
+    "2023": 4200000,
+    "2024": 4400000
+   },
+   "weight": 1000000,
+   "partners": {
+    "CHN": 3900000,
+    "IND": 500000
+   }
+  }
+ ],
+ "expected": [
+  {
+   "flow": "M",
+   "code": "271019",
+   "score": 85.3,
+   "breakdown": {
+    "market_size": 0.904214448113396,
+    "growth": 0.75,
+    "import_dependency": 0.9425286688680377,
+    "stability": 1,
+    "supplier_concentration": 0.5555555555555554
+   },
+   "signal": "supplier_diversification",
+   "confidence": "medium",
+   "reasons": [
+    "3 years of history, enough for a trend but not a long one.",
+    "Product-level detail (HS6).",
+    "Volume reported alongside value.",
+    "Only 2 partner countries reported."
+   ],
+   "excluded": true,
+   "excluded_reason": "Mineral fuels and oils. Ghana's traditional petroleum trade dominates any ranking it enters.",
+   "explanation": "Imports of Petroleum oils reached $1.50 billion in 2024. Value has grown over 2022 to 2024. Year on year the change was +25.0%. NLD supplied 67% of it, of 2 reporting partners. Supply is concentrated in few countries, which is a potential opening for an alternative supplier as well as a risk to buyers who depend on it. This is a signal rather than a recommendation: nothing here measures local production capacity, input costs, or whether anybody can compete on it.",
+   "evidence": [
+    "2024 value: $1.50 billion (1500000000 USD)",
+    "trend: growing across 3 years",
+    "year on year: 25.0%",
+    "top partner: NLD at 66.7%",
+    "unit value: $0.75 per kg",
+    "supplier concentration (HHI): 0.56"
+   ],
+   "limitations": [
+    "No three year growth rate: the data spans 2 years (2022 to 2024) and a three year rate needs a reading from 2021.",
+    "No five year growth rate: the data spans 2 years (2022 to 2024) and a five year rate needs a reading from 2019.",
+    "Domestic production is not in this dataset, so the gap between local supply and demand cannot be established."
+   ],
+   "trend": "growing"
+  },
+  {
+   "flow": "X",
+   "code": "180100",
+   "score": 80.3,
+   "breakdown": {
+    "market_size": 1,
+    "growth": 0.720522444470285,
+    "import_dependency": 1,
+    "stability": 0.5839832251967902,
+    "supplier_concentration": 0.355
+   },
+   "signal": "export_growth",
+   "confidence": "high",
+   "reasons": [
+    "5 years of history.",
+    "Product-level detail (HS6).",
+    "Volume reported alongside value.",
+    "3 partner countries reported."
+   ],
+   "excluded": false,
+   "excluded_reason": null,
+   "explanation": "Exports of Cocoa beans reached $2.00 billion in 2024. Value has grown over 2020 to 2024. That is +22.1% a year over three years. NLD supplied 45% of it, of 3 reporting partners. Export growth at this rate is worth examining alongside the destination markets. This is a signal rather than a recommendation: nothing here measures local production capacity, input costs, or whether anybody can compete on it.",
+   "evidence": [
+    "2024 value: $2.00 billion (2000000000 USD)",
+    "trend: growing across 5 years",
+    "3 year CAGR: 22.1%",
+    "top partner: NLD at 45.0%",
+    "unit value: $4.00 per kg",
+    "supplier concentration (HHI): 0.35"
+   ],
+   "limitations": [
+    "No five year growth rate: the data spans 4 years (2020 to 2024) and a five year rate needs a reading from 2019."
+   ],
+   "trend": "growing"
+  },
+  {
+   "flow": "M",
+   "code": "870323",
+   "score": 49.6,
+   "breakdown": {
+    "market_size": 0.1761101204065811,
+    "growth": 0.6586755482954834,
+    "import_dependency": 0.5056660722439487,
+    "stability": 1,
+    "supplier_concentration": 0.2755102040816327
+   },
+   "signal": "import_substitution",
+   "confidence": "high",
+   "reasons": [
+    "5 years of history.",
+    "Product-level detail (HS6).",
+    "Volume reported alongside value.",
+    "4 partner countries reported."
+   ],
+   "excluded": false,
+   "excluded_reason": null,
+   "explanation": "Imports of Cars 1500-3000cc reached $14.0 million in 2024. Value has grown over 2020 to 2024. That is +15.9% a year over three years. USA supplied 36% of it, of 4 reporting partners. Sustained imports of a product at this scale are a potential import-substitution signal. This is a signal rather than a recommendation: nothing here measures local production capacity, input costs, or whether anybody can compete on it.",
+   "evidence": [
+    "2024 value: $14.0 million (14000000 USD)",
+    "trend: growing across 5 years",
+    "3 year CAGR: 15.9%",
+    "top partner: USA at 35.7%",
+    "unit value: $3.50 per kg",
+    "supplier concentration (HHI): 0.28"
+   ],
+   "limitations": [
+    "No five year growth rate: the data spans 4 years (2020 to 2024) and a five year rate needs a reading from 2019.",
+    "Domestic production is not in this dataset, so the gap between local supply and demand cannot be established."
+   ],
+   "trend": "growing"
+  },
+  {
+   "flow": "M",
+   "code": "732393",
+   "score": 46.4,
+   "breakdown": {
+    "market_size": 0.11744862541563882,
+    "growth": 0.5476190476190476,
+    "import_dependency": 0.3104691752493833,
+    "stability": 1,
+    "supplier_concentration": 0.7985537190082646
+   },
+   "signal": "supplier_diversification",
+   "confidence": "medium",
+   "reasons": [
+    "3 years of history, enough for a trend but not a long one.",
+    "Product-level detail (HS6).",
+    "Volume reported alongside value.",
+    "Only 2 partner countries reported."
+   ],
+   "excluded": true,
+   "excluded_reason": "Iron and steel. Bulk commodity inputs priced on world markets rather than local demand.",
+   "explanation": "Imports of Steel tableware reached $4.4 million in 2024. Value has held roughly level over 2022 to 2024. Year on year the change was +4.8%. CHN supplied 89% of it, of 2 reporting partners. Supply is concentrated in few countries, which is a potential opening for an alternative supplier as well as a risk to buyers who depend on it. This is a signal rather than a recommendation: nothing here measures local production capacity, input costs, or whether anybody can compete on it.",
+   "evidence": [
+    "2024 value: $4.4 million (4400000 USD)",
+    "trend: stable across 3 years",
+    "year on year: 4.8%",
+    "top partner: CHN at 88.6%",
+    "unit value: $4.40 per kg",
+    "supplier concentration (HHI): 0.80"
+   ],
+   "limitations": [
+    "No three year growth rate: the data spans 2 years (2022 to 2024) and a three year rate needs a reading from 2021.",
+    "No five year growth rate: the data spans 2 years (2022 to 2024) and a five year rate needs a reading from 2019.",
+    "Domestic production is not in this dataset, so the gap between local supply and demand cannot be established."
+   ],
+   "trend": "stable"
+  },
+  {
+   "flow": "M",
+   "code": "430110",
+   "score": 43.1,
+   "breakdown": {
+    "market_size": 0.03329300052581139,
+    "growth": 0.7,
+    "import_dependency": 0.41997580031548687,
+    "stability": 0.812087912087912,
+    "supplier_concentration": 0.4
+   },
+   "signal": "supplier_diversification",
+   "confidence": "medium",
+   "reasons": [
+    "3 years of history, enough for a trend but not a long one.",
+    "Product-level detail (HS6).",
+    "Volume reported alongside value.",
+    "Only 1 partner country reported."
+   ],
+   "excluded": true,
+   "excluded_reason": "The whole national market is $120 thousand a year, which is too small to support a business however fast it is growing.",
+   "explanation": "Imports of Furskins reached $120 thousand in 2024. Value has grown over 2022 to 2024. Year on year the change was +20.0%. ITA supplied 100% of it. Supply is concentrated in few countries, which is a potential opening for an alternative supplier as well as a risk to buyers who depend on it. This is a signal rather than a recommendation: nothing here measures local production capacity, input costs, or whether anybody can compete on it.",
+   "evidence": [
+    "2024 value: $120 thousand (120000 USD)",
+    "trend: growing across 3 years",
+    "year on year: 20.0%",
+    "top partner: ITA at 100.0%",
+    "unit value: $120.00 per kg"
+   ],
+   "limitations": [
+    "No three year growth rate: the data spans 2 years (2022 to 2024) and a three year rate needs a reading from 2021.",
+    "No five year growth rate: the data spans 2 years (2022 to 2024) and a five year rate needs a reading from 2019.",
+    "Fewer than two partner countries reported, so supplier concentration cannot be assessed.",
+    "Domestic production is not in this dataset, so the gap between local supply and demand cannot be established."
+   ],
+   "trend": "growing"
+  },
+  {
+   "flow": "X",
+   "code": "200820",
+   "score": 43,
+   "breakdown": {
+    "market_size": 0.11837606011299008,
+    "growth": 0.8103706971044482,
+    "import_dependency": 0.4710256360677941,
+    "stability": 0.41290699127793307,
+    "supplier_concentration": 0.3580246913580246
+   },
+   "signal": "export_growth",
+   "confidence": "high",
+   "reasons": [
+    "4 years of history, enough for a trend but not a long one.",
+    "Product-level detail (HS6).",
+    "Volume reported alongside value.",
+    "3 partner countries reported."
+   ],
+   "excluded": false,
+   "excluded_reason": null,
+   "explanation": "Exports of Pineapples prepared reached $4.5 million in 2024. Value has grown over 2021 to 2024. That is +31.0% a year over three years. GBR supplied 44% of it, of 3 reporting partners. Export growth at this rate is worth examining alongside the destination markets. This is a signal rather than a recommendation: nothing here measures local production capacity, input costs, or whether anybody can compete on it.",
+   "evidence": [
+    "2024 value: $4.5 million (4500000 USD)",
+    "trend: growing across 4 years",
+    "3 year CAGR: 31.0%",
+    "top partner: GBR at 44.4%",
+    "unit value: $4.50 per kg",
+    "supplier concentration (HHI): 0.36"
+   ],
+   "limitations": [
+    "No five year growth rate: the data spans 3 years (2021 to 2024) and a five year rate needs a reading from 2019."
+   ],
+   "trend": "growing"
+  },
+  {
+   "flow": "M",
+   "code": "190590",
+   "score": 36.4,
+   "breakdown": {
+    "market_size": 0.1381731999496856,
+    "growth": 0.9,
+    "import_dependency": 0.20290391996981136,
+    "stability": 0.15,
+    "supplier_concentration": 0.346938775510204
+   },
+   "signal": "import_substitution",
+   "confidence": "high",
+   "reasons": [
+    "3 years of history, enough for a trend but not a long one.",
+    "Product-level detail (HS6).",
+    "Volume reported alongside value.",
+    "3 partner countries reported."
+   ],
+   "excluded": false,
+   "excluded_reason": null,
+   "explanation": "Imports of Bakers wares reached $7.0 million in 2024. Value has moved unevenly over 2019 to 2024. Year on year the change was +40.0%. ZAF supplied 43% of it, of 3 reporting partners. Sustained imports of a product at this scale are a potential import-substitution signal. This is a signal rather than a recommendation: nothing here measures local production capacity, input costs, or whether anybody can compete on it.",
+   "evidence": [
+    "2024 value: $7.0 million (7000000 USD)",
+    "trend: volatile across 3 years",
+    "year on year: 40.0%",
+    "top partner: ZAF at 42.9%",
+    "unit value: $2.33 per kg",
+    "supplier concentration (HHI): 0.35"
+   ],
+   "limitations": [
+    "No three year growth rate: the data spans 5 years (2019 to 2024) and a three year rate needs a reading from 2021.",
+    "Domestic production is not in this dataset, so the gap between local supply and demand cannot be established."
+   ],
+   "trend": "volatile"
+  },
+  {
+   "flow": "M",
+   "code": "340111",
+   "score": 33.9,
+   "breakdown": {
+    "market_size": 0.08242927792075454,
+    "growth": 0.31096026607645333,
+    "import_dependency": 0.16945756675245272,
+    "stability": 1,
+    "supplier_concentration": 0.53125
+   },
+   "signal": "supplier_diversification",
+   "confidence": "medium",
+   "reasons": [
+    "4 years of history, enough for a trend but not a long one.",
+    "Product-level detail (HS6).",
+    "No volume reported.",
+    "Only 2 partner countries reported."
+   ],
+   "excluded": false,
+   "excluded_reason": null,
+   "explanation": "Imports of Soap reached $1.6 million in 2024. Value has fallen over 2021 to 2024. That is -18.9% a year over three years. CHN supplied 63% of it, of 2 reporting partners. Supply is concentrated in few countries, which is a potential opening for an alternative supplier as well as a risk to buyers who depend on it. This is a signal rather than a recommendation: nothing here measures local production capacity, input costs, or whether anybody can compete on it.",
+   "evidence": [
+    "2024 value: $1.6 million (1600000 USD)",
+    "trend: declining across 4 years",
+    "3 year CAGR: -18.9%",
+    "top partner: CHN at 62.5%",
+    "supplier concentration (HHI): 0.53"
+   ],
+   "limitations": [
+    "Import volume is not reported, so no unit value can be calculated.",
+    "No five year growth rate: the data spans 3 years (2021 to 2024) and a five year rate needs a reading from 2019.",
+    "Domestic production is not in this dataset, so the gap between local supply and demand cannot be established."
+   ],
+   "trend": "declining"
+  },
+  {
+   "flow": "M",
+   "code": "210690",
+   "score": 31.4,
+   "breakdown": {
+    "market_size": 0.13091591310001358,
+    "growth": 0.5,
+    "import_dependency": 0.19854954786000814,
+    "stability": 0.4,
+    "supplier_concentration": 0.5005555555555556
+   },
+   "signal": "supplier_diversification",
+   "confidence": "medium",
+   "reasons": [
+    "Only 1 year of history.",
+    "Product-level detail (HS6).",
+    "Volume reported alongside value.",
+    "Only 2 partner countries reported."
+   ],
+   "excluded": false,
+   "excluded_reason": null,
+   "explanation": "Imports of Food prep reached $6.0 million in 2024. USA supplied 52% of it, of 2 reporting partners. Supply is concentrated in few countries, which is a potential opening for an alternative supplier as well as a risk to buyers who depend on it. This is a signal rather than a recommendation: nothing here measures local production capacity, input costs, or whether anybody can compete on it.",
+   "evidence": [
+    "2024 value: $6.0 million (6000000 USD)",
+    "top partner: USA at 51.7%",
+    "unit value: $3.00 per kg",
+    "supplier concentration (HHI): 0.50"
+   ],
+   "limitations": [
+    "Only one year of data, so year-on-year growth cannot be calculated.",
+    "A three year growth rate needs at least two years of data.",
+    "A five year growth rate needs at least two years of data.",
+    "At least 3 years of meaningful trade are needed to describe a trend.",
+    "Domestic production is not in this dataset, so the gap between local supply and demand cannot be established."
+   ],
+   "trend": "insufficient_data"
+  },
+  {
+   "flow": "M",
+   "code": "100630",
+   "score": 19,
+   "breakdown": {
+    "market_size": 0.12282280261157906,
+    "growth": 0.24690079109286078,
+    "import_dependency": 0.19369368156694744,
+    "stability": 0.15,
+    "supplier_concentration": 0.30000000000000004
+   },
+   "signal": "import_substitution",
+   "confidence": "high",
+   "reasons": [
+    "5 years of history.",
+    "Product-level detail (HS6).",
+    "Volume reported alongside value.",
+    "4 partner countries reported."
+   ],
+   "excluded": false,
+   "excluded_reason": null,
+   "explanation": "Imports of Rice reached $5.0 million in 2024. Value has moved unevenly over 2020 to 2024. That is -25.3% a year over three years. VNM supplied 40% of it, of 4 reporting partners. Sustained imports of a product at this scale are a potential import-substitution signal. This is a signal rather than a recommendation: nothing here measures local production capacity, input costs, or whether anybody can compete on it.",
+   "evidence": [
+    "2024 value: $5.0 million (5000000 USD)",
+    "trend: volatile across 5 years",
+    "3 year CAGR: -25.3%",
+    "top partner: VNM at 40.0%",
+    "unit value: $0.56 per kg",
+    "supplier concentration (HHI): 0.30"
+   ],
+   "limitations": [
+    "No five year growth rate: the data spans 4 years (2020 to 2024) and a five year rate needs a reading from 2019.",
+    "Domestic production is not in this dataset, so the gap between local supply and demand cannot be established."
+   ],
+   "trend": "volatile"
+  }
+ ]
+}

@@ -184,12 +184,17 @@ pub.get('/dashboard/:slug', async (c) => {
   // and by who is asking. Anonymous readers never see them under either
   // setting, so the tier is resolved from the session rather than assumed.
   const viewerTier: ViewerTier = !viewer ? 'anonymous' : isPremium ? 'premium' : 'registered';
-  const blueOceans = entity.iso2
+  const oracleBlue = c.env.ORACLE_API_URL && c.env.ORACLE_API_TOKEN
+    ? { url: c.env.ORACLE_API_URL, token: c.env.ORACLE_API_TOKEN, iso3: entity.iso3 ?? null }
+    : undefined;
+  const blueOceans = entity.iso2 || (oracleBlue && entity.iso3)
     ? await loadBlueOceans(
         c.env.DB,
-        entity.iso2,
+        entity.iso2 ?? '',
         (entity.blue_ocean_visibility ?? 'hidden') as BlueOceanVisibility,
         viewerTier,
+        12,
+        oracleBlue,
       )
     : {
         blue_oceans: null,

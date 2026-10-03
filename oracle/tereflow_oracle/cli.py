@@ -10,7 +10,7 @@ from pathlib import Path
 import requests
 
 from .config import load_env, need
-from . import db, analytics
+from . import db, analytics, opportunity
 from .ingest import Ingestor, ISO3_M49, default_years
 from .comtrade import Comtrade
 
@@ -59,7 +59,7 @@ def cmd_create_app_user(conn, _a):
     cur.execute(f'CREATE USER tereflow_app IDENTIFIED BY "{pw}" QUOTA UNLIMITED ON DATA')
     cur.execute("GRANT CREATE SESSION TO tereflow_app")
     for obj in ("tf_country", "tf_ingest_run", "tf_comtrade_availability", "tf_ingest_state", "tf_ingest_error",
-                "tf_trade_facts", "tf_trade_stage", "tf_product_metrics"):
+                "tf_trade_facts", "tf_trade_stage", "tf_product_metrics", "tf_opportunity"):
         cur.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON {obj} TO tereflow_app")
     for v in ("v_sandbox_product_totals", "v_market_share", "v_world_reconciliation"):
         cur.execute(f"GRANT SELECT ON {v} TO tereflow_app")
@@ -80,12 +80,16 @@ def cmd_ingest(conn, a):
     if not a.dry_run and s.status in ("SUCCESS", "PARTIAL") and not a.no_analytics:
         for c in countries:
             print(f"metrics {c}: {analytics.refresh_metrics(conn, c):,} products")
+            if c in opportunity.CONFIG:
+                print(f"opportunities {c}: {opportunity.refresh_opportunities(conn, c):,} scored")
     sys.exit(0 if s.status in ("SUCCESS",) else 2)
 
 
 def cmd_analytics(conn, a):
     for c in [x.upper() for x in a.country] or active_countries(conn):
         print(f"metrics {c}: {analytics.refresh_metrics(conn, c):,} products")
+        if c in opportunity.CONFIG:
+            print(f"opportunities {c}: {opportunity.refresh_opportunities(conn, c):,} scored")
 
 
 def cmd_status(conn, _a):

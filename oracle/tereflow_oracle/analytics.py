@@ -21,6 +21,10 @@ agg AS (
     MAX(CASE WHEN year = ly - 3 THEN v END) AS v3
   FROM yrs GROUP BY reporter_iso3, flow, cmd_code, classification_level, ly, n
 ),
+descs AS (
+  SELECT flow, cmd_code, year, MAX(cmd_desc) AS cmd_desc
+  FROM tf_trade_facts WHERE reporter_iso3 = :rep AND partner_iso3 <> 'WLD' GROUP BY flow, cmd_code, year
+),
 part AS (
   SELECT f.reporter_iso3, f.flow, f.cmd_code, f.year,
          COUNT(CASE WHEN f.value_usd > 0 THEN 1 END) AS partner_count,
@@ -31,15 +35,16 @@ part AS (
   FROM tf_trade_facts f WHERE f.reporter_iso3 = :rep AND f.partner_iso3 <> 'WLD' GROUP BY f.reporter_iso3, f.flow, f.cmd_code, f.year
 )
 SELECT a.reporter_iso3, a.flow, a.cmd_code, a.classification_level,
-  (SELECT MAX(cmd_desc) FROM tf_trade_facts d WHERE d.reporter_iso3 = a.reporter_iso3 AND d.cmd_code = a.cmd_code
-     AND d.year = a.latest_year AND d.flow = a.flow AND d.partner_iso3 <> 'WLD'),
+  ds.cmd_desc,
   a.latest_year, a.years_available, a.latest_v, a.prior_v,
   CASE WHEN a.prior_v > 0 AND a.latest_v IS NOT NULL THEN ROUND(100 * (a.latest_v / a.prior_v - 1), 4) END,
   CASE WHEN a.v3 > 0 AND a.latest_v IS NOT NULL THEN ROUND(100 * (POWER(a.latest_v / a.v3, 1/3) - 1), 4) END,
   p.partner_count, p.top_partner,
   CASE WHEN p.total > 0 THEN ROUND(100 * p.top_v / p.total, 4) END,
   CASE WHEN p.total > 0 THEN ROUND(p.sq / (p.total * p.total), 6) END
-FROM agg a LEFT JOIN part p ON p.reporter_iso3 = a.reporter_iso3 AND p.flow = a.flow
+FROM agg a
+LEFT JOIN descs ds ON ds.flow = a.flow AND ds.cmd_code = a.cmd_code AND ds.year = a.latest_year
+LEFT JOIN part p ON p.reporter_iso3 = a.reporter_iso3 AND p.flow = a.flow
   AND p.cmd_code = a.cmd_code AND p.year = a.latest_year
 """
 

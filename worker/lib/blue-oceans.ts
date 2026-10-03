@@ -166,9 +166,30 @@ export async function loadBlueOceans(
   visibility: BlueOceanVisibility,
   viewer: ViewerTier,
   limit = 12,
+  oracle?: { url: string; token: string; iso3: string | null },
 ): Promise<BlueOceanResult> {
   if (!canView(visibility, viewer)) {
     return { blue_oceans: null, visibility, withheld_reason: withheldReason(visibility, viewer) };
+  }
+
+  // Oracle holds the trade facts and the scored opportunities, with the figures
+  // as structured fields rather than prose. The visibility and tier gate above
+  // still applies. An outage is reported, not papered over with older D1 rows.
+  if (oracle) {
+    if (!oracle.iso3) {
+      return { blue_oceans: null, visibility, withheld_reason: 'This country has no ISO code recorded, so its analysis cannot be located.' };
+    }
+    try {
+      const res = await fetch(
+        `${oracle.url.replace(/\/$/, '')}/api/blue-oceans/${encodeURIComponent(oracle.iso3)}?limit=${limit}`,
+        { headers: { authorization: `Bearer ${oracle.token}` }, signal: AbortSignal.timeout(20_000) },
+      );
+      if (!res.ok) throw new Error(`oracle ${res.status}`);
+      const body = (await res.json()) as { blue_oceans: BlueOcean[] };
+      return { blue_oceans: body.blue_oceans, visibility, withheld_reason: null };
+    } catch {
+      return { blue_oceans: null, visibility, withheld_reason: 'Blue ocean analysis is temporarily unavailable.' };
+    }
   }
 
   const { results } = await db

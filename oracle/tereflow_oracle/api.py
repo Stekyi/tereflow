@@ -10,7 +10,7 @@ import oracledb
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-from . import db
+from . import db, opportunity
 from .config import load_env, need
 
 load_env()
@@ -148,3 +148,39 @@ def trade_sandbox(body: SandboxIn, _=Depends(auth)):
     }
 
 
+
+
+@app.get("/api/blue-oceans/{iso3}")
+def blue_oceans(iso3: str, limit: int = 12, _=Depends(auth)):
+    """Blue oceans for a reporter, from structured metrics. Visibility and tier gating stay in the Worker."""
+    iso3 = iso3.upper()
+    with pool().acquire() as c:
+        return {"reporter": iso3, "blue_oceans": opportunity.blue_oceans(c, iso3, max(1, min(limit, 50)))}
+
+
+@app.get("/api/opportunities/{iso3}")
+def opportunities(iso3: str, flow: str | None = None, include_excluded: bool = False, limit: int = 50, _=Depends(auth)):
+    """Ranked opportunities with the evidence and metrics each score was computed from."""
+    if flow is not None and flow not in ("X", "M"):
+        raise HTTPException(400, "flow must be X or M")
+    sql = """SELECT flow, cmd_code, classification_level, product_name, latest_year, opportunity_score, signal_type,
+                    data_confidence, explanation, evidence_json, limitations_json, is_excluded, excluded_reason
+             FROM tf_opportunity WHERE reporter_iso3 = :rep"""
+    binds: dict = {"rep": iso3.upper()}
+    if flow:
+        sql += " AND flow = :fl"
+        binds["fl"] = flow
+    if not include_excluded:
+        sql += " AND is_excluded = 0"
+    sql += " ORDER BY opportunity_score DESC, cmd_code FETCH FIRST :n ROWS ONLY"
+    binds["n"] = max(1, min(limit, 200))
+    rd = lambda v: v.read() if hasattr(v, "read") else v
+    with pool().acquire() as c:
+        cur = c.cursor()
+        cur.execute(sql, binds)
+        rows = cur.fetchall()
+    return {"reporter": iso3.upper(), "opportunities": [{
+        "trade_flow": FLOW[r[0]], "product_code": r[1], "classification_level": r[2], "product_name": r[3],
+        "latest_year": int(r[4]), "opportunity_score": float(r[5]), "signal_type": r[6], "data_confidence": r[7],
+        "explanation": rd(r[8]), "evidence": json.loads(rd(r[9])), "limitations": json.loads(rd(r[10])),
+        "is_excluded": bool(r[11]), "excluded_reason": r[12]} for r in rows]}

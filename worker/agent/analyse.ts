@@ -770,7 +770,7 @@ function buildCoverageNote(
 
 // Central opportunity eligibility rule. Product/headline analytics keep
 // traditional goods visible; only opportunity-producing paths call this.
-function isOpportunityEligible(
+export function isOpportunityEligible(
   hsCode: string | null,
   classifications: Map<string, Pick<ExportClassification, 'category'>>,
   dominant: Set<string>,
@@ -999,7 +999,7 @@ function clamp01(n: number): number {
  * Turns the numbers into the handful of sentences an investor actually reads.
  * Every recommendation carries its evidence so nothing here is a black box.
  */
-function recommend(
+export function recommend(
   name: string,
   overview: Overview,
   topExports: RankedItem[],

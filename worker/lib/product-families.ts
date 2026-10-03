@@ -1,6 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { disambiguateProductNames, shortProductName } from '../../shared/product-name';
-import { hs2Sector } from '../agent/codes';
+import { hs2Sector, hs6Label } from '../agent/codes';
 
 /**
  * Product families: the same trade, split by the tariff into bands.
@@ -284,7 +284,8 @@ export async function loadProductFamiliesOracle(
       country_total_usd: number | null;
       lines: Array<{ hs_code: string; product_name: string | null; value_usd: number }>;
     };
-    return buildFamilies(body.lines, body.year, body.country_total_usd, limit);
+    const lines = body.lines.map((l) => ({ ...l, product_name: hs6Label(l.hs_code, l.product_name) }));
+    return buildFamilies(lines, body.year, body.country_total_usd, limit);
   } catch {
     return null;
   }

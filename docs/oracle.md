@@ -78,7 +78,7 @@ Weekly is enough: unchanged years cost two availability calls. Windows: `schedul
 ## Known gaps
 
 - Active countries: `sync-countries` needs a Cloudflare token with D1 read on account 959613069119a4056537a3f89f8d91ac. The current token is rejected (403 / 7403), so pass `--country` or insert into `tf_country` until that is fixed.
-- Served from Oracle: the trade sandbox, Blue Ocean, and the trade-derived part of the country dashboard. Still D1: services figures, market context, recommendations (computed from the old overview, so they can disagree with the Oracle numbers shown beside them), the momentum signals, rankings and the explore pages.
+- Served from Oracle: the trade sandbox, Blue Ocean, and the trade-derived part of the country dashboard. Recommendations are rewritten in the Worker from the Oracle figures with the same `recommend()` code (the services card is kept from D1). Still D1: services figures, market context, the momentum signals, rankings and the explore pages.
 - The D1 analytics stay in place for countries not yet on Oracle. Oracle scoring needs an entry in `data/country_config.json` (only GHA so far).
 - Oracle has 2020 Ghana recorded as NO_DATA (Comtrade reports none), so five-year views start in 2021.
 - HS6 requests use one AG6 call per flow/year. A reporter above 250,000 rows per flow fails loudly; chunking is needed for those.

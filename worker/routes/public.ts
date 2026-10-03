@@ -11,6 +11,7 @@ import { budgetFit } from '../../shared/budget';
 import { buildProductInsight } from '../lib/product-insight';
 import { loadBlueOceans, type BlueOceanVisibility, type ViewerTier } from '../lib/blue-oceans';
 import { loadMarketContext } from '../lib/market-context';
+import { isOpportunityEligible, recommend, type SignalDraft } from '../agent/analyse';
 import { loadProductFamilies, loadProductFamiliesOracle } from '../lib/product-families';
 import { loadSettings, type Settings } from '../lib/settings';
 import {
@@ -178,7 +179,9 @@ pub.get('/dashboard/:slug', async (c) => {
           services_export_usd: overview?.services_export_usd ?? null,
           services_import_usd: overview?.services_import_usd ?? null,
         };
-        topExports = d.top_exports; topImports = d.top_imports;
+        // The same curated product labels the D1 pipeline stored, ahead of Comtrade's long descriptions.
+        const labelled = (items: RankedItem[]) => items.map((r) => ({ ...r, name: hs6Label(r.code, r.name) }));
+        topExports = labelled(d.top_exports); topImports = labelled(d.top_imports);
         partnersExport = d.partners_export; partnersImport = d.partners_import; trend = d.trend;
         oracleComputedAt = d.computed_at;
       }
@@ -246,6 +249,29 @@ pub.get('/dashboard/:slug', async (c) => {
   const classifications = await loadClassifications(c.env.DB, entity.id);
   const settings = await loadSettings(c.env);
   const dominant = dominantCodes(overview?.export_chapter_shares, settings.dominantShareThreshold);
+  // The recommendations are written from the overview, ranked lists and
+  // signals. With Oracle serving those figures they are rewritten from the same
+  // numbers, so a card cannot contradict the table beside it. The services card
+  // is not trade-derived and is kept from D1.
+  if (oracleDash && overview) {
+    const eligibleImports = (topImports ?? []).filter((p) => isOpportunityEligible(p.code, classifications, dominant));
+    const drafts = (signals ?? [])
+      .filter((s) => s.cagr_3y != null)
+      .map((s) => ({ product_name: s.product_name, cagr_3y: s.cagr_3y, momentum: s.momentum, rationale: s.rationale ?? '' }));
+    const regenerated = recommend(
+      entity.name, overview, topExports ?? [], topImports ?? [], eligibleImports,
+      partnersExport ?? [], partnersImport ?? [], drafts as unknown as SignalDraft[],
+      { gdp_by_year: {}, services_export_by_year: {}, services_import_by_year: {}, gns_export_by_year: {}, gns_import_by_year: {} },
+      overview.year,
+    );
+    const servicesCard = (recs ?? []).find((r) => r.headline === 'Services are a real part of this economy');
+    if (servicesCard) {
+      const at = regenerated.findIndex((r) => r.angle === 'timing');
+      regenerated.splice(at === -1 ? regenerated.length : at, 0, servicesCard);
+    }
+    recs = regenerated;
+  }
+
   const tagProducts = (items: RankedItem[]) =>
     items.map((r) => ({ ...r, category: classify(r.code, classifications, dominant) }));
 

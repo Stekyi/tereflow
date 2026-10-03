@@ -1,4 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
+import { hs6Label } from '../agent/codes';
 
 /**
  * Blue oceans: lines where the opening is not already crowded.
@@ -186,7 +187,8 @@ export async function loadBlueOceans(
       );
       if (!res.ok) throw new Error(`oracle ${res.status}`);
       const body = (await res.json()) as { blue_oceans: BlueOcean[] };
-      return { blue_oceans: body.blue_oceans, visibility, withheld_reason: null };
+      const named = body.blue_oceans.map((b) => ({ ...b, product_name: hs6Label(b.product_code, b.product_name) }));
+      return { blue_oceans: named, visibility, withheld_reason: null };
     } catch {
       return { blue_oceans: null, visibility, withheld_reason: 'Blue ocean analysis is temporarily unavailable.' };
     }

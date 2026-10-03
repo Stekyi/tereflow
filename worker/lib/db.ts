@@ -13,6 +13,9 @@ export interface Env {
   ADMIN_EMAILS: string;
   ADMIN_TOKEN?: string;
   COMTRADE_API_KEY?: string;
+  /** Oracle read API (oracle/tereflow_oracle/api.py). When both are set, the trade sandbox is served from Oracle. */
+  ORACLE_API_URL?: string;
+  ORACLE_API_TOKEN?: string;
   CENSUS_API_KEY?: string;
   SESSION_SECRET?: string;
   STRIPE_SECRET_KEY?: string;
@@ -117,3 +120,4 @@ export function json(data: unknown, status = 200, headers: HeadersInit = {}): Re
 export function bad(message: string, status = 400): Response {
   return json({ error: message }, status);
 }
+

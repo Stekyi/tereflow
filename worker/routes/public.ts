@@ -241,7 +241,7 @@ pub.get('/dashboard/:slug', async (c) => {
   );
 });
 
-/** Where the numbers came from — shown under every dashboard. */
+/** Where the numbers came from â€” shown under every dashboard. */
 pub.get('/dashboard/:slug/sources', async (c) => {
   const entity = await getEntityBySlug(c.env.DB, c.req.param('slug'));
   if (!entity) return bad('Not found', 404);
@@ -364,6 +364,26 @@ pub.post('/trade/sandbox', async (c) => {
   const emptyBody: { primary?: string; partners?: string[] } = {};
   const body = await c.req.json<{ primary?: string; partners?: string[] }>().catch(() => emptyBody);
   const primarySlug = String(body.primary ?? '').trim();
+  if (c.env.ORACLE_API_URL && c.env.ORACLE_API_TOKEN) {
+    // Oracle is the source of truth for trade facts. A failure is reported as
+    // such rather than quietly falling back to older D1 data.
+    try {
+      const res = await fetch(`${c.env.ORACLE_API_URL.replace(/\/$/, '')}/api/trade/sandbox`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${c.env.ORACLE_API_TOKEN}` },
+        body: JSON.stringify({ primary: primarySlug, partners: body.partners ?? [] }),
+        signal: AbortSignal.timeout(25_000),
+      });
+      const text = await res.text();
+      if (res.status >= 500 || res.status === 401) return bad('Trade data service is unavailable', 502);
+      return new Response(text, {
+        status: res.status,
+        headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+      });
+    } catch {
+      return bad('Trade data service is unavailable', 502);
+    }
+  }
   const partnerIso3s: string[] = [...new Set(
     (body.partners ?? []).map((x) => String(x).trim().toUpperCase()).filter((iso3) => iso3.length > 0),
   )].slice(0, 12);
@@ -1205,7 +1225,7 @@ pub.get('/opportunities', async (c) => {
   // dominant legacy commodity (Ghanaian cocoa is always top-5, never a
   // "signal"). What that exclusion does NOT catch is a smaller, growing
   // mining/oil-type category that isn't top-5 yet but is still never
-  // realistically SME-accessible — the universal defaults + admin overrides
+  // realistically SME-accessible â€” the universal defaults + admin overrides
   // below catch that.
   const classificationsByEntity = await loadClassificationsBulk(
     c.env.DB,
@@ -1341,7 +1361,7 @@ pub.get('/market/hs-codes', async (c) => {
 /**
  * Product view: for one HS2 product/service chapter, rank every country by
  * trade volume. Partner detail attached per country is that country's own
- * general trading partners (already computed) — never product-specific,
+ * general trading partners (already computed) â€” never product-specific,
  * because Comtrade's keyless tier never fetches partner x HS-code together.
  */
 pub.get('/market/products', async (c) => {
@@ -1432,3 +1452,4 @@ pub.get('/registry', async (c) => {
   const withSources = await attachSources(c.env.DB, results ?? []);
   return json({ entities: withSources, count: withSources.length });
 });
+

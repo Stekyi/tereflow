@@ -1,4 +1,4 @@
-﻿"""Oracle connection and the SQL migration runner."""
+"""Oracle connection and the SQL migration runner."""
 from __future__ import annotations
 import os
 import re
@@ -32,6 +32,8 @@ def connect(app: bool = False) -> oracledb.Connection:
     cur = conn.cursor()
     cur.execute("ALTER SESSION DISABLE PARALLEL DML")
     cur.execute("ALTER SESSION DISABLE PARALLEL QUERY")
+    if app and os.environ.get("ORACLE_APP_USER"):
+        cur.execute("ALTER SESSION SET CURRENT_SCHEMA = ADMIN")
     return conn
 
 
@@ -59,5 +61,6 @@ def migrate(conn: oracledb.Connection) -> list[str]:
         conn.commit()
         applied.append(f.name)
     return applied
+
 
 

@@ -1,4 +1,4 @@
-﻿# Oracle backend (Autonomous AI Database 26ai)
+# Oracle backend (Autonomous AI Database 26ai)
 
 Oracle is the persistent source of truth for the Comtrade dataset. Cloudflare D1 keeps users, sessions and the network feature.
 
@@ -35,6 +35,16 @@ python -m pytest tests -q                                # 20 tests, real Oracle
 
 `ingest` exits 0 only on full success, 2 otherwise, so a scheduler can alert.
 
+## API (read only)
+
+oracle/tereflow_oracle/api.py (FastAPI, bearer token ORACLE_API_TOKEN, app login, connection pool).
+
+- POST /api/trade/sandbox: same contract as the Worker route, plus unreported_rows per partner. Years with no rows are null, a NULL value is counted as unreported rather than shown as 0, and product totals sum every partner (WLD row excluded).
+- GET /api/health.
+- Run: cd oracle; PYTHONPATH=. python -m uvicorn tereflow_oracle.api:app --port 8099.
+- The Worker route proxies to it when ORACLE_API_URL and ORACLE_API_TOKEN are set (.dev.vars locally, wrangler secret put in production). If Oracle is down it answers 502 and does not fall back to stale D1 data. Unset the two variables to return to D1.
+- Cloudflare cannot reach a service on this PC. Production needs the API on a public host, such as the OCI VM behind HTTPS or a Cloudflare Tunnel.
+
 ## Scheduling
 
 Weekly is enough: unchanged years cost two availability calls. Windows: `schedule-oracle.ps1`. OCI VM: `0 3 * * 1 cd /opt/tereflow/oracle && PYTHONPATH=. python -m tereflow_oracle ingest`.
@@ -46,7 +56,7 @@ Weekly is enough: unchanged years cost two availability calls. Windows: `schedul
 ## Known gaps
 
 - Active countries: `sync-countries` needs a Cloudflare token with D1 read on account 959613069119a4056537a3f89f8d91ac. The current token is rejected (403 / 7403), so pass `--country` or insert into `tf_country` until that is fixed.
-- No API layer yet (ORDS or Worker proxy), so the Cloudflare UI still reads D1.
+- Only the trade sandbox is served from Oracle so far (see API below). Everything else still reads D1.
 - Sandbox, Blue Ocean and opportunity scoring (`shared/opportunity.ts`, `worker/analytics`) still run on D1; the Oracle views and `tf_product_metrics` are the intended inputs.
 - HS6 requests use one AG6 call per flow/year. A reporter above 250,000 rows per flow fails loudly; chunking is needed for those.
 - No OCI VM exists yet (needs a human to create it).

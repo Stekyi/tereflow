@@ -26,6 +26,9 @@ const app = new Hono<{ Bindings: Env }>();
  */
 app.use('*', async (c, next) => {
   await next();
+  // Responses fetched from the assets binding (the SPA fallback for a deep link such as /countries)
+  // have read-only headers, and setting one throws. Copying the response makes them writable.
+  c.res = new Response(c.res.body, c.res);
   const h = c.res.headers;
   h.set('x-content-type-options', 'nosniff');
   h.set('referrer-policy', 'strict-origin-when-cross-origin');

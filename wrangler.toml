@@ -8,7 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 # failed with "Authentication error [code: 10000]" while `wrangler whoami`
 # cheerfully reported d1 (write). The error names authentication, so the hour
 # goes on tokens and scopes rather than on the account being addressed.
-account_id = "959613069119a4056537a3f89f8d91ac"
+account_id = "7d45a565f13b85b72350bca2cc8c4d09"
 
 # NOTE ON CHANGING database_id
 #
@@ -43,12 +43,12 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "tereflow"
-database_id = "7d803dfa-5dc6-4ca1-b399-228466bc0a24"
+database_id = "2ffaffa8-6b49-46f0-91cb-12caa524e286"
 migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "CACHE"
-id = "4a22ccdf4f0f414787313c49f900ebb8"
+id = "c695850919d14808be6049cf75a0ccf1"
 
 [vars]
 APP_NAME = "Tereflow"

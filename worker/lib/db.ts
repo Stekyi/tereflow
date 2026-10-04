@@ -18,6 +18,7 @@ export interface Env {
   ORACLE_API_TOKEN?: string;
   /** ORDS on the Autonomous Database: base URL ending /ords/<schema>, plus an OAuth2 client. Preferred over the API pair above. */
   ORACLE_ORDS_URL?: string;
+  ANANSE_NEWS_URL?: string;
   ORACLE_CLIENT_ID?: string;
   ORACLE_CLIENT_SECRET?: string;
   CENSUS_API_KEY?: string;

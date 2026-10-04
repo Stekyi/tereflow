@@ -25,6 +25,7 @@ const Playbooks = lazy(() => import('./pages/Playbooks'));
 const PlaybookDetail = lazy(() => import('./pages/PlaybookDetail'));
 const Upgrade = lazy(() => import('./pages/Upgrade'));
 const TradeSandbox = lazy(() => import('./pages/TradeSandbox'));
+const TradeNews = lazy(() => import('./pages/TradeNews'));
 
 const TITLES: Record<string, string> = {
   '/': 'Tereflow',
@@ -37,6 +38,7 @@ const TITLES: Record<string, string> = {
   '/playbooks': 'How to start',
   '/upgrade': 'Premium',
   '/sandbox': 'Trade sandbox',
+  '/news': 'Trade news',
   '/registry': 'Data registry',
   '/admin': 'Owner portal',
   '/admin/new': 'New record',
@@ -50,6 +52,7 @@ const TITLES: Record<string, string> = {
 const NAV: { to: string; label: string; d: string; stroke?: boolean; badge?: 'feed' | 'messages' }[] = [
   { to: '/', label: 'Products', d: 'M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z' },
   { to: '/countries', label: 'Countries', d: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 0v20M2 12h20M12 2c3 3 3 17 0 20M12 2C9 5 9 19 12 22', stroke: true },
+  { to: '/news', label: 'Trade news', d: 'M5 4h12a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2zM9 8h6M9 12h6M9 16h3', stroke: true },
   { to: '/sandbox', label: 'Sandbox', d: 'M4 4h16v16H4zM8 8h8M8 12h8M8 16h5', stroke: true },
   { to: '/opportunities', label: 'Opportunities', d: 'M4 19 10 13l4 3 6-8', stroke: true },
   { to: '/network', label: 'Network', d: 'M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 13a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm0 1.5c-3 0-6 1.5-6 3.5v2h12v-2c0-2-3-3.5-6-3.5zm8-1c-.9 0-1.8.14-2.6.4 1.6.9 2.6 2.2 2.6 3.6v2h6v-2c0-2-3-4-6-4z' },
@@ -58,7 +61,7 @@ const NAV: { to: string; label: string; d: string; stroke?: boolean; badge?: 'fe
   { to: '/me', label: 'Me', d: 'M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm0 2c-4 0-8 2-8 5v2h16v-2c0-3-4-5-8-5z' },
 ];
 
-const ROOTS = new Set(['/', '/countries', '/network', '/me']);
+const ROOTS = new Set(['/', '/countries', '/news', '/network', '/me']);
 
 export default function App() {
   const location = useLocation();
@@ -139,6 +142,7 @@ export default function App() {
             <Route path="/playbooks/:slug" element={<PlaybookDetail />} />
             <Route path="/upgrade" element={<Upgrade />} />
             <Route path="/sandbox" element={<TradeSandbox />} />
+            <Route path="/news" element={<TradeNews />} />
 
             <Route path="/admin" element={<Portal />} />
             <Route path="/admin/new" element={<AdminForm />} />
@@ -176,9 +180,9 @@ export default function App() {
           stroke
         />
         <Tab
-          to="/sandbox"
-          label="Sandbox"
-          d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5"
+          to="/news"
+          label="News"
+          d="M5 4h12a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2zM9 8h6M9 12h6M9 16h3"
           stroke
         />
         <Tab

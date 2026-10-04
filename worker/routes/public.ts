@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+﻿import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { attachSources, bad, getEntityBySlug, json } from '../lib/db';
 import { currentUser, isEntitled } from '../lib/session';
@@ -13,6 +13,7 @@ import { loadBlueOceans, type BlueOceanVisibility, type ViewerTier } from '../li
 import { loadMarketContext } from '../lib/market-context';
 import { isOpportunityEligible, recommend, type SignalDraft } from '../agent/analyse';
 import { loadProductFamilies, loadProductFamiliesOracle } from '../lib/product-families';
+import { loadTradeNews } from '../lib/trade-news';
 import { oracleConfig, oracleFetch, oracleJson } from '../lib/oracle';
 import {
   buildMarketProducts, buildProductDetail, buildProductInsightOracle, catalogueFrom, loadCountryData, oracleProductDetail,
@@ -88,6 +89,16 @@ pub.get('/entities', async (c) => {
 });
 
 /** Counts for the home screen. */
+pub.get('/trade-news', async (c) => {
+  try {
+    const d = await loadTradeNews(c.env);
+    c.header('Cache-Control', 'public, max-age=900');
+    return c.json(d);
+  } catch {
+    return bad('Trade news is unavailable right now', 503);
+  }
+});
+
 pub.get('/stats', async (c) => {
   const statsCfg = oracleConfig(c.env);
   if (statsCfg) {
@@ -333,7 +344,7 @@ pub.get('/dashboard/:slug', async (c) => {
   );
 });
 
-/** Where the numbers came from Ã¢â‚¬â€ shown under every dashboard. */
+/** Where the numbers came from ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â shown under every dashboard. */
 pub.get('/dashboard/:slug/sources', async (c) => {
   const entity = await getEntityBySlug(c.env.DB, c.req.param('slug'));
   if (!entity) return bad('Not found', 404);
@@ -1532,7 +1543,7 @@ pub.get('/opportunities', async (c) => {
   // dominant legacy commodity (Ghanaian cocoa is always top-5, never a
   // "signal"). What that exclusion does NOT catch is a smaller, growing
   // mining/oil-type category that isn't top-5 yet but is still never
-  // realistically SME-accessible Ã¢â‚¬â€ the universal defaults + admin overrides
+  // realistically SME-accessible ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the universal defaults + admin overrides
   // below catch that.
   const classificationsByEntity = await loadClassificationsBulk(
     c.env.DB,
@@ -1679,7 +1690,7 @@ pub.get('/market/hs-codes', async (c) => {
 /**
  * Product view: for one HS2 product/service chapter, rank every country by
  * trade volume. Partner detail attached per country is that country's own
- * general trading partners (already computed) Ã¢â‚¬â€ never product-specific,
+ * general trading partners (already computed) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â never product-specific,
  * because Comtrade's keyless tier never fetches partner x HS-code together.
  */
 pub.get('/market/products', async (c) => {

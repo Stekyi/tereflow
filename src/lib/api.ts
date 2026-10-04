@@ -580,8 +580,12 @@ export interface OpportunityFeed {
   opportunities: TradeOpportunity[];
 }
 
+export type { TradeNewsPayload, TradeNewsItem } from '../../shared/trade-news';
+import type { TradeNewsPayload } from '../../shared/trade-news';
+
 export const api = {
   stats: () => req<HomeStats>('/api/stats'),
+  tradeNews: () => req<TradeNewsPayload>('/api/trade-news'),
 
   // Ghana opportunities, read from precomputed rows. Opening the page never
   // calls StatBank: the ingest job runs separately and this serves what it

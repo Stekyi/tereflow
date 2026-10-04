@@ -1,4 +1,4 @@
-﻿"""Incremental, resumable, classification-aware Comtrade ingestion into Oracle."""
+"""Incremental, resumable, classification-aware Comtrade ingestion into Oracle."""
 from __future__ import annotations
 import json
 import uuid
@@ -9,6 +9,7 @@ from pathlib import Path
 from . import classify
 from .classify import Availability, Selection
 from .comtrade import Comtrade, RateLimited, ComtradeError, FetchResult
+from . import national
 
 ISO3_M49: dict[str, int] = json.loads((Path(__file__).parent / "data" / "iso3_m49.json").read_text())
 M49_ISO3: dict[int, str] = {v: k for k, v in ISO3_M49.items()}
@@ -39,9 +40,11 @@ class Summary:
 
 
 class Ingestor:
-    def __init__(self, conn, client: Comtrade | None, log=print, force=False, dry_run=False):
+    def __init__(self, conn, client: Comtrade | None, log=print, force=False, dry_run=False, providers=None):
         self.conn, self.api, self.log = conn, client, log
         self.force, self.dry = force, dry_run
+        # Policy: a country's own statistics office is read first when it serves deeper codes.
+        self.providers = national.registry() if providers is None else providers
 
     # ---- availability (cached, refreshed on a schedule) -------------------
     def availability(self, iso3: str, year: int) -> tuple[Availability | None, Availability | None]:
@@ -164,17 +167,107 @@ class Ingestor:
             self.conn.commit()
         return s
 
+    def _usd_rate(self, prov, iso3, year, flow):
+        """USD per unit of the source's currency, kept in tf_fx_rate so a rerun converts identically.
+
+        The first time, it is the rate implied by Comtrade's own USD total for the same reporter, year
+        and flow (so both sources agree on the size of the trade). It needs Comtrade data to exist
+        first; None means there is no basis yet and the caller uses Comtrade this run."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT usd_per_unit FROM tf_fx_rate WHERE source=:1 AND year=:2 AND flow=:3", [prov.key, year, flow])
+        row = cur.fetchone()
+        if row:
+            return float(row[0])
+        cur.execute("""SELECT SUM(value_usd) FROM tf_trade_facts
+                       WHERE reporter_iso3=:1 AND year=:2 AND flow=:3 AND partner_iso3='WLD' AND classification_level='HS6'""",
+                    [iso3, year, flow])
+        usd = cur.fetchone()[0]
+        if not usd:
+            return None
+        local = prov.total_local(year, flow)
+        if not local:
+            return None
+        rate = float(usd) / local
+        lo, hi = prov.fx_bounds
+        if not lo <= rate <= hi:
+            raise ComtradeError(f"implied {prov.currency}/USD rate {rate:.4f} for {year} {flow} is outside {lo}-{hi}; refusing to convert")
+        cur.execute("INSERT INTO tf_fx_rate (source, year, flow, currency, usd_per_unit, basis) VALUES (:1,:2,:3,:4,:5,:6)",
+                    [prov.key, year, flow, prov.currency, rate, "implied by Comtrade WLD total for the same reporter, year and flow"])
+        self.conn.commit()
+        return rate
+
+    def _national_unit(self, run_id, iso3, year, flow, prov, s: Summary) -> bool:
+        """True when the national source handled this flow (loaded, unchanged, or kept after a failure).
+        False sends the flow to Comtrade."""
+        st = self._state(iso3, year, flow)
+        held = bool(st and st[0] == "SUCCESS" and st[1] == "HS8")
+        try:
+            av = prov.availability(year, flow)
+        except Exception as e:
+            self.log(f"{iso3} {year} {flow}: {prov.key} unreachable ({e})")
+            av = None
+        if av is None:
+            if held:
+                self.log(f"{iso3} {year} {flow}: {prov.key} unavailable, keeping the stored HS8")
+                s.skipped += 1
+                return True
+            return False
+        sel = Selection(prov.key, f"HS{av.level_length}", av.level_length,
+                        f"{prov.key} publishes {av.level_length}-digit codes",
+                        Availability(av.level_length, av.records, "CN8", av.checksum, av.released))
+        if held and st[2] == av.checksum and not self.force:
+            s.skipped += 1
+            self.log(f"{iso3} {year} {flow}: unchanged ({sel.level} via {prov.key}), skipped")
+            return True
+        if self.dry:
+            s.planned.append(f"{iso3} {year} {flow}: would ingest {sel.level} via {prov.key} ({av.records:,} lines)")
+            self.log(s.planned[-1])
+            return True
+        retry = st[4] if st else 0
+        try:
+            rate = self._usd_rate(prov, iso3, year, flow)
+            if rate is None:
+                self.log(f"{iso3} {year} {flow}: no USD basis yet, using Comtrade this run")
+                return False
+            if not held:
+                self._set_state(run_id, iso3, year, flow, "RUNNING", sel)
+            res = prov.fetch(year, flow, rate)
+            n = self.load(run_id, iso3, year, flow, sel, res)
+            self._set_state(run_id, iso3, year, flow, "SUCCESS", sel, records=n, retry=0)
+            s.success += 1
+            s.rows += n
+            self.log(f"{iso3} {year} {flow}: {n:,} rows stored at {sel.level} via {prov.key}")
+            return True
+        except Exception as e:
+            self.conn.rollback()
+            self._log_error(run_id, iso3, year, flow, sel.level, prov.key, e, retry + 1)
+            self.log(f"{iso3} {year} {flow}: {prov.key} FAILED {e}")
+            if held:
+                # The stored HS8 stays; a transient fault must never swap it for HS6.
+                s.failed += 1
+                return True
+            self._set_state(run_id, iso3, year, flow, "FAILED", sel, error=str(e), retry=retry + 1)
+            return False
+
     def _country_year(self, run_id, iso3, year, s: Summary):
+        prov = self.providers.get(iso3)
+        todo = []
+        for flow in FLOWS:
+            if prov and self._national_unit(run_id, iso3, year, flow, prov, s):
+                continue
+            todo.append(flow)
+        if not todo:
+            return
         tl, fn = self.availability(iso3, year)
         sel = classify.resolve(tl, fn)
         if sel is None:
             self.log(f"{iso3} {year}: no data reported by Comtrade")
             s.no_data += 1
             if not self.dry:
-                for fl in FLOWS:
+                for fl in todo:
                     self._set_state(run_id, iso3, year, fl, "NO_DATA", None)
             return
-        for flow in FLOWS:
+        for flow in todo:
             st = self._state(iso3, year, flow)
             a = sel.availability
             unchanged = st and st[0] == "SUCCESS" and st[1] == sel.level and st[2] == a.dataset_checksum \

@@ -59,14 +59,29 @@ ok(carried.items.length === 1 && carried.items[0].title === 'Old but kept', 'car
 ok(countriesIn('U.K. and U.S. sign deal').sort().join() === 'United Kingdom,United States', 'dotted aliases');
 ok(!isTradeStory('Mahama urges health investment', '', 'business'), 'no loose economy words');
 
+// Dedicated Ananse trade desk is preferred over the wire when it answers.
+{
+  const kv2 = new Map();
+  const env2 = { CACHE: { get: async (k) => (kv2.has(k) ? JSON.parse(kv2.get(k)) : null), put: async (k, v) => void kv2.set(k, v) } };
+  const deskItems = [{ title: 'Desk story', link: 'https://d.test/1', summary: '', source: 'WTO', published: '2026-10-04T10:00:00Z', image: null, scope: 'global', countries: [], region: '', topic: 'Tariffs and policy' }];
+  const seenUrls = [];
+  globalThis.fetch = async (u) => { seenUrls.push(String(u)); return String(u).includes('trade-news') ? new Response(JSON.stringify({ generated: 'x', items: deskItems, countries: [], topics: [] })) : new Response(JSON.stringify(wire)); };
+  const d = await loadTradeNews(env2);
+  ok(d.items.length === 1 && d.items[0].title === 'Desk story' && seenUrls.length === 1, 'uses the Ananse trade desk when it answers');
+  kv2.clear(); seenUrls.length = 0;
+  globalThis.fetch = async (u) => (String(u).includes('trade-news') ? new Response('nope', { status: 404 }) : new Response(JSON.stringify(wire)));
+  const f = await loadTradeNews(env2);
+  ok(f.items.length === 2, 'falls back to the filtered wire when the desk is missing');
+}
+
 // 12-hour cache: serves held data inside the window, refreshes after, keeps stale on failure.
 const kv = new Map();
-const env = { CACHE: { get: async (k) => (kv.has(k) ? JSON.parse(kv.get(k)) : null), put: async (k, v) => void kv.set(k, v) }, ANANSE_NEWS_URL: 'https://wire.test/' };
+const env = { CACHE: { get: async (k) => (kv.has(k) ? JSON.parse(kv.get(k)) : null), put: async (k, v) => void kv.set(k, v) } };
 let calls = 0, fail = false;
-globalThis.fetch = async () => { calls++; if (fail) return new Response('no', { status: 500 }); return new Response(JSON.stringify(wire)); };
+globalThis.fetch = async (u) => { if (String(u).includes('trade-news')) return new Response('no', { status: 404 }); calls++; if (fail) return new Response('no', { status: 500 }); return new Response(JSON.stringify(wire)); };
 const a = await loadTradeNews(env); ok(a.items.length === 2 && calls === 1, 'first load fetches');
 await loadTradeNews(env); ok(calls === 1, 'second load is served from cache');
-const stale = JSON.parse(kv.get('trade-news:v4')); stale.fetched = new Date(Date.now() - 13 * 3600e3).toISOString(); kv.set('trade-news:v4', JSON.stringify(stale));
+const stale = JSON.parse(kv.get('trade-news:v5')); stale.fetched = new Date(Date.now() - 13 * 3600e3).toISOString(); kv.set('trade-news:v5', JSON.stringify(stale));
 fail = true; const b = await loadTradeNews(env); ok(b.items.length === 2 && calls === 2, 'stale copy served when refresh fails');
 fail = false; await loadTradeNews(env); ok(calls === 3, 'refreshes after 12 hours');
 

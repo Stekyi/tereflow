@@ -13,9 +13,10 @@ export type { TradeNewsItem, TradeNewsPayload } from '../../shared/trade-news';
 import type { TradeNewsItem, TradeNewsPayload } from '../../shared/trade-news';
 import type { Env } from './db';
 
-const DEFAULT_URL = 'https://ananses.com/api/wire';
+const TRADE_URL = 'https://ananses.com/api/trade-news';
+const WIRE_URL = 'https://ananses.com/api/wire';
 const REFRESH_MS = 12 * 3600 * 1000;
-const KV_KEY = 'trade-news:v4';
+const KV_KEY = 'trade-news:v5';
 const MAX_ITEMS = 120;
 const KEEP_MS = 7 * 86400 * 1000;
 
@@ -157,11 +158,22 @@ export async function loadTradeNews(env: Pick<Env, 'CACHE' | 'ANANSE_NEWS_URL'>)
   const held = await env.CACHE.get<TradeNewsPayload>(KV_KEY, 'json');
   if (held && Date.now() - Date.parse(held.fetched) < REFRESH_MS) return held;
   try {
-    const res = await fetch(env.ANANSE_NEWS_URL || DEFAULT_URL, {
-      headers: { accept: 'application/json', 'user-agent': 'Tereflow/1.0 (+https://tereflow.tiwaak.com)' },
-    });
-    if (!res.ok) throw new Error(`Ananse ${res.status}`);
-    const fresh = buildTradeNews(await res.json(), new Date(), held?.items ?? []);
+    const get = (u: string) =>
+      fetch(u, { headers: { accept: 'application/json', 'user-agent': 'Tereflow/1.0 (+https://tereflow.tiwaak.com)' } });
+    // The dedicated Ananse trade desk is preferred. Until it is deployed, or if it is down, the wire is filtered here.
+    let fresh: TradeNewsPayload | null = null;
+    const desk = await get(env.ANANSE_NEWS_URL || TRADE_URL).catch(() => null);
+    if (desk && desk.ok) {
+      const body = (await desk.json().catch(() => null)) as Partial<TradeNewsPayload> | null;
+      if (body && Array.isArray(body.items) && body.items.length) {
+        fresh = { ...(body as TradeNewsPayload), fetched: new Date().toISOString() };
+      }
+    }
+    if (!fresh) {
+      const res = await get(WIRE_URL);
+      if (!res.ok) throw new Error(`Ananse ${res.status}`);
+      fresh = buildTradeNews(await res.json(), new Date(), held?.items ?? []);
+    }
     if (fresh.items.length) {
       await env.CACHE.put(KV_KEY, JSON.stringify(fresh), { expirationTtl: 7 * 86400 });
       return fresh;

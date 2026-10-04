@@ -43,7 +43,7 @@ oracle/tereflow_oracle/api.py (FastAPI, bearer token ORACLE_API_TOKEN, app login
 - GET /api/health.
 - Run: cd oracle; PYTHONPATH=. python -m uvicorn tereflow_oracle.api:app --port 8099.
 - The Worker route proxies to it when ORACLE_API_URL and ORACLE_API_TOKEN are set (.dev.vars locally, wrangler secret put in production). If Oracle is down it answers 502 and does not fall back to stale D1 data. Unset the two variables to return to D1.
-- Cloudflare cannot reach a service on this PC. Production needs the API on a public host, such as the OCI VM behind HTTPS or a Cloudflare Tunnel.
+- Cloudflare cannot reach a service on this PC, so production does not use this FastAPI service. It stays for local development; production reads through ORDS (below).
 
 ## Opportunities and Blue Ocean
 
@@ -66,6 +66,18 @@ Deliberate differences, all marked `DIFF` in code: HS8 tariff-line levels count 
 - Payloads are precomputed into `tf_dashboard_cache` after each ingest (`analytics` and `ingest` both do it), so a request reads one row (~0.1 s) instead of aggregating 400,000 facts (~11 s).
 - `GET /api/dashboard/{iso3}` and `GET /api/lines/{iso3}?flow=M`. The Worker groups the lines into product families with the same `buildFamilies` code the D1 path uses.
 - In the Worker, an Oracle outage returns 502, and a country with no Oracle data shows empty trade sections instead of stale D1 figures.
+
+## ORDS (production API)
+
+Oracle REST Data Services is built into the Autonomous Database, so the API needs no VM and costs nothing. The module `tf_api` is defined in the ADMIN schema at `https://<host>/ords/admin/tf/` by `python -m tereflow_oracle define-ords` (rebuilds the module from `oracle/ords/handlers/*.plsql`; safe to re-run).
+
+- `GET /tf/dashboard/{iso3}`, `/tf/blue-oceans/{iso3}`, `/tf/lines/{iso3}?flow=X|M`: serve the precomputed rows in `tf_dashboard_cache` (refreshed after every ingest or `analytics` run).
+- `GET /tf/sandbox?primary=ghana&partners=DEU,CHN`: computed live in one SQL statement; same response and the same validation messages as the Python API (`tests/test_ords_live.py` compares them).
+- Security: every route needs an OAuth2 bearer token (`tf_read` privilege). The Worker holds the client credentials (`ORACLE_ORDS_URL`, `ORACLE_CLIENT_ID`, `ORACLE_CLIENT_SECRET`), gets a token from `/ords/admin/oauth/token`, and caches it in KV until shortly before it expires. A 401 triggers one refresh.
+- Worker code: `worker/lib/oracle.ts` is the only place that talks to Oracle; it prefers ORDS and falls back to the FastAPI pair when only `ORACLE_API_URL`/`ORACLE_API_TOKEN` are set.
+- The sandbox body can be tens of megabytes; the Worker streams it through instead of buffering it.
+
+Cloudflare D1 still holds users, sessions, the network feature, the country registry, services and market context. No trade facts are in D1.
 
 ## Scheduling
 

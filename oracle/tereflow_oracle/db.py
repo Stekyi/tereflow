@@ -60,7 +60,23 @@ def migrate(conn: oracledb.Connection) -> list[str]:
         cur.execute("INSERT INTO tf_schema_migrations (name) VALUES (:1)", [f.name])
         conn.commit()
         applied.append(f.name)
+    seed_iso3(conn)
     return applied
+
+
+def seed_iso3(conn) -> int:
+    """Load the ISO3 reference table from the packaged JSON files (idempotent)."""
+    import json
+    data = Path(__file__).parent / "data"
+    m49 = json.loads((data / "iso3_m49.json").read_text())
+    names = json.loads((data / "iso3_name.json").read_text(encoding="utf-8"))
+    cur = conn.cursor()
+    rows = [(k, v, names.get(k, k)) for k, v in m49.items()]
+    cur.executemany("""MERGE INTO tf_iso3 t USING (SELECT :1 i, :2 m, :3 n FROM dual) s ON (t.iso3 = s.i)
+                       WHEN MATCHED THEN UPDATE SET m49 = s.m, name = s.n
+                       WHEN NOT MATCHED THEN INSERT (iso3, m49, name) VALUES (s.i, s.m, s.n)""", rows)
+    conn.commit()
+    return len(rows)
 
 
 

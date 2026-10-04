@@ -13,6 +13,7 @@ import { loadBlueOceans, type BlueOceanVisibility, type ViewerTier } from '../li
 import { loadMarketContext } from '../lib/market-context';
 import { isOpportunityEligible, recommend, type SignalDraft } from '../agent/analyse';
 import { loadProductFamilies, loadProductFamiliesOracle } from '../lib/product-families';
+import { oracleConfig, oracleFetch } from '../lib/oracle';
 import { loadSettings, type Settings } from '../lib/settings';
 import {
   classify,
@@ -154,16 +155,12 @@ pub.get('/dashboard/:slug', async (c) => {
   // Trade-derived figures come from Oracle when it is configured. Services,
   // market context, recommendations and the momentum signals are not derived
   // from trade facts and still come from D1.
-  const oracleDash = c.env.ORACLE_API_URL && c.env.ORACLE_API_TOKEN && entity.iso3
-    ? { url: c.env.ORACLE_API_URL, token: c.env.ORACLE_API_TOKEN, iso3: entity.iso3 }
-    : null;
+  const oracle = oracleConfig(c.env);
+  const oracleDash = oracle && entity.iso3 ? { cfg: oracle, iso3: entity.iso3 } : null;
   let oracleComputedAt: string | null = null;
   if (oracleDash) {
     try {
-      const res = await fetch(`${oracleDash.url.replace(/\/$/, '')}/api/dashboard/${encodeURIComponent(oracleDash.iso3)}`, {
-        headers: { authorization: `Bearer ${oracleDash.token}` },
-        signal: AbortSignal.timeout(25_000),
-      });
+      const res = await oracleFetch(oracleDash.cfg, { route: 'dashboard', iso3: oracleDash.iso3 });
       if (res.status === 404) {
         // Oracle has nothing for this country yet: say so rather than show stale D1 numbers.
         overview = null; topExports = []; topImports = []; partnersExport = []; partnersImport = []; trend = [];
@@ -217,7 +214,7 @@ pub.get('/dashboard/:slug', async (c) => {
   // and label the result a total.
   const [familiesImport, familiesExport] = await Promise.all(
     oracleDash
-      ? [loadProductFamiliesOracle(oracleDash, 'import'), loadProductFamiliesOracle(oracleDash, 'export')]
+      ? [loadProductFamiliesOracle(oracleDash.cfg, oracleDash.iso3, 'import'), loadProductFamiliesOracle(oracleDash.cfg, oracleDash.iso3, 'export')]
       : [loadProductFamilies(c.env.DB, entity.id, 'import'), loadProductFamilies(c.env.DB, entity.id, 'export')],
   );
 
@@ -225,9 +222,7 @@ pub.get('/dashboard/:slug', async (c) => {
   // and by who is asking. Anonymous readers never see them under either
   // setting, so the tier is resolved from the session rather than assumed.
   const viewerTier: ViewerTier = !viewer ? 'anonymous' : isPremium ? 'premium' : 'registered';
-  const oracleBlue = c.env.ORACLE_API_URL && c.env.ORACLE_API_TOKEN
-    ? { url: c.env.ORACLE_API_URL, token: c.env.ORACLE_API_TOKEN, iso3: entity.iso3 ?? null }
-    : undefined;
+  const oracleBlue = oracle ? { cfg: oracle, iso3: entity.iso3 ?? null } : undefined;
   const blueOceans = entity.iso2 || (oracleBlue && entity.iso3)
     ? await loadBlueOceans(
         c.env.DB,
@@ -433,19 +428,16 @@ pub.post('/trade/sandbox', async (c) => {
   const emptyBody: { primary?: string; partners?: string[] } = {};
   const body = await c.req.json<{ primary?: string; partners?: string[] }>().catch(() => emptyBody);
   const primarySlug = String(body.primary ?? '').trim();
-  if (c.env.ORACLE_API_URL && c.env.ORACLE_API_TOKEN) {
+  const oracleSandbox = oracleConfig(c.env);
+  if (oracleSandbox) {
     // Oracle is the source of truth for trade facts. A failure is reported as
     // such rather than quietly falling back to older D1 data.
     try {
-      const res = await fetch(`${c.env.ORACLE_API_URL.replace(/\/$/, '')}/api/trade/sandbox`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${c.env.ORACLE_API_TOKEN}` },
-        body: JSON.stringify({ primary: primarySlug, partners: body.partners ?? [] }),
-        signal: AbortSignal.timeout(25_000),
-      });
-      const text = await res.text();
-      if (res.status >= 500 || res.status === 401) return bad('Trade data service is unavailable', 502);
-      return new Response(text, {
+      const partners = (body.partners ?? []).map((x) => String(x));
+      const res = await oracleFetch(oracleSandbox, { route: 'sandbox', primary: primarySlug, partners }, 60_000);
+      if (res.status >= 500 || res.status === 401 || res.status === 403) return bad('Trade data service is unavailable', 502);
+      // Streamed through: the body can be tens of megabytes.
+      return new Response(res.body, {
         status: res.status,
         headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
       });

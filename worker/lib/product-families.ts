@@ -1,6 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { disambiguateProductNames, shortProductName } from '../../shared/product-name';
 import { hs2Sector, hs6Label } from '../agent/codes';
+import { oracleFetch, type OracleConfig } from './oracle';
 
 /**
  * Product families: the same trade, split by the tariff into bands.
@@ -267,17 +268,15 @@ function fmtBn(n: number): string {
   return `$${Math.round(n).toLocaleString()}`;
 }
 
-/** Oracle path: the lines come from the Oracle API, the grouping is the same code. */
+/** Oracle path: the lines come from Oracle, the grouping is the same code. */
 export async function loadProductFamiliesOracle(
-  oracle: { url: string; token: string; iso3: string },
+  cfg: OracleConfig,
+  iso3: string,
   flow: 'import' | 'export',
   limit = 12,
 ): Promise<FamilyBreakdown | null> {
   try {
-    const res = await fetch(
-      `${oracle.url.replace(/\/$/, '')}/api/lines/${encodeURIComponent(oracle.iso3)}?flow=${flow === 'import' ? 'M' : 'X'}`,
-      { headers: { authorization: `Bearer ${oracle.token}` }, signal: AbortSignal.timeout(20_000) },
-    );
+    const res = await oracleFetch(cfg, { route: 'lines', iso3, flow: flow === 'import' ? 'M' : 'X' });
     if (!res.ok) return null;
     const body = (await res.json()) as {
       year: number;

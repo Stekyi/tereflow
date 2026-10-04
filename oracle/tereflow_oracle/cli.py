@@ -10,7 +10,7 @@ from pathlib import Path
 import requests
 
 from .config import load_env, need
-from . import db, analytics, opportunity, dashboard
+from . import db, analytics, opportunity, dashboard, ords
 from .ingest import Ingestor, ISO3_M49, default_years
 from .comtrade import Comtrade
 
@@ -94,6 +94,20 @@ def cmd_analytics(conn, a):
         print(f"dashboard {c}: {dashboard.refresh_dashboard(conn, c)} payloads cached")
 
 
+def cmd_define_ords(conn, _a):
+    """Create or refresh the ORDS module and OAuth client; write the Worker settings to .env."""
+    ords.define_module(conn)
+    client_id, secret = ords.define_security(conn)
+    envf = ROOT / ".env"
+    text = envf.read_text()
+    host = os.environ.get("ORACLE_ORDS_HOST", "qfrucfvqrp17bzk-tereflow.adb.us-ashburn-1.oraclecloudapps.com")
+    for k, v in (("ORACLE_ORDS_URL", f"https://{host}/ords/admin"), ("ORACLE_CLIENT_ID", client_id), ("ORACLE_CLIENT_SECRET", secret)):
+        if f"\n{k}=" not in "\n" + text:
+            text = text.rstrip("\n") + f"\n{k}={v}\n"
+    envf.write_text(text)
+    print("ORDS module and OAuth client defined; ORACLE_ORDS_URL, ORACLE_CLIENT_ID, ORACLE_CLIENT_SECRET are in .env")
+
+
 def cmd_status(conn, _a):
     cur = conn.cursor()
     cur.execute("""SELECT reporter_iso3, year, flow, classification_level, status, records, retry_count, TO_CHAR(updated_at,'YYYY-MM-DD HH24:MI')
@@ -113,7 +127,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(prog="tereflow_oracle")
     p.add_argument("--app", action="store_true", help="use the least-privilege app login")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("migrate", "sync-countries", "create-app-user", "status", "check"):
+    for name in ("migrate", "sync-countries", "create-app-user", "status", "check", "define-ords"):
         sub.add_parser(name)
     i = sub.add_parser("ingest")
     i.add_argument("--country", nargs="*", default=[])
@@ -130,7 +144,7 @@ def main(argv=None):
         print("applied:", db.migrate(conn) or "nothing new")
         return
     {"sync-countries": cmd_sync_countries, "create-app-user": cmd_create_app_user, "ingest": cmd_ingest,
-     "analytics": cmd_analytics, "status": cmd_status, "check": cmd_check}[a.cmd](conn, a)
+     "analytics": cmd_analytics, "status": cmd_status, "check": cmd_check, "define-ords": cmd_define_ords}[a.cmd](conn, a)
 
 
 if __name__ == "__main__":

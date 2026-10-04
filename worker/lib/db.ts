@@ -16,6 +16,10 @@ export interface Env {
   /** Oracle read API (oracle/tereflow_oracle/api.py). When both are set, the trade sandbox is served from Oracle. */
   ORACLE_API_URL?: string;
   ORACLE_API_TOKEN?: string;
+  /** ORDS on the Autonomous Database: base URL ending /ords/<schema>, plus an OAuth2 client. Preferred over the API pair above. */
+  ORACLE_ORDS_URL?: string;
+  ORACLE_CLIENT_ID?: string;
+  ORACLE_CLIENT_SECRET?: string;
   CENSUS_API_KEY?: string;
   SESSION_SECRET?: string;
   STRIPE_SECRET_KEY?: string;

@@ -210,8 +210,11 @@ def load_lines(conn, reporter: str, flow: str) -> dict | None:
 
 def refresh_dashboard(conn, reporter: str) -> int:
     """Store the dashboard and family line payloads for one reporter. Returns payloads written."""
+    from . import opportunity
     payloads = {"dashboard": load_dashboard(conn, reporter),
                 "lines_X": load_lines(conn, reporter, "X"), "lines_M": load_lines(conn, reporter, "M")}
+    if reporter in opportunity.CONFIG:
+        payloads["blue_oceans"] = {"reporter": reporter, "blue_oceans": opportunity.blue_oceans(conn, reporter, 50)}
     cur = conn.cursor()
     try:
         cur.execute("DELETE FROM tf_dashboard_cache WHERE reporter_iso3 = :1", [reporter])

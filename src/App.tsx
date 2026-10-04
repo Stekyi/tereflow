@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Skeletons } from './components/ui';
 import { Logo } from './components/Brand';
@@ -43,6 +43,21 @@ const TITLES: Record<string, string> = {
   '/join': 'Join Tereflow',
 };
 
+/**
+ * One list drives the desktop top bar. Mobile keeps the five-tab bottom bar below, because five is
+ * what fits under a thumb; the rest is reached from the Me tab.
+ */
+const NAV: { to: string; label: string; d: string; stroke?: boolean; badge?: 'feed' | 'messages' }[] = [
+  { to: '/', label: 'Products', d: 'M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z' },
+  { to: '/countries', label: 'Countries', d: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 0v20M2 12h20M12 2c3 3 3 17 0 20M12 2C9 5 9 19 12 22', stroke: true },
+  { to: '/sandbox', label: 'Sandbox', d: 'M4 4h16v16H4zM8 8h8M8 12h8M8 16h5', stroke: true },
+  { to: '/opportunities', label: 'Opportunities', d: 'M4 19 10 13l4 3 6-8', stroke: true },
+  { to: '/network', label: 'Network', d: 'M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 13a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm0 1.5c-3 0-6 1.5-6 3.5v2h12v-2c0-2-3-3.5-6-3.5zm8-1c-.9 0-1.8.14-2.6.4 1.6.9 2.6 2.2 2.6 3.6v2h6v-2c0-2-3-4-6-4z' },
+  { to: '/feed', label: 'Feed', d: 'M5 5h14v14H5zM8 9h8M8 12h8M8 15h5', stroke: true, badge: 'feed' },
+  { to: '/messages', label: 'Messages', d: 'M21 6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3v4l5-4h6a2 2 0 0 0 2-2z', badge: 'messages' },
+  { to: '/me', label: 'Me', d: 'M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm0 2c-4 0-8 2-8 5v2h16v-2c0-3-4-5-8-5z' },
+];
+
 const ROOTS = new Set(['/', '/countries', '/network', '/me']);
 
 export default function App() {
@@ -53,11 +68,6 @@ export default function App() {
   // change unmounts the old page, whose cleanup clears the name, so a page that
   // reports nothing falls back to its static label below.
   const [pageTitle, setPageTitle] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [location.pathname]);
 
   const isRoot = ROOTS.has(location.pathname);
   const title = pageTitle ?? TITLES[location.pathname] ?? 'Tereflow';
@@ -65,18 +75,27 @@ export default function App() {
   return (
     <PageTitleContext.Provider value={setPageTitle}>
     <div className="app">
+      <header className="topnav">
+        <div className="topnav-inner">
+          <NavLink to="/" className="topnav-brand" aria-label="Tereflow home">
+            <span className="brand-dot">
+              <Logo size={22} />
+            </span>
+            <span className="topnav-word">Tereflow</span>
+          </NavLink>
+          <nav className="topnav-links" aria-label="Main navigation">
+            {NAV.map((n) => (
+              <TopLink
+                key={n.to}
+                {...n}
+                badge={n.badge === 'feed' ? feedUnread : n.badge === 'messages' ? unread : 0}
+              />
+            ))}
+          </nav>
+        </div>
+      </header>
+
       <header className="topbar">
-        <button
-          className="menu-btn"
-          type="button"
-          onClick={() => setMenuOpen(true)}
-          aria-label="Open navigation"
-          aria-expanded={menuOpen}
-        >
-          <span />
-          <span />
-          <span />
-        </button>
         {isRoot ? (
           <span className="brand-mark">
             <span className="brand-dot">
@@ -98,24 +117,6 @@ export default function App() {
           {unread > 0 && <span className="tab-badge">{unread > 9 ? '9+' : unread}</span>}
         </NavLink>
       </header>
-
-      {menuOpen && <button className="nav-scrim" type="button" aria-label="Close navigation" onClick={() => setMenuOpen(false)} />}
-      <aside className={`app-drawer ${menuOpen ? 'open' : ''}`} aria-hidden={!menuOpen}>
-        <div className="drawer-head">
-          <span className="drawer-title">Navigation</span>
-          <button className="drawer-close" type="button" onClick={() => setMenuOpen(false)} aria-label="Close navigation">×</button>
-        </div>
-        <nav className="drawer-nav" aria-label="Main navigation">
-          <DrawerLink to="/" label="Products" d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z" />
-          <DrawerLink to="/countries" label="Countries" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 0v20M2 12h20M12 2c3 3 3 17 0 20M12 2C9 5 9 19 12 22" stroke />
-          <DrawerLink to="/sandbox" label="Trade Sandbox" d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5" stroke />
-          <DrawerLink to="/opportunities" label="Opportunities" d="M4 19 10 13l4 3 6-8" stroke />
-          <DrawerLink to="/network" label="Network" d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 13a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm0 1.5c-3 0-6 1.5-6 3.5v2h12v-2c0-2-3-3.5-6-3.5zm8-1c-.9 0-1.8.14-2.6.4 1.6.9 2.6 2.2 2.6 3.6v2h6v-2c0-2-3-4-6-4z" />
-          <DrawerLink to="/feed" label="Feed" d="M5 5h14v14H5zM8 9h8M8 12h8M8 15h5" stroke />
-          <DrawerLink to="/playbooks" label="How to start" d="M6 3h12v18H6zM9 7h6M9 11h6M9 15h4" stroke />
-          <DrawerLink to="/me" label="Me" d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm0 2c-4 0-8 2-8 5v2h16v-2c0-3-4-5-8-5z" />
-        </nav>
-      </aside>
 
       <main>
         <Suspense fallback={<Skeletons n={5} />}>
@@ -160,7 +161,7 @@ export default function App() {
         </Suspense>
       </main>
 
-      {/* Primary navigation: mobile app-style bottom bar. Desktop uses the hamburger drawer above. */}
+      {/* Primary navigation: mobile app-style bottom bar. Desktop uses the top navigation bar above. */}
       <nav className="tabbar" aria-label="Primary navigation">
         <Tab
           to="/"
@@ -198,31 +199,36 @@ export default function App() {
   );
 }
 
-function DrawerLink({
+function TopLink({
   to,
   label,
   d,
   stroke,
+  badge,
 }: {
   to: string;
   label: string;
   d: string;
   stroke?: boolean;
+  badge?: number;
 }) {
   return (
-    <NavLink to={to} end={to === '/'} className={({ isActive }) => (isActive ? 'drawer-link active' : 'drawer-link')}>
-      <svg
-        viewBox="0 0 24 24"
-        fill={stroke ? 'none' : 'currentColor'}
-        stroke={stroke ? 'currentColor' : 'none'}
-        strokeWidth={stroke ? 1.7 : 0}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden
-      >
-        <path d={d} />
-      </svg>
-      <span>{label}</span>
+    <NavLink to={to} end={to === '/'} className={({ isActive }) => (isActive ? 'topnav-link active' : 'topnav-link')}>
+      <span className="tab-icon">
+        <svg
+          viewBox="0 0 24 24"
+          fill={stroke ? 'none' : 'currentColor'}
+          stroke={stroke ? 'currentColor' : 'none'}
+          strokeWidth={stroke ? 1.7 : 0}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d={d} />
+        </svg>
+        {badge != null && badge > 0 && <span className="tab-badge">{badge > 9 ? '9+' : badge}</span>}
+      </span>
+      <span className="topnav-label">{label}</span>
     </NavLink>
   );
 }

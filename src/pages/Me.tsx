@@ -41,6 +41,14 @@ export default function Me() {
         <div className="section-head">
           <h2>Browse without an account</h2>
         </div>
+        <Link className="list-item" to="/opportunities">
+          <span className="grow">
+            <span className="name">Opportunities</span>
+            <span className="tiny dim">Products and markets worth a closer look</span>
+          </span>
+          <span className="dim">?</span>
+        </Link>
+
         <Link className="list-item" to="/registry">
           <span className="grow">
             <span className="name">Data sources</span>
@@ -119,6 +127,14 @@ export default function Me() {
       <div className="section-head">
         <h2>More</h2>
       </div>
+
+      <Link className="list-item" to="/opportunities">
+        <span className="grow">
+          <span className="name">Opportunities</span>
+          <span className="tiny dim">Products and markets worth a closer look</span>
+        </span>
+        <span className="dim">?</span>
+      </Link>
 
       <Link className="list-item" to="/feed">
         <span className="grow">

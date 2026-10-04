@@ -2795,105 +2795,65 @@ textarea {
 @media (max-width:760px){.sandbox-grid{grid-template-columns:1fr}}
 
 /* ---------- responsive primary navigation ---------- */
-.menu-btn {
-  display: none;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  padding: 8px;
-  border: 1px solid var(--line-soft);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--ink);
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 4px;
-}
-.menu-btn span {
-  display: block;
-  width: 17px;
-  height: 2px;
-  border-radius: 2px;
-  background: currentColor;
-}
-.nav-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 55;
-  border: 0;
-  background: rgba(15, 23, 42, 0.34);
-  backdrop-filter: blur(2px);
-}
-.app-drawer {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 60;
-  width: min(300px, 86vw);
-  padding: calc(14px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom));
-  background: var(--surface);
-  border-right: 1px solid var(--line-soft);
-  box-shadow: 18px 0 50px rgba(15, 23, 42, 0.16);
-  transform: translateX(-105%);
-  transition: transform 180ms ease;
-  overflow-y: auto;
-}
-.app-drawer.open { transform: translateX(0); }
-.drawer-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 38px;
-  margin-bottom: 14px;
-}
-.drawer-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--ink);
-}
-.drawer-close {
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--line-soft);
-  border-radius: 9px;
-  background: transparent;
-  color: var(--dim);
-  font-size: 23px;
-  line-height: 1;
-  cursor: pointer;
-}
-.drawer-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.drawer-link {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 12px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  color: var(--dim);
-  font-size: 14px;
-  font-weight: 600;
-}
-.drawer-link:hover { text-decoration: none; background: var(--surface-2); color: var(--ink); }
-.drawer-link.active { color: var(--brand); background: var(--surface-2); border-color: var(--line-soft); }
-.drawer-link svg { width: 19px; height: 19px; flex: 0 0 19px; }
+/* Desktop: a top bar in the LinkedIn mould, brand on the left and icon-over-label tabs on the
+   right. Mobile: the app-style top bar and bottom tab bar. The hamburger and drawer are gone. */
+.topnav { display: none; }
+.mobile-only { display: block; }
 
 @media (min-width: 901px) {
-  .menu-btn { display: flex; }
-  .tabbar { display: none; }
-  main { padding-bottom: 24px; }
-}
-
-@media (max-width: 900px) {
-  .app-drawer, .nav-scrim { display: none; }
-  .menu-btn { display: none; }
+  .topbar, .tabbar { display: none; }
+  .mobile-only { display: none; }
+  main { padding-bottom: 24px; max-width: 1128px; }
+  .topnav {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line-soft);
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+  }
+  .topnav-inner {
+    max-width: 1128px;
+    margin: 0 auto;
+    padding: 0 var(--pad);
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .topnav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: auto;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .topnav-brand:hover { text-decoration: none; }
+  .topnav-links { display: flex; align-items: stretch; height: 100%; }
+  .topnav-link {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 76px;
+    padding: 0 8px;
+    color: var(--dim);
+    font-size: 12px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .topnav-link svg { width: 24px; height: 24px; }
+  .topnav-link:hover { color: var(--ink); text-decoration: none; background: var(--surface-2); }
+  .topnav-link.active { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .topnav-link .tab-badge { top: -5px; right: -10px; }
 }
 
 @media (max-width: 420px) {

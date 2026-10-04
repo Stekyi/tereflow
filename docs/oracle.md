@@ -79,6 +79,15 @@ Oracle REST Data Services is built into the Autonomous Database, so the API need
 
 Cloudflare D1 still holds users, sessions, the network feature, the country registry, services and market context. No trade facts are in D1.
 
+## Product feeds and traditional trade
+
+- `GET /tf/products/{iso3}` serves every scored product above a $100k noise floor (3,466 lines for Ghana), with the five largest partners on the top-scoring lines. The Products, Countries, Opportunities and Rankings pages are built from these feeds and the dashboard payloads, not from D1.
+- **Traditional trade is the admin's decision, held in D1** (`export_classifications`, edited in the Owner portal). Migration 0022 seeds HS2 chapters 25-27 style defaults for 26, 27, 71, 72, 73, 74, 75, 76, 78, 79, 80, 81, 88, 89, 93, 97, 98, 99. A chapter covers every HS4/HS6/HS8/HS10 line beneath it; an exact product row, or a per-country override, wins over its chapter. The Worker applies the classification, so a change in the portal shows up on the next request. Oracle never filters by chapter for the feeds (the per-country chapter list in `country_config.json` only feeds the legacy `/api/opportunities` route and the parity tests).
+- Hidden by default and revealed per view: Products (`?all=1`), Opportunities (`?all=1`), Blue Ocean (`?all=1`), the country page (existing toggle) and the Sandbox (checkbox, sent as `all`).
+- Sandbox: the Worker passes the traditional codes as `exclude=71,27,...`; ORDS drops those codes and everything beneath them from the partner lists, the partner totals and the product totals, and reports `excluded_codes`. Digits and commas only, anything else is ignored.
+- `below_floor` (market under $1M, or a total line) is stored separately from `is_excluded` so the feeds can apply the size floor without the old chapter list.
+- Data is displayed at the deepest level Comtrade reports: HS6 for Ghana, HS8 or HS10 for a reporter with genuine tariff-line data. The level is on every row.
+
 ## Scheduling
 
 Weekly is enough: unchanged years cost two availability calls. Windows: `schedule-oracle.ps1`. OCI VM: `0 3 * * 1 cd /opt/tereflow/oracle && PYTHONPATH=. python -m tereflow_oracle ingest`.

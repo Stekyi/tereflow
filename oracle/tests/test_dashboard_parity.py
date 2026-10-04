@@ -24,6 +24,8 @@ def close(a, b):
 
 
 def same_items(g, e):
+    # Oracle lists products 30 deep (D1 lists 12); the first 12 must agree exactly.
+    g = g[:len(e)]
     assert len(g) == len(e) and len(e) > 0
     for x, y in zip(g, e):
         for k in ("rank", "code", "name"):

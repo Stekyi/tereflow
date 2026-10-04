@@ -64,3 +64,22 @@ def test_sandbox_matches_python_api(auth):
     ta = sorted((t["year"], t["flow"], t["hs_code"], round(t["value_usd"], 2)) for t in py["primary_product_totals"])
     tb = sorted((t["year"], t["flow"], t["hs_code"], round(t["value_usd"], 2)) for t in od["primary_product_totals"])
     assert ta == tb
+
+
+def test_sandbox_exclude_hides_codes_and_empty_exclude_hides_nothing(auth):
+    full = requests.get(f"{URL}/tf/sandbox?primary=ghana&partners=CHE", headers=auth, timeout=120).json()
+    none = requests.get(f"{URL}/tf/sandbox?primary=ghana&partners=CHE&exclude=", headers=auth, timeout=120).json()
+    cut = requests.get(f"{URL}/tf/sandbox?primary=ghana&partners=CHE&exclude=71,27", headers=auth, timeout=120).json()
+    n = lambda r: len(r["partners"][0]["products"])
+    assert n(full) == n(none) > 0
+    assert 0 < n(cut) < n(full)
+    assert not any(p["hs_code"].startswith(("71", "27")) for p in cut["partners"][0]["products"])
+    assert not any(t["hs_code"].startswith(("71", "27")) for t in cut["primary_product_totals"])
+    # a digit-only filter: anything else in the list is ignored rather than treated as a wildcard
+    wild = requests.get(f"{URL}/tf/sandbox?primary=ghana&partners=CHE&exclude=%25", headers=auth, timeout=120).json()
+    assert n(wild) == n(full)
+
+
+def test_products_route(auth):
+    d = requests.get(f"{URL}/tf/products/GHA", headers=auth, timeout=120).json()
+    assert d["count"] > 1000 and d["products"][0]["code"] and d["latest_year"] >= 2024

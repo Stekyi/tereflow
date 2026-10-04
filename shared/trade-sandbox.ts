@@ -49,5 +49,7 @@ export interface TradeSandboxResponse {
   years: number[];
   /** Product totals for the primary reporter across all stored partners. */
   primary_product_totals: TradeSandboxProductTotal[];
+  /** How many traditional codes were hidden from this result. Absent or 0 when nothing was hidden. */
+  excluded_codes?: number;
   note: string;
 }

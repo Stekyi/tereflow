@@ -168,7 +168,7 @@ export async function loadBlueOceans(
   visibility: BlueOceanVisibility,
   viewer: ViewerTier,
   limit = 12,
-  oracle?: { cfg: OracleConfig; iso3: string | null },
+  oracle?: { cfg: OracleConfig; iso3: string | null; keep?: (code: string) => boolean },
 ): Promise<BlueOceanResult> {
   if (!canView(visibility, viewer)) {
     return { blue_oceans: null, visibility, withheld_reason: withheldReason(visibility, viewer) };
@@ -185,7 +185,8 @@ export async function loadBlueOceans(
       const res = await oracleFetch(oracle.cfg, { route: 'blue-oceans', iso3: oracle.iso3, limit });
       if (!res.ok) throw new Error(`oracle ${res.status}`);
       const body = (await res.json()) as { blue_oceans: BlueOcean[] };
-      const named = body.blue_oceans.slice(0, limit).map((b) => ({ ...b, product_name: hs6Label(b.product_code, b.product_name) }));
+      const kept = oracle.keep ? body.blue_oceans.filter((b) => oracle.keep!(b.product_code)) : body.blue_oceans;
+      const named = kept.slice(0, limit).map((b) => ({ ...b, product_name: hs6Label(b.product_code, b.product_name) }));
       return { blue_oceans: named, visibility, withheld_reason: null };
     } catch {
       return { blue_oceans: null, visibility, withheld_reason: 'Blue ocean analysis is temporarily unavailable.' };

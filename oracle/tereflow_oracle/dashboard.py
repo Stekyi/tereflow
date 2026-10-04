@@ -18,6 +18,9 @@ from datetime import datetime, timezone
 from .opportunity import NAMES
 
 RANKED_TOP_N = 12
+# Product lists are longer than partner lists: the traditional lines are hidden by default, so a short
+# list would leave an SME very little to read once gold and oil are out of it.
+PRODUCT_TOP_N = 30
 NOISE_FLOOR_SPECIFIC_USD = 2_000_000   # settings.noiseFloorHs6Usd
 NOISE_FLOOR_CHAPTER_USD = 5_000_000    # settings.noiseFloorHs2Usd
 GROWTH_BASE_DIVISOR = 20
@@ -126,7 +129,7 @@ def build_dashboard(reporter: str, product_rows: list[tuple], partner_rows: list
         prev_y = previous_year(product_years, product_year)
         floor = NOISE_FLOOR_SPECIFIC_USD if specific else NOISE_FLOOR_CHAPTER_USD
         out = []
-        for i, p in enumerate(sorted(cur, key=lambda p: (-p["v"], p["code"]))[:RANKED_TOP_N]):
+        for i, p in enumerate(sorted(cur, key=lambda p: (-p["v"], p["code"]))[:PRODUCT_TOP_N]):
             past = prod.get((flow, three_back, p["code"]), {}).get("v") if three_back is not None else None
             last = prod.get((flow, prev_y, p["code"]), {}).get("v") if prev_y is not None else None
             c3 = cagr(past, p["v"], product_year - three_back) if three_back is not None and has_real_base(past, floor) else None
@@ -214,7 +217,9 @@ def refresh_dashboard(conn, reporter: str) -> int:
     payloads = {"dashboard": load_dashboard(conn, reporter),
                 "lines_X": load_lines(conn, reporter, "X"), "lines_M": load_lines(conn, reporter, "M")}
     if reporter in opportunity.CONFIG:
-        payloads["blue_oceans"] = {"reporter": reporter, "blue_oceans": opportunity.blue_oceans(conn, reporter, 50)}
+        # Chapter exclusions are the admin's (D1 classification), so the cached feeds only drop the size floor.
+        payloads["blue_oceans"] = {"reporter": reporter, "blue_oceans": opportunity.blue_oceans(conn, reporter, 200, apply_config_exclusions=False)}
+        payloads["products"] = load_products(conn, reporter)
     cur = conn.cursor()
     try:
         cur.execute("DELETE FROM tf_dashboard_cache WHERE reporter_iso3 = :1", [reporter])
@@ -239,3 +244,49 @@ def read_cached(conn, reporter: str, kind: str) -> dict | None:
         return None
     raw = row[0].read() if hasattr(row[0], "read") else row[0]
     return json.loads(raw)
+
+
+PRODUCT_FLOOR_USD = 100_000
+PARTNER_ROWS_FOR_TOP = 400
+
+
+def load_products(conn, reporter: str) -> dict | None:
+    """Every scored product above a noise floor, for the cross-country product feed.
+
+    Not filtered by traditional chapters: that is the admin's classification, applied by the Worker so
+    a change in the admin portal takes effect at once. The top-scoring lines also carry their five
+    largest partners (for the opportunities page)."""
+    cur = conn.cursor()
+    cur.execute("""SELECT flow, cmd_code, classification_level, product_name, latest_year, opportunity_score, signal_type,
+                          data_confidence, metrics_json
+                   FROM tf_opportunity WHERE reporter_iso3 = :1 AND NOT REGEXP_LIKE(cmd_code, '^0+$') AND NOT REGEXP_LIKE(cmd_code, '^9+$')""", [reporter])
+    items = []
+    for fl, code, lvl, name, yr, score, sig, conf, mj in cur:
+        m = json.loads(mj.read() if hasattr(mj, "read") else mj)
+        if m["value"] < PRODUCT_FLOOR_USD:
+            continue
+        uv = m.get("unit_value")
+        items.append({"flow": fl, "code": code, "level": lvl, "name": name, "year": int(yr), "value_usd": m["value"],
+                      "cagr_3y": m.get("cagr3"), "yoy_pct": m.get("yoy"), "score": float(score), "confidence": conf,
+                      "signal": sig, "top_partner": m.get("top_partner"), "top_share_pct": m.get("top_share"),
+                      "partner_count": m.get("partner_count"), "unit_value_usd_t": None if uv is None else uv * 1000,
+                      "years_available": m.get("years_available"), "trend": m.get("trend")})
+    if not items:
+        return None
+    latest = max(i["year"] for i in items)
+    top = sorted((i for i in items if i["year"] == latest), key=lambda i: -i["score"])[:PARTNER_ROWS_FOR_TOP]
+    want = {(i["flow"], i["code"]) for i in top}
+    cur.execute("""SELECT flow, cmd_code, partner_iso3, value_usd FROM (
+                     SELECT f.flow, f.cmd_code, f.partner_iso3, f.value_usd,
+                            ROW_NUMBER() OVER (PARTITION BY f.flow, f.cmd_code ORDER BY f.value_usd DESC) rn
+                     FROM tf_trade_facts f
+                     WHERE f.reporter_iso3 = :rep AND f.year = :yr AND f.partner_iso3 <> 'WLD' AND f.value_usd > 0)
+                   WHERE rn <= 5""", {"rep": reporter, "yr": latest})
+    parts: dict[tuple, list] = {}
+    for fl, code, p, v in cur:
+        if (fl, code) in want:
+            parts.setdefault((fl, code), []).append({"iso3": p, "name": NAMES.get(p, p), "value_usd": float(v)})
+    for i in items:
+        if (i["flow"], i["code"]) in parts:
+            i["partners"] = parts[(i["flow"], i["code"])]
+    return {"reporter": reporter, "latest_year": latest, "count": len(items), "products": items}

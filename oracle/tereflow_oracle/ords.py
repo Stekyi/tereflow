@@ -14,6 +14,7 @@ ROUTES = [
     ("dashboard/:iso3", "dashboard.plsql"),
     ("blue-oceans/:iso3", "blue_oceans.plsql"),
     ("lines/:iso3", "lines.plsql"),
+    ("products/:iso3", "products.plsql"),
     ("sandbox", "sandbox.plsql"),
 ]
 ROLE, PRIVILEGE, CLIENT = "tf_reader", "tf_read", "tereflow_worker"

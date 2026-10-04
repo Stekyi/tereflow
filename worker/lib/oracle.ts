@@ -35,7 +35,8 @@ export type OracleRoute =
   | { route: 'dashboard'; iso3: string }
   | { route: 'blue-oceans'; iso3: string; limit?: number }
   | { route: 'lines'; iso3: string; flow: 'X' | 'M' }
-  | { route: 'sandbox'; primary: string; partners: string[] };
+  | { route: 'products'; iso3: string }
+  | { route: 'sandbox'; primary: string; partners: string[]; exclude?: string[] };
 
 const TOKEN_KEY = 'oracle:ords-token';
 let memoryToken: { value: string; expires: number } | null = null;
@@ -75,14 +76,18 @@ function target(cfg: OracleConfig, r: OracleRoute): { url: string; init: Request
       case 'dashboard': return { url: `${cfg.base}/tf/dashboard/${enc(r.iso3)}`, init: {} };
       case 'blue-oceans': return { url: `${cfg.base}/tf/blue-oceans/${enc(r.iso3)}`, init: {} };
       case 'lines': return { url: `${cfg.base}/tf/lines/${enc(r.iso3)}?flow=${r.flow}`, init: {} };
-      case 'sandbox':
-        return { url: `${cfg.base}/tf/sandbox?primary=${enc(r.primary)}&partners=${enc(r.partners.join(','))}`, init: {} };
+      case 'products': return { url: `${cfg.base}/tf/products/${enc(r.iso3)}`, init: {} };
+      case 'sandbox': {
+        const ex = r.exclude?.length ? `&exclude=${enc(r.exclude.join(','))}` : '';
+        return { url: `${cfg.base}/tf/sandbox?primary=${enc(r.primary)}&partners=${enc(r.partners.join(','))}${ex}`, init: {} };
+      }
     }
   }
   switch (r.route) {
     case 'dashboard': return { url: `${cfg.base}/api/dashboard/${enc(r.iso3)}`, init: {} };
     case 'blue-oceans': return { url: `${cfg.base}/api/blue-oceans/${enc(r.iso3)}?limit=${r.limit ?? 12}`, init: {} };
     case 'lines': return { url: `${cfg.base}/api/lines/${enc(r.iso3)}?flow=${r.flow}`, init: {} };
+    case 'products': return { url: `${cfg.base}/api/products/${enc(r.iso3)}`, init: {} };
     case 'sandbox':
       return {
         url: `${cfg.base}/api/trade/sandbox`,
@@ -113,4 +118,27 @@ export async function oracleFetch(cfg: OracleConfig, r: OracleRoute, timeoutMs =
     return send(true);
   }
   return res;
+}
+
+const jsonCache = new Map<string, { at: number; value: unknown }>();
+const JSON_TTL_MS = 120_000;
+
+/**
+ * A cached JSON read. The country feeds are precomputed in Oracle and change only after an ingest,
+ * so a short in-memory cache spares Oracle repeated round trips when several pages ask in a row.
+ * Returns null when Oracle has nothing for the country (404) and throws on a service failure.
+ */
+export async function oracleJson<T>(cfg: OracleConfig, r: OracleRoute): Promise<T | null> {
+  const key = JSON.stringify([cfg.base, r]);
+  const hit = jsonCache.get(key);
+  if (hit && Date.now() - hit.at < JSON_TTL_MS) return hit.value as T | null;
+  const res = await oracleFetch(cfg, r);
+  if (res.status === 404) {
+    jsonCache.set(key, { at: Date.now(), value: null });
+    return null;
+  }
+  if (!res.ok) throw new Error(`oracle ${res.status}`);
+  const value = (await res.json()) as T;
+  jsonCache.set(key, { at: Date.now(), value });
+  return value;
 }

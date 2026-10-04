@@ -386,11 +386,13 @@ def build(conn, reporter: str) -> list[dict]:
         if m.flow == "M":
             lim.append("Domestic production is not in this dataset, so the gap between local supply and demand cannot be established.")
         excl = exclusion_for(m.code, cfg["excluded"])
+        below_floor = m.value < MIN_MARKET_USD or bool(m.code and set(m.code) == {"0"})
         if not excl and m.value < MIN_MARKET_USD:
             excl = (f"The whole national market is {usd(m.value)} a year, which is too small "
                     "to support a business however fast it is growing.")
         out.append({"m": m, "score": score, "breakdown": bd, "signal": sig, "confidence": conf,
-                    "reasons": reasons, "text": text, "evidence": ev, "limitations": lim, "excluded": excl})
+                    "reasons": reasons, "text": text, "evidence": ev, "limitations": lim, "excluded": excl,
+                    "below_floor": below_floor})
     out.sort(key=lambda r: -r["score"])
     return out
 
@@ -407,12 +409,12 @@ def refresh_opportunities(conn, reporter: str) -> int:
                 rep=reporter, fl=m.flow, code=m.code, lvl=m.level, name=(m.description or f"HS {m.code}")[:500],
                 yr=m.latest_year, sc=r["score"], bd=json.dumps(r["breakdown"]), sig=r["signal"], conf=r["confidence"],
                 cr=json.dumps(r["reasons"]), ex=r["text"], ev=json.dumps(r["evidence"]),
-                li=json.dumps(r["limitations"]), isx=1 if r["excluded"] else 0, exr=r["excluded"],
+                li=json.dumps(r["limitations"]), isx=1 if r["excluded"] else 0, exr=r["excluded"], bf=1 if r["below_floor"] else 0,
                 mj=json.dumps(m.__dict__)))
         cur.executemany("""INSERT INTO tf_opportunity (reporter_iso3, flow, cmd_code, classification_level, product_name,
             latest_year, opportunity_score, score_breakdown_json, signal_type, data_confidence, confidence_reasons_json,
-            explanation, evidence_json, limitations_json, is_excluded, excluded_reason, metrics_json)
-            VALUES (:rep,:fl,:code,:lvl,:name,:yr,:sc,:bd,:sig,:conf,:cr,:ex,:ev,:li,:isx,:exr,:mj)""", binds)
+            explanation, evidence_json, limitations_json, is_excluded, excluded_reason, below_floor, metrics_json)
+            VALUES (:rep,:fl,:code,:lvl,:name,:yr,:sc,:bd,:sig,:conf,:cr,:ex,:ev,:li,:isx,:exr,:bf,:mj)""", binds)
         conn.commit()
         return len(binds)
     except Exception:
@@ -420,12 +422,16 @@ def refresh_opportunities(conn, reporter: str) -> int:
         raise
 
 
-def blue_oceans(conn, reporter: str, limit: int = 12) -> list[dict]:
-    """Blue oceans from structured metrics (the D1 version parsed numbers out of evidence prose)."""
+def blue_oceans(conn, reporter: str, limit: int = 12, apply_config_exclusions: bool = True) -> list[dict]:
+    """Blue oceans from structured metrics (the D1 version parsed numbers out of evidence prose).
+
+    apply_config_exclusions=False drops only the size floor, so the caller can apply the admin
+    classification (traditional chapters) itself. The cached feed served to the app uses that."""
     cur = conn.cursor()
-    cur.execute("""SELECT flow, cmd_code, classification_level, product_name, opportunity_score, signal_type,
+    flag = "is_excluded" if apply_config_exclusions else "below_floor"
+    cur.execute(f"""SELECT flow, cmd_code, classification_level, product_name, opportunity_score, signal_type,
                           score_breakdown_json, evidence_json, limitations_json, data_confidence, metrics_json
-                   FROM tf_opportunity WHERE reporter_iso3 = :1 AND is_excluded = 0 AND opportunity_score >= :2
+                   FROM tf_opportunity WHERE reporter_iso3 = :1 AND {flag} = 0 AND opportunity_score >= :2
                    ORDER BY opportunity_score DESC, cmd_code""", [reporter, BLUE_MIN_SCORE])
     found = []
     for fl, code, lvl, name, score, sig, bd, ev, li, conf, mj in cur:

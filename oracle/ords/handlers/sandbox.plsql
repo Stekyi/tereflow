@@ -1,6 +1,7 @@
 DECLARE
   l_primary  VARCHAR2(80)  := TRIM(:primary);
   l_partners VARCHAR2(400) := UPPER(REPLACE(:partners, ' ', ''));
+  l_exclude  VARCHAR2(4000) := REGEXP_REPLACE(:exclude, '[^0-9,]', '');
   l_p_iso    VARCHAR2(3);
   l_p_name   VARCHAR2(120);
   l_p_slug   VARCHAR2(80);
@@ -53,6 +54,10 @@ BEGIN
     WHERE ROWNUM <= 12
   ),
   yrs AS (SELECT l_y0 + LEVEL - 1 AS yr FROM dual CONNECT BY LEVEL <= 5),
+  xl AS (SELECT c FROM (
+           SELECT DISTINCT TRIM(REGEXP_SUBSTR(l_exclude, '[^,]+', 1, LEVEL)) c
+           FROM dual CONNECT BY LEVEL <= REGEXP_COUNT(l_exclude, '[^,]+'))
+         WHERE c IS NOT NULL),
   pdata AS (
     SELECT pl.ord, pl.p, i.name,
       (SELECT 'HS' || MAX(TO_NUMBER(SUBSTR(f.classification_level, 3)))
@@ -65,9 +70,9 @@ BEGIN
       (SELECT JSON_ARRAYAGG(JSON_OBJECT(
                 'year' VALUE y.yr,
                 'export_usd' VALUE (SELECT SUM(f.value_usd) FROM tf_trade_facts f
-                   WHERE f.reporter_iso3 = l_p_iso AND f.partner_iso3 = pl.p AND f.year = y.yr AND f.flow = 'X'),
+                   WHERE f.reporter_iso3 = l_p_iso AND f.partner_iso3 = pl.p AND f.year = y.yr AND f.flow = 'X' AND NOT EXISTS (SELECT 1 FROM xl WHERE f.cmd_code LIKE xl.c || '%')),
                 'import_usd' VALUE (SELECT SUM(f.value_usd) FROM tf_trade_facts f
-                   WHERE f.reporter_iso3 = l_p_iso AND f.partner_iso3 = pl.p AND f.year = y.yr AND f.flow = 'M'))
+                   WHERE f.reporter_iso3 = l_p_iso AND f.partner_iso3 = pl.p AND f.year = y.yr AND f.flow = 'M' AND NOT EXISTS (SELECT 1 FROM xl WHERE f.cmd_code LIKE xl.c || '%')))
               ORDER BY y.yr RETURNING CLOB)
          FROM yrs y) AS totals_json,
       COALESCE((SELECT JSON_ARRAYAGG(JSON_OBJECT(
@@ -83,10 +88,10 @@ BEGIN
               ORDER BY f.year, f.flow, f.cmd_code RETURNING CLOB)
          FROM tf_trade_facts f
         WHERE f.reporter_iso3 = l_p_iso AND f.partner_iso3 = pl.p AND f.year BETWEEN l_y0 AND l_last
-          AND f.value_usd IS NOT NULL), TO_CLOB('[]')) AS products_json,
+          AND f.value_usd IS NOT NULL AND NOT EXISTS (SELECT 1 FROM xl WHERE f.cmd_code LIKE xl.c || '%')), TO_CLOB('[]')) AS products_json,
       (SELECT COUNT(*) FROM tf_trade_facts f
         WHERE f.reporter_iso3 = l_p_iso AND f.partner_iso3 = pl.p AND f.year BETWEEN l_y0 AND l_last
-          AND f.value_usd IS NULL) AS unreported
+          AND f.value_usd IS NULL AND NOT EXISTS (SELECT 1 FROM xl WHERE f.cmd_code LIKE xl.c || '%')) AS unreported
     FROM plist pl JOIN tf_iso3 i ON i.iso3 = pl.p
   )
   SELECT JSON_OBJECT(
@@ -105,6 +110,7 @@ BEGIN
         RETURNING CLOB) ORDER BY d.ord RETURNING CLOB)
       FROM pdata d), TO_CLOB('[]')) FORMAT JSON,
     'years' VALUE (SELECT JSON_ARRAYAGG(yr ORDER BY yr) FROM yrs) FORMAT JSON,
+    'excluded_codes' VALUE (SELECT COUNT(*) FROM xl),
     'primary_product_totals' VALUE COALESCE((
       SELECT JSON_ARRAYAGG(JSON_OBJECT(
         'year' VALUE t.year,
@@ -113,6 +119,7 @@ BEGIN
         'value_usd' VALUE t.all_partner_value_usd) RETURNING CLOB)
       FROM v_sandbox_product_totals t
       WHERE t.reporter_iso3 = l_p_iso AND t.year BETWEEN l_y0 AND l_last AND t.all_partner_value_usd IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM xl WHERE t.hs_code LIKE xl.c || '%')
         AND EXISTS (SELECT 1 FROM tf_trade_facts f JOIN plist pl ON pl.p = f.partner_iso3
                     WHERE f.reporter_iso3 = t.reporter_iso3 AND f.year = t.year AND f.flow = t.flow
                       AND f.cmd_code = t.hs_code)), TO_CLOB('[]')) FORMAT JSON,

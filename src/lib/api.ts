@@ -692,10 +692,10 @@ export const api = {
   },
 
   /** Countries index: summary figures only, no product lists. */
-  tradeSandbox: (primary: string, partners: string[]) =>
+  tradeSandbox: (primary: string, partners: string[], all = false) =>
     req<TradeSandboxResponse>('/api/trade/sandbox', {
       method: 'POST',
-      body: JSON.stringify({ primary, partners }),
+      body: JSON.stringify({ primary, partners, all }),
     }),
 
   countries: (params: { continent?: string; q?: string } = {}) => {

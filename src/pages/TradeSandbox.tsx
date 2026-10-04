@@ -46,6 +46,8 @@ export default function TradeSandbox() {
   const [partners, setPartners] = useState<string[]>(requestedPartner ? [requestedPartner] : []);
   const [partnerSearch, setPartnerSearch] = useState('');
   const [result, setResult] = useState<TradeSandboxResponse | null>(null);
+  // Traditional trade (gold, oil, metals and the like) is hidden unless the reader asks to see it.
+  const [showTraditional, setShowTraditional] = useState(false);
   const [loadingCountries, setLoadingCountries] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +83,7 @@ export default function TradeSandbox() {
     setRunning(true);
     setError(null);
     try {
-      setResult(await api.tradeSandbox(primary, partners));
+      setResult(await api.tradeSandbox(primary, partners, showTraditional));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not build the trade comparison');
     } finally {
@@ -153,6 +155,21 @@ export default function TradeSandbox() {
           </section>
         </div>
 
+        <label className="sandbox-check" style={{ marginTop: 14 }}>
+          <input
+            type="checkbox"
+            checked={showTraditional}
+            onChange={(e) => {
+              setShowTraditional(e.target.checked);
+              setResult(null);
+            }}
+          />
+          <span>
+            Include traditional trade (gold, oil, metals and similar)
+            <span className="tiny dim"> Hidden by default: large licensed or state-controlled lines that a small company cannot enter.</span>
+          </span>
+        </label>
+
         <button className="btn primary" type="button" disabled={!primary || partners.length === 0 || running} onClick={initiate} style={{ marginTop: 16 }}>
           {running ? 'Building trade view…' : 'Initiate Tere'}
         </button>
@@ -165,6 +182,11 @@ export default function TradeSandbox() {
             <p className="card-title">{result.primary.name} bilateral trade</p>
             <p className="tiny dim">Years: {result.years.join(' · ')}</p>
             <p className="tiny dim">{result.note}</p>
+            {!showTraditional && (result.excluded_codes ?? 0) > 0 && (
+              <p className="tiny dim">
+                Traditional trade is hidden from these totals and product lists. Tick the box above and run it again to include it.
+              </p>
+            )}
           </div>
           {result.partners.map((partner) => (
             <PartnerResult

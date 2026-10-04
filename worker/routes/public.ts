@@ -14,6 +14,9 @@ import { loadMarketContext } from '../lib/market-context';
 import { isOpportunityEligible, recommend, type SignalDraft } from '../agent/analyse';
 import { loadProductFamilies, loadProductFamiliesOracle } from '../lib/product-families';
 import { oracleConfig, oracleFetch } from '../lib/oracle';
+import {
+  CONFIDENCE_WEIGHT, currentItems, feedEntities, flowName, itemName, oracleDashboard, oracleProducts, partnerLabel, toExplore,
+} from '../lib/oracle-feeds';
 import { loadSettings, type Settings } from '../lib/settings';
 import {
   classify,
@@ -221,8 +224,20 @@ pub.get('/dashboard/:slug', async (c) => {
   // Blue oceans are gated twice: by what the admin published for this country,
   // and by who is asking. Anonymous readers never see them under either
   // setting, so the tier is resolved from the session rather than assumed.
+  const classifications = await loadClassifications(c.env.DB, entity.id);
+  const settings = await loadSettings(c.env);
+  const dominant = dominantCodes(overview?.export_chapter_shares, settings.dominantShareThreshold);
   const viewerTier: ViewerTier = !viewer ? 'anonymous' : isPremium ? 'premium' : 'registered';
-  const oracleBlue = oracle ? { cfg: oracle, iso3: entity.iso3 ?? null } : undefined;
+  // Blue oceans follow the admin classification: a traditional chapter or product never appears,
+  // here or anywhere else, until the viewer asks to see it.
+  const showAll = c.req.query('all') === '1';
+  const oracleBlue = oracle
+    ? {
+        cfg: oracle,
+        iso3: entity.iso3 ?? null,
+        keep: (code: string) => showAll || classify(code, classifications, dominant) !== 'traditional',
+      }
+    : undefined;
   const blueOceans = entity.iso2 || (oracleBlue && entity.iso3)
     ? await loadBlueOceans(
         c.env.DB,
@@ -241,9 +256,6 @@ pub.get('/dashboard/:slug', async (c) => {
   // Traditional vs non-traditional: tag each product row so the UI can badge
   // cocoa/gold-style bulk commodities differently from what an SME could
   // actually enter. Partner rows have no HS code and are left untagged.
-  const classifications = await loadClassifications(c.env.DB, entity.id);
-  const settings = await loadSettings(c.env);
-  const dominant = dominantCodes(overview?.export_chapter_shares, settings.dominantShareThreshold);
   // The recommendations are written from the overview, ranked lists and
   // signals. With Oracle serving those figures they are rewritten from the same
   // numbers, so a card cannot contradict the table beside it. The services card
@@ -425,8 +437,8 @@ pub.get('/dashboard/:slug/products/:flow/:hsCode', async (c) => {
  * line is globally interchangeable with another country's tariff line.
  */
 pub.post('/trade/sandbox', async (c) => {
-  const emptyBody: { primary?: string; partners?: string[] } = {};
-  const body = await c.req.json<{ primary?: string; partners?: string[] }>().catch(() => emptyBody);
+  const emptyBody: { primary?: string; partners?: string[]; all?: boolean } = {};
+  const body = await c.req.json<{ primary?: string; partners?: string[]; all?: boolean }>().catch(() => emptyBody);
   const primarySlug = String(body.primary ?? '').trim();
   const oracleSandbox = oracleConfig(c.env);
   if (oracleSandbox) {
@@ -434,7 +446,24 @@ pub.post('/trade/sandbox', async (c) => {
     // such rather than quietly falling back to older D1 data.
     try {
       const partners = (body.partners ?? []).map((x) => String(x));
-      const res = await oracleFetch(oracleSandbox, { route: 'sandbox', primary: primarySlug, partners }, 60_000);
+      // Traditional chapters and products are hidden unless the caller asks for everything.
+      let exclude: string[] = [];
+      if (!body.all) {
+        const ent = await c.env.DB.prepare(
+          "SELECT id, iso3 FROM entities WHERE kind = 'country' AND is_active = 1 AND slug = ?",
+        ).bind(primarySlug).first<{ id: string; iso3: string | null }>();
+        if (ent) {
+          const cls = await loadClassifications(c.env.DB, ent.id);
+          const codes = new Set<string>();
+          for (const [code, row] of cls) if (row.category === 'traditional' && /^\d{2,10}$/.test(code)) codes.add(code);
+          const dash = ent.iso3 ? await oracleDashboard(oracleSandbox, ent.iso3).catch(() => null) : null;
+          for (const ch of dominantCodes(dash?.overview.export_chapter_shares, 0.25)) {
+            if (cls.get(ch)?.category !== 'non_traditional') codes.add(ch);
+          }
+          exclude = [...codes];
+        }
+      }
+      const res = await oracleFetch(oracleSandbox, { route: 'sandbox', primary: primarySlug, partners, exclude }, 60_000);
       if (res.status >= 500 || res.status === 401 || res.status === 403) return bad('Trade data service is unavailable', 502);
       // Streamed through: the body can be tens of megabytes.
       return new Response(res.body, {
@@ -607,6 +636,30 @@ pub.post('/trade/sandbox', async (c) => {
 pub.get('/rankings', async (c) => {
   const metric = c.req.query('metric') ?? 'export';
   const column = metric === 'import' ? 'import_usd' : 'export_usd';
+  const rankCfg = oracleConfig(c.env);
+  if (rankCfg) {
+    try {
+      const entities = await feedEntities(c.env.DB);
+      const dashes = await Promise.all(entities.map(async (e) => ({ e, d: await oracleDashboard(rankCfg, e.iso3) })));
+      const rows = dashes
+        .filter((x) => x.d)
+        .map(({ e, d }) => ({
+          slug: e.slug,
+          name: e.name,
+          iso3: e.iso3,
+          continent: e.continent,
+          year: d!.overview.year,
+          value_usd: metric === 'import' ? d!.overview.import_usd : d!.overview.export_usd,
+          balance_usd: d!.overview.balance_usd,
+        }))
+        .filter((r) => r.value_usd > 0)
+        .sort((a, b) => b.value_usd - a.value_usd)
+        .map((r, i) => ({ ...r, rank: i + 1 }));
+      return json({ metric, rows });
+    } catch {
+      return bad('Trade data service is unavailable', 502);
+    }
+  }
   const { results } = await c.env.DB.prepare(
     `SELECT e.slug, e.name, e.iso3, e.continent, r.payload
        FROM entities e
@@ -709,7 +762,42 @@ pub.get('/products', async (c) => {
   // asking for "mango" is looking for the product, even when that product has
   // not earned an opportunity signal yet.
   let rows: SignalRow[] = [];
-  if (q) {
+  const oracleCfg = oracleConfig(c.env);
+  if (oracleCfg) {
+    // Oracle holds the trade data. Each country's scored products come from one precomputed feed.
+    try {
+      const entities = await feedEntities(c.env.DB, { continent: continent ?? undefined, slug: slug ?? undefined });
+      const feeds = await Promise.all(entities.map(async (e) => ({ e, feed: await oracleProducts(oracleCfg, e.iso3) })));
+      for (const { e, feed } of feeds) {
+        if (!feed) continue;
+        for (const i of feed.products) {
+          if ((flow === 'export' || flow === 'import') && flowName(i.flow) !== flow) continue;
+          rows.push({
+            entity_id: e.id,
+            hs_code: i.code,
+            product_name: itemName(i),
+            flow: flowName(i.flow),
+            year: i.year,
+            value_usd: i.value_usd,
+            cagr_3y: i.cagr_3y,
+            momentum: i.score / 100,
+            confidence: CONFIDENCE_WEIGHT[i.confidence],
+            best_market: partnerLabel(i.top_partner),
+            best_market_iso3: i.top_partner,
+            best_market_product_specific: 1,
+            unit_value_usd_t: i.unit_value_usd_t,
+            price_ratio: null,
+            slug: e.slug,
+            country: e.name,
+            iso3: e.iso3,
+            continent: e.continent ?? '',
+          });
+        }
+      }
+    } catch {
+      return bad('Trade data service is unavailable', 502);
+    }
+  } else if (q) {
     const clauses = [
       'f.stream = \'goods\'',
       'length(f.hs_code) = 6',
@@ -1143,8 +1231,44 @@ pub.get('/countries', async (c) => {
   /** Three years of product detail is the floor detectSignals works from. */
   const MIN_YEARS_FOR_SIGNALS = 3;
 
+  const countriesCfg = oracleConfig(c.env);
   const summaries = await Promise.all(
     rows.map(async (r): Promise<CountrySummary> => {
+      if (countriesCfg && r.is_active === 1 && r.iso3) {
+        try {
+          const [d, feed] = await Promise.all([oracleDashboard(countriesCfg, r.iso3), oracleProducts(countriesCfg, r.iso3)]);
+          if (d) {
+            const cls = await loadClassifications(c.env.DB, r.id);
+            const dom = dominantCodes(d.overview.export_chapter_shares, 0.25);
+            // An opening: a non-traditional product above one million dollars that scores 45 or better.
+            const openings = feed
+              ? currentItems(feed).filter(
+                  (i) => i.value_usd >= 1_000_000 && i.score >= 45 && classify(i.code, cls, dom) !== 'traditional',
+                ).length
+              : 0;
+            const years = d.trend.length;
+            const top = d.top_exports.find((i) => classify(i.code, cls, dom) !== 'traditional') ?? d.top_exports[0];
+            return {
+              slug: r.slug,
+              name: r.name,
+              iso3: r.iso3,
+              continent: r.continent,
+              is_active: true,
+              opportunities: years >= 3 ? openings : null,
+              opportunities_note: years >= 3 ? null : `Only ${years} year${years === 1 ? '' : 's'} of product detail. Trends need 3.`,
+              last_ingest_at: d.computed_at,
+              year: d.overview.year,
+              export_usd: d.overview.export_usd,
+              import_usd: d.overview.import_usd,
+              balance_usd: d.overview.balance_usd,
+              top_export: top ? shortProductName(hs6Label(top.code, top.name)) : null,
+              top_partner: d.partners_export[0]?.name ?? null,
+            };
+          }
+        } catch {
+          // Oracle unreachable: fall through to the stored figures rather than hide the country.
+        }
+      }
       const years = productYears.get(r.id) ?? 0;
       const assessable = years >= MIN_YEARS_FOR_SIGNALS;
       const base = {
@@ -1198,6 +1322,32 @@ pub.get('/countries', async (c) => {
 /** Public SME view: growing, non-headline products and available services. */
 pub.get('/opportunities', async (c) => {
   const includeTraditional = c.req.query('all') === '1';
+
+  const oppCfg = oracleConfig(c.env);
+  if (oppCfg) {
+    try {
+      const entities = await feedEntities(c.env.DB);
+      const feeds = await Promise.all(entities.map(async (e) => ({ e, feed: await oracleProducts(oppCfg, e.iso3), dash: await oracleDashboard(oppCfg, e.iso3) })));
+      const classByEntity = await loadClassificationsBulk(c.env.DB, entities.map((e) => e.id));
+      const picked: Array<ReturnType<typeof toExplore> & { score: number }> = [];
+      for (const { e, feed, dash } of feeds) {
+        if (!feed) continue;
+        const cls = resolveForEntity(classByEntity, e.id);
+        const dom = dominantCodes(dash?.overview.export_chapter_shares, 0.25);
+        for (const i of currentItems(feed)) {
+          if (i.value_usd < 1_000_000) continue;
+          const category = classify(i.code, cls, dom);
+          if (!includeTraditional && category === 'traditional') continue;
+          picked.push({ ...toExplore(e, i, category), score: i.score });
+        }
+      }
+      picked.sort((a, b) => b.score - a.score || b.value_usd - a.value_usd);
+      const products = picked.slice(0, 100).map(({ score: _s, ...rest }) => rest);
+      return json({ opportunities: products, count: products.length });
+    } catch {
+      return bad('Trade data service is unavailable', 502);
+    }
+  }
 
   const { results: productRows } = await c.env.DB.prepare(
     `SELECT s.id, s.entity_id, s.hs_code, 'product' AS kind, e.slug, e.name AS country, e.iso3, e.continent,

@@ -229,3 +229,17 @@ def lines(iso3: str, flow: str = "M", _=Depends(auth)):
     if d is None:
         raise HTTPException(404, f"No stored trade facts for {iso3}")
     return d
+
+
+@app.get("/api/products/{iso3}")
+def products(iso3: str, _=Depends(auth)):
+    """The scored product feed for a reporter (traditional chapters are filtered by the Worker)."""
+    iso3 = iso3.upper()
+
+    def run():
+        with pool().acquire() as c:
+            return dash.read_cached(c, iso3, "products")
+    d = cached(("products", iso3), run)
+    if d is None:
+        raise HTTPException(404, f"No stored products for {iso3}")
+    return d

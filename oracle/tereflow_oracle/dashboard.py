@@ -297,3 +297,37 @@ def load_products(conn, reporter: str) -> dict | None:
         if (i["flow"], i["code"]) in parts:
             i["partners"] = parts[(i["flow"], i["code"])]
     return {"reporter": reporter, "latest_year": latest, "count": len(items), "products": items}
+
+
+PRODUCT_SERIES_SQL = """SELECT year, SUM(value_usd), SUM(CASE WHEN net_weight_kg > 0 THEN net_weight_kg END)
+  FROM tf_trade_facts WHERE reporter_iso3 = :rep AND flow = :fl AND cmd_code LIKE :code || '%'
+   AND partner_iso3 <> 'WLD' AND value_usd IS NOT NULL GROUP BY year ORDER BY year"""
+PRODUCT_PARTNERS_SQL = """SELECT partner_iso3, SUM(value_usd) v, SUM(CASE WHEN net_weight_kg > 0 THEN net_weight_kg END)
+  FROM tf_trade_facts WHERE reporter_iso3 = :rep AND flow = :fl AND cmd_code LIKE :code || '%'
+   AND partner_iso3 <> 'WLD' AND value_usd > 0 AND year = :yr GROUP BY partner_iso3 ORDER BY v DESC FETCH FIRST 100 ROWS ONLY"""
+
+
+def load_product_detail(conn, reporter: str, flow: str, code: str) -> dict | None:
+    """One product for one reporter and flow: yearly series and the latest year's partners (live)."""
+    b = {"rep": reporter.upper(), "fl": flow, "code": code}
+    cur = conn.cursor()
+    cur.execute(PRODUCT_SERIES_SQL, b)
+    series = [{"year": int(y), "value_usd": float(v), "qty_kg": None if w is None else float(w)} for y, v, w in cur]
+    if not series:
+        return None
+    latest = series[-1]["year"]
+    cur.execute(PRODUCT_PARTNERS_SQL, {**b, "yr": latest})
+    partners = [{"iso3": p, "value_usd": float(v), "qty_kg": None if w is None else float(w)} for p, v, w in cur]
+    cur.execute("""SELECT MAX(cmd_desc) KEEP (DENSE_RANK LAST ORDER BY year, value_usd), MAX(classification_level) KEEP (DENSE_RANK LAST ORDER BY year)
+                   FROM tf_trade_facts WHERE reporter_iso3 = :rep AND flow = :fl AND cmd_code LIKE :code || '%' AND partner_iso3 <> 'WLD'""", b)
+    name, level = cur.fetchone()
+    return {"reporter": b["rep"], "flow": flow, "code": code, "name": name, "level": level,
+            "latest_year": latest, "series": series, "partners": partners}
+
+
+def load_stats(conn) -> dict:
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(DISTINCT reporter_iso3), NVL(SUM(records), 0) FROM tf_ingest_state WHERE status = 'SUCCESS'")
+    n, facts = cur.fetchone()
+    cur.execute("SELECT TO_CHAR(MAX(finished_at), 'YYYY-MM-DD\"T\"HH24:MI:SS') FROM tf_ingest_run WHERE status IN ('SUCCESS', 'PARTIAL')")
+    return {"countries_with_data": int(n), "facts": int(facts), "last_run": cur.fetchone()[0]}

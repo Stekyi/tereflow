@@ -1,0 +1,30 @@
+{
+    "analysis":  {
+                     "codeReview":  {
+                                        "level":  "high",
+                                        "autoRun":  true,
+                                        "enabled":  true
+                                    },
+                     "securityReview":  {
+                                            "level":  "high",
+                                            "autoRun":  true,
+                                            "enabled":  true
+                                        },
+                     "enabled":  true
+                 },
+    "askPermissions":  false,
+    "autoPermissions":  true,
+    "permissions":  {
+                        "createFiles":  true,
+                        "pushCode":  true,
+                        "installDependencies":  true,
+                        "editFiles":  true,
+                        "runBashCommands":  true,
+                        "deleteFiles":  true,
+                        "runTests":  true,
+                        "createBranches":  true,
+                        "runSecurityScans":  true,
+                        "createPullRequests":  true
+                    },
+    "permissionMode":  "auto"
+}

@@ -243,3 +243,23 @@ def products(iso3: str, _=Depends(auth)):
     if d is None:
         raise HTTPException(404, f"No stored products for {iso3}")
     return d
+
+
+@app.get("/api/product/{iso3}/{flow}/{code}")
+def product_detail(iso3: str, flow: str, code: str, _=Depends(auth)):
+    f = {"X": "X", "EXPORT": "X", "M": "M", "IMPORT": "M"}.get(flow.upper())
+    if f is None:
+        raise HTTPException(400, "flow must be X, M, export or import")
+    if not code.isdigit() or not 2 <= len(code) <= 10:
+        raise HTTPException(400, "code must be 2 to 10 digits")
+    with pool().acquire() as c:
+        d = dash.load_product_detail(c, iso3, f, code)
+    if d is None:
+        raise HTTPException(404, f"No stored trade for {iso3.upper()} {f} {code}")
+    return d
+
+
+@app.get("/api/stats")
+def stats(_=Depends(auth)):
+    with pool().acquire() as c:
+        return dash.load_stats(c)

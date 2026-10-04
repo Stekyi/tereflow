@@ -487,7 +487,7 @@ function likeTerm(productName: string): string | null {
  * Only published cards, and no contact details: this says who to approach, and
  * the card page says how.
  */
-async function loadSubscribers(
+export async function loadSubscribers(
   env: Env,
   hs: string,
   productName: string,

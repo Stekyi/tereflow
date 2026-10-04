@@ -13,7 +13,10 @@ import { loadBlueOceans, type BlueOceanVisibility, type ViewerTier } from '../li
 import { loadMarketContext } from '../lib/market-context';
 import { isOpportunityEligible, recommend, type SignalDraft } from '../agent/analyse';
 import { loadProductFamilies, loadProductFamiliesOracle } from '../lib/product-families';
-import { oracleConfig, oracleFetch } from '../lib/oracle';
+import { oracleConfig, oracleFetch, oracleJson } from '../lib/oracle';
+import {
+  buildMarketProducts, buildProductDetail, buildProductInsightOracle, catalogueFrom, loadCountryData, oracleProductDetail,
+} from '../lib/oracle-insight';
 import {
   CONFIDENCE_WEIGHT, currentItems, feedEntities, flowName, itemName, oracleDashboard, oracleProducts, partnerLabel, toExplore,
 } from '../lib/oracle-feeds';
@@ -86,6 +89,19 @@ pub.get('/entities', async (c) => {
 
 /** Counts for the home screen. */
 pub.get('/stats', async (c) => {
+  const statsCfg = oracleConfig(c.env);
+  if (statsCfg) {
+    const base = await c.env.DB.prepare(
+      `SELECT (SELECT COUNT(*) FROM entities WHERE kind='country') AS countries,
+              (SELECT COUNT(*) FROM entities WHERE kind='country' AND is_active=1) AS countries_active,
+              (SELECT COUNT(*) FROM entities WHERE kind='intl_org') AS orgs,
+              (SELECT COUNT(*) FROM entities WHERE kind='regional_body') AS regional,
+              (SELECT COUNT(*) FROM entity_sources) AS sources`,
+    ).first();
+    const o = await oracleJson<{ countries_with_data: number; facts: number; last_run: string | null }>(statsCfg, { route: 'stats' }).catch(() => null);
+    // The counts of what is covered come from Oracle, where the trade data is.
+    return json({ ...(base ?? {}), countries_with_data: o?.countries_with_data ?? 0, facts: o?.facts ?? 0, last_run: o?.last_run ?? null });
+  }
   const row = await c.env.DB.prepare(
     `SELECT
        (SELECT COUNT(*) FROM entities WHERE kind='country')            AS countries,
@@ -322,11 +338,13 @@ pub.get('/dashboard/:slug/sources', async (c) => {
   const entity = await getEntityBySlug(c.env.DB, c.req.param('slug'));
   if (!entity) return bad('Not found', 404);
 
-  const { results: contributors } = await c.env.DB.prepare(
-    `SELECT DISTINCT source_ref FROM trade_facts WHERE entity_id = ?`,
-  )
-    .bind(entity.id)
-    .all<{ source_ref: string }>();
+  const srcCfg = oracleConfig(c.env);
+  const heldInOracle = srcCfg && entity.iso3 ? Boolean(await oracleDashboard(srcCfg, entity.iso3).catch(() => null)) : false;
+  const { results: contributors } = heldInOracle
+    ? { results: [{ source_ref: 'un-comtrade' }] }
+    : await c.env.DB.prepare(`SELECT DISTINCT source_ref FROM trade_facts WHERE entity_id = ?`)
+        .bind(entity.id)
+        .all<{ source_ref: string }>();
     const { results: attempts } = await c.env.DB.prepare(
       `SELECT source_ref, role, status, rows_written, note, attempted_at
          FROM source_attempts
@@ -362,6 +380,39 @@ pub.get('/dashboard/:slug/products/:flow/:hsCode', async (c) => {
   const flow = c.req.param('flow');
   const hsCode = decodeURIComponent(c.req.param('hsCode'));
   if (flow !== 'export' && flow !== 'import') return bad('Invalid trade flow', 400);
+
+  const breakdownCfg = oracleConfig(c.env);
+  if (breakdownCfg && entity.iso3 && /^\d{2,10}$/.test(hsCode)) {
+    try {
+      const d = await oracleProductDetail(breakdownCfg, entity.iso3, flow === 'export' ? 'X' : 'M', hsCode);
+      if (d) {
+        const last = d.series[d.series.length - 1];
+        const rows = d.partners.map((p) => ({
+          partner_iso3: p.iso3,
+          partner_name: partnerLabel(p.iso3) ?? p.iso3,
+          value_usd: p.value_usd,
+          qty: p.qty_kg,
+          qty_unit: p.qty_kg != null ? 'kg' : null,
+        }));
+        const response: ProductBreakdown = {
+          product_name: hs6Label(hsCode, d.name),
+          hs_code: hsCode,
+          flow,
+          year: d.latest_year,
+          product_value_usd: last?.value_usd ?? 0,
+          product_qty: last?.qty_kg ?? null,
+          product_qty_unit: last?.qty_kg != null ? 'kg' : null,
+          detail_available: rows.length > 0,
+          note: rows.length > 0 ? 'Partner rows are reported for this product.' : 'No partner detail was reported for this product.',
+          rows,
+        };
+        return json(response, 200, { 'cache-control': 'private, max-age=300' });
+      }
+      return bad('Product breakdown not found', 404);
+    } catch {
+      return bad('Trade data service is unavailable', 502);
+    }
+  }
 
   const product = await c.env.DB.prepare(
     `SELECT year, product_name, value_usd, qty, qty_unit
@@ -1009,7 +1060,10 @@ pub.get('/insight/:hs', async (c) => {
   const flow = flowParam === 'export' || flowParam === 'import' ? flowParam : null;
 
   try {
-    const insight = await buildProductInsight(c.env, hs, country, flow);
+    const insightCfg = oracleConfig(c.env);
+    const insight = insightCfg
+      ? await buildProductInsightOracle(c.env, insightCfg, hs, country, flow)
+      : await buildProductInsight(c.env, hs, country, flow);
     return json(insight, 200, { 'cache-control': 'public, max-age=300', vary: 'Cookie' });
   } catch (err) {
     // A bare 500 on one product and not another is impossible to diagnose from
@@ -1035,6 +1089,48 @@ pub.get('/products/:hs', async (c) => {
   if (!/^\d{2}$|^\d{6}$/.test(hs)) {
     return bad('hs must be a 2-digit chapter or 6-digit product code', 400);
   }
+  const detailCfg = oracleConfig(c.env);
+  if (detailCfg) {
+    try {
+      const settings = await loadSettings(c.env);
+      const data = await loadCountryData(c.env, detailCfg);
+      const global = await loadClassifications(c.env.DB, '*');
+      // Who ships and buys it: the partners of the largest exporter, or the largest importer if nobody exports it.
+      const lead = (() => {
+        let best: { iso3: string; flow: 'X' | 'M'; v: number } | null = null;
+        for (const { e, feed } of data) {
+          for (const i of feed.products) {
+            if (i.year !== feed.latest_year || !i.code.startsWith(hs)) continue;
+            const rank = i.flow === 'X' ? i.value_usd * 1e6 : i.value_usd;
+            if (!best || rank > best.v) best = { iso3: e.iso3, flow: i.flow, v: rank };
+          }
+        }
+        return best;
+      })();
+      const detail = lead ? await oracleProductDetail(detailCfg, lead.iso3, lead.flow, hs).catch(() => null) : null;
+      const rowsNamed = data.flatMap((d) => d.feed.products.filter((i) => i.code === hs).map((i) => i.name));
+      const full = (hs.length === 6 ? hs6Label(hs, rowsNamed.find(Boolean) ?? null) : hs2Label(hs));
+      return json(
+        buildProductDetail({
+          hs,
+          data,
+          settings,
+          topN: MARKET_TOP_N,
+          category: classify(hs, global, new Set()),
+          fullName: full,
+          partners: (detail?.partners ?? []).slice(0, 8).map((p) => ({
+            name: partnerLabel(p.iso3) ?? p.iso3,
+            iso3: p.iso3,
+            value_usd: p.value_usd,
+            product_specific: true,
+          })),
+        }),
+      );
+    } catch {
+      return bad('Trade data service is unavailable', 502);
+    }
+  }
+
   const isSpecific = hs.length === 6;
   const chapter = hs.slice(0, 2);
 
@@ -1501,6 +1597,15 @@ pub.get('/market/hs-codes', async (c) => {
   // built into one SQL string. Concatenating an unknown number of LIKE clauses
   // is how a query ends up depending on what somebody typed.
   const rows = new Map<string, { hs_code: string; product_name: string | null; total_value: number }>();
+  const hsCfg = oracleConfig(c.env);
+  if (hsCfg) {
+    try {
+      const data = await loadCountryData(c.env, hsCfg);
+      for (const r of catalogueFrom(data)) rows.set(r.hs_code, r);
+    } catch {
+      return bad('Trade data service is unavailable', 502);
+    }
+  }
 
   async function collect(sql: string, binds: unknown[]) {
     const { results } = await c.env.DB.prepare(sql).bind(...binds).all<{
@@ -1516,7 +1621,9 @@ pub.get('/market/hs-codes', async (c) => {
                    WHERE stream = 'goods' AND length(hs_code) = 6 AND partner_iso3 IS NULL
                      AND flow = 'export'`;
 
-  if (!q) {
+  if (hsCfg) {
+    // The catalogue above already holds every product; matching and ranking happen below.
+  } else if (!q) {
     await collect(`${SELECT} GROUP BY hs_code ORDER BY total_value DESC LIMIT ?`, [LIMIT * 4]);
   } else {
     for (const token of expanded.tokens.slice(0, 6)) {
@@ -1582,6 +1689,27 @@ pub.get('/market/products', async (c) => {
   if (!isChapter && !isSpecific) {
     return bad('hs must be a 2-digit HS chapter or 6-digit HS product code', 400);
   }
+  const marketCfg = oracleConfig(c.env);
+  if (marketCfg) {
+    try {
+      const settings = await loadSettings(c.env);
+      const data = await loadCountryData(c.env, marketCfg);
+      const global = await loadClassifications(c.env.DB, '*');
+      return json(
+        buildMarketProducts({
+          hs,
+          data,
+          settings,
+          topN: MARKET_TOP_N,
+          category: classify(hs, global, new Set()),
+          label: isSpecific ? hs6Label(hs) : hs2Label(hs),
+        }),
+      );
+    } catch {
+      return bad('Trade data service is unavailable', 502);
+    }
+  }
+
   // Exact match at whichever level was asked for. A chapter request reads the
   // chapter row, which already contains everything under it. Matching on a
   // prefix would also pick up the HS6 children stored alongside it and count

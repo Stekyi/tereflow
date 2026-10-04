@@ -6,6 +6,11 @@ from pathlib import Path
 
 import oracledb
 
+# Return CLOB columns as plain strings fetched with the row. The default hands back a LOB locator,
+# and every .read() on it is a separate network round trip: with 11,000 scored products and four
+# CLOBs each, that turned a seconds-long step into a stall of tens of minutes.
+oracledb.defaults.fetch_lobs = False
+
 from .config import need
 
 SCHEMA_DIR = Path(__file__).resolve().parents[1] / "schema"

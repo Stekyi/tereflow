@@ -106,15 +106,23 @@ export function classify(
 ): ExportCategory {
   if (!hsCode) return 'non_traditional';
 
-  // Exact product classification wins. This is the admin control for HS6
-  // products and deliberately sits above the broader chapter rule.
-  const exact = resolved.get(hsCode);
-  if (exact) return exact.category;
+  // The most specific rule wins: the exact code, then each shorter prefix down to the HS2 chapter.
+  // A rule on HS4 heading 1801 (cocoa beans) therefore covers 180100 without touching 1803 (cocoa
+  // paste), and a rule on a chapter covers everything beneath it. Checking only the exact code and the
+  // chapter, as this once did, silently ignored every heading-level rule.
+  const rule = longestRule(hsCode, resolved);
+  if (rule) return rule.category;
 
-  const chapter = chapterOf(hsCode);
-  const chapterRow = resolved.get(chapter);
-  if (chapterRow) return chapterRow.category;
-  return dominant.has(chapter) ? 'traditional' : 'non_traditional';
+  return dominant.has(chapterOf(hsCode)) ? 'traditional' : 'non_traditional';
+}
+
+/** The classification row for the longest prefix of hsCode (down to two digits), if any. */
+export function longestRule<T>(hsCode: string, resolved: Map<string, T>): T | undefined {
+  for (let len = hsCode.length; len >= 2; len -= 1) {
+    const row = resolved.get(hsCode.slice(0, len));
+    if (row) return row;
+  }
+  return undefined;
 }
 
 function classificationSource(
@@ -122,12 +130,9 @@ function classificationSource(
   resolved: Map<string, ExportClassification>,
   dominant: Set<string>,
 ): ResolvedClassification['source'] {
-  const exact = resolved.get(hsCode);
-  if (exact) return exact.entity_id === '*' ? 'default' : 'override';
-  const chapter = chapterOf(hsCode);
-  const row = resolved.get(chapter);
+  const row = longestRule(hsCode, resolved);
   if (row) return row.entity_id === '*' ? 'default' : 'override';
-  return dominant.has(chapter) ? 'heuristic' : 'default';
+  return dominant.has(chapterOf(hsCode)) ? 'heuristic' : 'default';
 }
 
 /** The full ~97-chapter resolved view for the admin curation screen. */

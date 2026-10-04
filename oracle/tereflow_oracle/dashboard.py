@@ -181,10 +181,12 @@ def build_dashboard(reporter: str, product_rows: list[tuple], partner_rows: list
             "partners_export": rank_partners("X"), "partners_import": rank_partners("M"), "trend": trend}
 
 
-def load_dashboard(conn, reporter: str) -> dict | None:
+def load_dashboard(conn, reporter: str, prows: list | None = None) -> dict | None:
+    """prows lets a caller that already ran the product-totals aggregate share it (it scans every fact)."""
     cur = conn.cursor()
-    cur.execute(PRODUCT_TOTALS_SQL, {"rep": reporter})
-    prows = cur.fetchall()
+    if prows is None:
+        cur.execute(PRODUCT_TOTALS_SQL, {"rep": reporter})
+        prows = cur.fetchall()
     cur.execute(PARTNER_TOTALS_SQL, {"rep": reporter})
     parts = cur.fetchall()
     d = build_dashboard(reporter, prows, parts)
@@ -196,11 +198,13 @@ def load_dashboard(conn, reporter: str) -> dict | None:
     return d
 
 
-def load_lines(conn, reporter: str, flow: str) -> dict | None:
+def load_lines(conn, reporter: str, flow: str, prows: list | None = None) -> dict | None:
     """Product lines for the latest year of a flow, for the family grouping done in the Worker."""
-    cur = conn.cursor()
-    cur.execute(PRODUCT_TOTALS_SQL, {"rep": reporter})
-    rows = [r for r in cur.fetchall() if r[0] == flow and r[5] is not None]
+    if prows is None:
+        cur = conn.cursor()
+        cur.execute(PRODUCT_TOTALS_SQL, {"rep": reporter})
+        prows = cur.fetchall()
+    rows = [r for r in prows if r[0] == flow and r[5] is not None]
     if not rows:
         return None
     year = max(int(r[1]) for r in rows)
@@ -214,8 +218,11 @@ def load_lines(conn, reporter: str, flow: str) -> dict | None:
 def refresh_dashboard(conn, reporter: str) -> int:
     """Store the dashboard and family line payloads for one reporter. Returns payloads written."""
     from . import opportunity
-    payloads = {"dashboard": load_dashboard(conn, reporter),
-                "lines_X": load_lines(conn, reporter, "X"), "lines_M": load_lines(conn, reporter, "M")}
+    cur0 = conn.cursor()
+    cur0.execute(PRODUCT_TOTALS_SQL, {"rep": reporter})
+    prows = cur0.fetchall()           # one scan of the facts, shared by all three payloads
+    payloads = {"dashboard": load_dashboard(conn, reporter, prows),
+                "lines_X": load_lines(conn, reporter, "X", prows), "lines_M": load_lines(conn, reporter, "M", prows)}
     if reporter in opportunity.CONFIG:
         # Chapter exclusions are the admin's (D1 classification), so the cached feeds only drop the size floor.
         payloads["blue_oceans"] = {"reporter": reporter, "blue_oceans": opportunity.blue_oceans(conn, reporter, 200, apply_config_exclusions=False)}

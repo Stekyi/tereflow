@@ -88,6 +88,15 @@ Cloudflare D1 still holds users, sessions, the network feature, the country regi
 - `below_floor` (market under $1M, or a total line) is stored separately from `is_excluded` so the feeds can apply the size floor without the old chapter list.
 - Data is displayed at the deepest level Comtrade reports: HS6 for Ghana, HS8 or HS10 for a reporter with genuine tariff-line data. The level is on every row.
 
+## Ingesting large countries (the UK as the worked example)
+
+- Comtrade caps every response at 100,000 rows, and returns exactly 100,000 when it has cut the answer short (asking for 250,000 still gives 100,000). The client therefore asks for each group of 20 partners separately, plus the World row, and halves any group that comes back at the cap. A single partner that alone fills the cap marks the year FAILED instead of storing a partial year.
+- Partner codes that Comtrade reports separately but that share a country (the USA as 840/841/842, Switzerland as 756/757) are summed, never overwritten. The not-elsewhere-specified areas keep their own codes.
+- Tariff-line data is announced for the UK (8-digit, 1.4M to 5.8M records a year) but the API serves no rows for it, as for Ghana, the USA and Kenya. The resolver falls back to HS6 after a single request, and the level is recorded on every row.
+- UK 2021-2025: 1,925,868 rows at HS6, about 1.5 minutes per country-flow-year. Partner sums equal Comtrade's World totals to 0.000% in all ten country-flow-years, with no missing values.
+- Oracle CLOB columns are fetched inline (`oracledb.defaults.fetch_lobs = False`). The default returns a locator and each `.read()` is a network round trip, which stalled the opportunity and Blue Ocean steps for tens of minutes at 11,000 products.
+- The analytics for the UK take about 8 minutes (metrics over 1.9M facts, scoring 11,226 products, five cached payloads).
+
 ## Scheduling
 
 Weekly is enough: unchanged years cost two availability calls. Windows: `schedule-oracle.ps1`. OCI VM: `0 3 * * 1 cd /opt/tereflow/oracle && PYTHONPATH=. python -m tereflow_oracle ingest`.

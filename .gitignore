@@ -49,3 +49,5 @@ e2e-out.txt
 # Python caches
 __pycache__/
 .pytest_cache/
+
+logs/

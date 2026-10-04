@@ -39,6 +39,8 @@ export interface TradeSandboxPartner {
   years: number[];
   totals: TradeSandboxYearTotal[];
   products: TradeSandboxProduct[];
+  /** Rows Comtrade stored without a value (Oracle path). Not zero, and not shown in products. */
+  unreported_rows?: number;
 }
 
 export interface TradeSandboxResponse {

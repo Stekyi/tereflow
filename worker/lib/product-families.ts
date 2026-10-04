@@ -1,6 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { disambiguateProductNames, shortProductName } from '../../shared/product-name';
-import { hs2Sector } from '../agent/codes';
+import { hs2Sector, hs6Label } from '../agent/codes';
 
 /**
  * Product families: the same trade, split by the tariff into bands.
@@ -168,6 +168,20 @@ export async function loadProductFamilies(
     .bind(entityId, flow, year)
     .first<{ total: number | null }>();
 
+  return buildFamilies(rows, year, chapterTotal?.total ?? null, limit);
+}
+
+/**
+ * The grouping itself, separate from where the rows came from, so the D1 and
+ * Oracle paths produce identical families from identical lines.
+ */
+export function buildFamilies(
+  rows: Row[],
+  year: number,
+  countryTotal: number | null,
+  limit = 12,
+): FamilyBreakdown | null {
+  if (rows.length === 0) return null;
   const groups = new Map<string, Row[]>();
   let total = 0;
 
@@ -228,8 +242,7 @@ export async function loadProductFamilies(
     }
   }
 
-  const countryTotal = chapterTotal?.total ?? null;
-  // Only worth saying when the two genuinely differ. Where a country files
+    // Only worth saying when the two genuinely differ. Where a country files
   // everything at HS6 the note would be noise.
   const shortfall = countryTotal != null ? countryTotal - total : 0;
   const coverageNote =
@@ -252,4 +265,28 @@ function fmtBn(n: number): string {
   if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}bn`;
   if (n >= 1e6) return `$${(n / 1e6).toFixed(0)}m`;
   return `$${Math.round(n).toLocaleString()}`;
+}
+
+/** Oracle path: the lines come from the Oracle API, the grouping is the same code. */
+export async function loadProductFamiliesOracle(
+  oracle: { url: string; token: string; iso3: string },
+  flow: 'import' | 'export',
+  limit = 12,
+): Promise<FamilyBreakdown | null> {
+  try {
+    const res = await fetch(
+      `${oracle.url.replace(/\/$/, '')}/api/lines/${encodeURIComponent(oracle.iso3)}?flow=${flow === 'import' ? 'M' : 'X'}`,
+      { headers: { authorization: `Bearer ${oracle.token}` }, signal: AbortSignal.timeout(20_000) },
+    );
+    if (!res.ok) return null;
+    const body = (await res.json()) as {
+      year: number;
+      country_total_usd: number | null;
+      lines: Array<{ hs_code: string; product_name: string | null; value_usd: number }>;
+    };
+    const lines = body.lines.map((l) => ({ ...l, product_name: hs6Label(l.hs_code, l.product_name) }));
+    return buildFamilies(lines, body.year, body.country_total_usd, limit);
+  } catch {
+    return null;
+  }
 }

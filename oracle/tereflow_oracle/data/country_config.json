@@ -1,0 +1,16 @@
+{
+  "GHA": {
+    "scoring": {"market_size": 0.30, "growth": 0.25, "import_dependency": 0.20, "stability": 0.15, "supplier_concentration": 0.10},
+    "excluded": [
+      {"codes": ["26"], "reason": "Metal ores and concentrates. Extractive, not a manufacturing opportunity."},
+      {"codes": ["27"], "reason": "Mineral fuels and oils. Ghana's traditional petroleum trade dominates any ranking it enters."},
+      {"codes": ["71"], "reason": "Pearls, precious stones and metals. Gold is Ghana's largest export and swamps every comparison."},
+      {"codes": ["72", "73"], "reason": "Iron and steel. Bulk commodity inputs priced on world markets rather than local demand."},
+      {"codes": ["74", "75", "76", "78", "79", "80", "81"], "reason": "Base metals. Commodity trade rather than a product opportunity."},
+      {"codes": ["88", "89"], "reason": "Aircraft and ships. Capital equipment with no plausible local substitution."},
+      {"codes": ["93"], "reason": "Arms and ammunition."},
+      {"codes": ["97"], "reason": "Works of art and antiques. Not a market that behaves like trade."},
+      {"codes": ["98", "99"], "reason": "Unclassified and special transactions. Residual accounting lines, not products."}
+    ]
+  }
+}

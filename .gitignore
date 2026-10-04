@@ -45,3 +45,7 @@ extract/.pytest_cache/.manual-verification/
 gexp*.txt
 ghana-*.txt
 e2e-out.txt
+
+# Python caches
+__pycache__/
+.pytest_cache/

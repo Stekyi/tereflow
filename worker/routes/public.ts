@@ -11,7 +11,8 @@ import { budgetFit } from '../../shared/budget';
 import { buildProductInsight } from '../lib/product-insight';
 import { loadBlueOceans, type BlueOceanVisibility, type ViewerTier } from '../lib/blue-oceans';
 import { loadMarketContext } from '../lib/market-context';
-import { loadProductFamilies } from '../lib/product-families';
+import { isOpportunityEligible, recommend, type SignalDraft } from '../agent/analyse';
+import { loadProductFamilies, loadProductFamiliesOracle } from '../lib/product-families';
 import { loadSettings, type Settings } from '../lib/settings';
 import {
   classify,
@@ -138,7 +139,7 @@ pub.get('/dashboard/:slug', async (c) => {
   const viewer = await currentUser(c.req.raw, c.env);
   const isPremium = isEntitled(viewer);
 
-  const [overview, topExports, topImports, services, partnersExport, partnersImport, trend, recs] =
+  let [overview, topExports, topImports, services, partnersExport, partnersImport, trend, recs] =
     await Promise.all([
       loadResult<Overview>(c.env.DB, entity.id, 'overview'),
       loadResult<RankedItem[]>(c.env.DB, entity.id, 'top_exports'),
@@ -149,6 +150,45 @@ pub.get('/dashboard/:slug', async (c) => {
       loadResult<TrendPoint[]>(c.env.DB, entity.id, 'yearly_trend'),
       loadResult<Recommendation[]>(c.env.DB, entity.id, 'recommendations'),
     ]);
+
+  // Trade-derived figures come from Oracle when it is configured. Services,
+  // market context, recommendations and the momentum signals are not derived
+  // from trade facts and still come from D1.
+  const oracleDash = c.env.ORACLE_API_URL && c.env.ORACLE_API_TOKEN && entity.iso3
+    ? { url: c.env.ORACLE_API_URL, token: c.env.ORACLE_API_TOKEN, iso3: entity.iso3 }
+    : null;
+  let oracleComputedAt: string | null = null;
+  if (oracleDash) {
+    try {
+      const res = await fetch(`${oracleDash.url.replace(/\/$/, '')}/api/dashboard/${encodeURIComponent(oracleDash.iso3)}`, {
+        headers: { authorization: `Bearer ${oracleDash.token}` },
+        signal: AbortSignal.timeout(25_000),
+      });
+      if (res.status === 404) {
+        // Oracle has nothing for this country yet: say so rather than show stale D1 numbers.
+        overview = null; topExports = []; topImports = []; partnersExport = []; partnersImport = []; trend = [];
+      } else if (!res.ok) {
+        return bad('Trade data service is unavailable', 502);
+      } else {
+        const d = (await res.json()) as {
+          overview: Overview; top_exports: RankedItem[]; top_imports: RankedItem[];
+          partners_export: RankedItem[]; partners_import: RankedItem[]; trend: TrendPoint[]; computed_at: string | null;
+        };
+        overview = {
+          ...d.overview,
+          services_export_usd: overview?.services_export_usd ?? null,
+          services_import_usd: overview?.services_import_usd ?? null,
+        };
+        // The same curated product labels the D1 pipeline stored, ahead of Comtrade's long descriptions.
+        const labelled = (items: RankedItem[]) => items.map((r) => ({ ...r, name: hs6Label(r.code, r.name) }));
+        topExports = labelled(d.top_exports); topImports = labelled(d.top_imports);
+        partnersExport = d.partners_export; partnersImport = d.partners_import; trend = d.trend;
+        oracleComputedAt = d.computed_at;
+      }
+    } catch {
+      return bad('Trade data service is unavailable', 502);
+    }
+  }
 
   const { results: signals } = await c.env.DB.prepare(
     `SELECT id, hs_code, product_name, flow, cagr_3y, momentum,
@@ -175,21 +215,27 @@ pub.get('/dashboard/:slug', async (c) => {
   // Grouped over every line rather than over the ranked twelve. Summing the
   // ranked list would understate each family by whatever fell below the cutoff
   // and label the result a total.
-  const [familiesImport, familiesExport] = await Promise.all([
-    loadProductFamilies(c.env.DB, entity.id, 'import'),
-    loadProductFamilies(c.env.DB, entity.id, 'export'),
-  ]);
+  const [familiesImport, familiesExport] = await Promise.all(
+    oracleDash
+      ? [loadProductFamiliesOracle(oracleDash, 'import'), loadProductFamiliesOracle(oracleDash, 'export')]
+      : [loadProductFamilies(c.env.DB, entity.id, 'import'), loadProductFamilies(c.env.DB, entity.id, 'export')],
+  );
 
   // Blue oceans are gated twice: by what the admin published for this country,
   // and by who is asking. Anonymous readers never see them under either
   // setting, so the tier is resolved from the session rather than assumed.
   const viewerTier: ViewerTier = !viewer ? 'anonymous' : isPremium ? 'premium' : 'registered';
-  const blueOceans = entity.iso2
+  const oracleBlue = c.env.ORACLE_API_URL && c.env.ORACLE_API_TOKEN
+    ? { url: c.env.ORACLE_API_URL, token: c.env.ORACLE_API_TOKEN, iso3: entity.iso3 ?? null }
+    : undefined;
+  const blueOceans = entity.iso2 || (oracleBlue && entity.iso3)
     ? await loadBlueOceans(
         c.env.DB,
-        entity.iso2,
+        entity.iso2 ?? '',
         (entity.blue_ocean_visibility ?? 'hidden') as BlueOceanVisibility,
         viewerTier,
+        12,
+        oracleBlue,
       )
     : {
         blue_oceans: null,
@@ -203,6 +249,29 @@ pub.get('/dashboard/:slug', async (c) => {
   const classifications = await loadClassifications(c.env.DB, entity.id);
   const settings = await loadSettings(c.env);
   const dominant = dominantCodes(overview?.export_chapter_shares, settings.dominantShareThreshold);
+  // The recommendations are written from the overview, ranked lists and
+  // signals. With Oracle serving those figures they are rewritten from the same
+  // numbers, so a card cannot contradict the table beside it. The services card
+  // is not trade-derived and is kept from D1.
+  if (oracleDash && overview) {
+    const eligibleImports = (topImports ?? []).filter((p) => isOpportunityEligible(p.code, classifications, dominant));
+    const drafts = (signals ?? [])
+      .filter((s) => s.cagr_3y != null)
+      .map((s) => ({ product_name: s.product_name, cagr_3y: s.cagr_3y, momentum: s.momentum, rationale: s.rationale ?? '' }));
+    const regenerated = recommend(
+      entity.name, overview, topExports ?? [], topImports ?? [], eligibleImports,
+      partnersExport ?? [], partnersImport ?? [], drafts as unknown as SignalDraft[],
+      { gdp_by_year: {}, services_export_by_year: {}, services_import_by_year: {}, gns_export_by_year: {}, gns_import_by_year: {} },
+      overview.year,
+    );
+    const servicesCard = (recs ?? []).find((r) => r.headline === 'Services are a real part of this economy');
+    if (servicesCard) {
+      const at = regenerated.findIndex((r) => r.angle === 'timing');
+      regenerated.splice(at === -1 ? regenerated.length : at, 0, servicesCard);
+    }
+    recs = regenerated;
+  }
+
   const tagProducts = (items: RankedItem[]) =>
     items.map((r) => ({ ...r, category: classify(r.code, classifications, dominant) }));
 
@@ -224,7 +293,7 @@ pub.get('/dashboard/:slug', async (c) => {
     market_context: marketContext,
     families_import: familiesImport,
     families_export: familiesExport,
-    computed_at: computed?.at ?? null,
+    computed_at: oracleComputedAt ?? computed?.at ?? null,
   };
 
   // Cached only for anonymous readers. The payload's `opportunities` field
@@ -241,7 +310,7 @@ pub.get('/dashboard/:slug', async (c) => {
   );
 });
 
-/** Where the numbers came from — shown under every dashboard. */
+/** Where the numbers came from Ã¢â‚¬â€ shown under every dashboard. */
 pub.get('/dashboard/:slug/sources', async (c) => {
   const entity = await getEntityBySlug(c.env.DB, c.req.param('slug'));
   if (!entity) return bad('Not found', 404);
@@ -364,6 +433,26 @@ pub.post('/trade/sandbox', async (c) => {
   const emptyBody: { primary?: string; partners?: string[] } = {};
   const body = await c.req.json<{ primary?: string; partners?: string[] }>().catch(() => emptyBody);
   const primarySlug = String(body.primary ?? '').trim();
+  if (c.env.ORACLE_API_URL && c.env.ORACLE_API_TOKEN) {
+    // Oracle is the source of truth for trade facts. A failure is reported as
+    // such rather than quietly falling back to older D1 data.
+    try {
+      const res = await fetch(`${c.env.ORACLE_API_URL.replace(/\/$/, '')}/api/trade/sandbox`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${c.env.ORACLE_API_TOKEN}` },
+        body: JSON.stringify({ primary: primarySlug, partners: body.partners ?? [] }),
+        signal: AbortSignal.timeout(25_000),
+      });
+      const text = await res.text();
+      if (res.status >= 500 || res.status === 401) return bad('Trade data service is unavailable', 502);
+      return new Response(text, {
+        status: res.status,
+        headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+      });
+    } catch {
+      return bad('Trade data service is unavailable', 502);
+    }
+  }
   const partnerIso3s: string[] = [...new Set(
     (body.partners ?? []).map((x) => String(x).trim().toUpperCase()).filter((iso3) => iso3.length > 0),
   )].slice(0, 12);
@@ -1205,7 +1294,7 @@ pub.get('/opportunities', async (c) => {
   // dominant legacy commodity (Ghanaian cocoa is always top-5, never a
   // "signal"). What that exclusion does NOT catch is a smaller, growing
   // mining/oil-type category that isn't top-5 yet but is still never
-  // realistically SME-accessible — the universal defaults + admin overrides
+  // realistically SME-accessible Ã¢â‚¬â€ the universal defaults + admin overrides
   // below catch that.
   const classificationsByEntity = await loadClassificationsBulk(
     c.env.DB,
@@ -1341,7 +1430,7 @@ pub.get('/market/hs-codes', async (c) => {
 /**
  * Product view: for one HS2 product/service chapter, rank every country by
  * trade volume. Partner detail attached per country is that country's own
- * general trading partners (already computed) — never product-specific,
+ * general trading partners (already computed) Ã¢â‚¬â€ never product-specific,
  * because Comtrade's keyless tier never fetches partner x HS-code together.
  */
 pub.get('/market/products', async (c) => {
@@ -1432,3 +1521,5 @@ pub.get('/registry', async (c) => {
   const withSources = await attachSources(c.env.DB, results ?? []);
   return json({ entities: withSources, count: withSources.length });
 });
+
+

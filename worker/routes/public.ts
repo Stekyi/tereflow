@@ -1054,6 +1054,12 @@ function toProductCard(
   };
 }
 
+/** National feeds can carry 8-digit codes (HS8/CN8); the product views are keyed on the 6-digit heading. */
+function normaliseHs(raw: string): string {
+  const s = raw.trim();
+  return /^\d{7,10}$/.test(s) ? s.slice(0, 6) : s;
+}
+
 /**
  * The product insight behind the modal.
  *
@@ -1062,7 +1068,7 @@ function toProductCard(
  * the global lists, which is what the country page does.
  */
 pub.get('/insight/:hs', async (c) => {
-  const hs = c.req.param('hs').trim();
+  const hs = normaliseHs(c.req.param('hs'));
   if (!/^\d{2}$|^\d{6}$/.test(hs)) {
     return bad('hs must be a 2-digit chapter or 6-digit product code', 400);
   }
@@ -1096,7 +1102,7 @@ pub.get('/insight/:hs', async (c) => {
  * happened to be listed under.
  */
 pub.get('/products/:hs', async (c) => {
-  const hs = c.req.param('hs').trim();
+  const hs = normaliseHs(c.req.param('hs'));
   if (!/^\d{2}$|^\d{6}$/.test(hs)) {
     return bad('hs must be a 2-digit chapter or 6-digit product code', 400);
   }

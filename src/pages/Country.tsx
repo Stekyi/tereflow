@@ -281,13 +281,32 @@ export default function Country() {
         iso3={data.entity.iso3}
         sub={data.entity.continent ?? ''}
         action={
-          <FollowButton
-            kind="country"
-            value={data.entity.slug}
-            label={data.entity.name}
-            following={subs.has(subKey('country', data.entity.slug))}
-            onChange={toggleFollow}
-          />
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <Link className="btn" to={`/sandbox?primary=${encodeURIComponent(data.entity.slug)}`}>
+              Open Trade Sandbox
+            </Link>
+            {data.blue_ocean_visibility !== 'hidden' &&
+              (data.blue_oceans !== null ? (
+                <a className="btn" href="#blue-oceans">
+                  Blue oceans
+                </a>
+              ) : user ? (
+                <Link className="btn gold" to="/upgrade">
+                  Blue oceans · Premium
+                </Link>
+              ) : (
+                <Link className="btn" to={`/join?next=/country/${data.entity.slug}`}>
+                  Blue oceans · Join free
+                </Link>
+              ))}
+            <FollowButton
+              kind="country"
+              value={data.entity.slug}
+              label={data.entity.name}
+              following={subs.has(subKey('country', data.entity.slug))}
+              onChange={toggleFollow}
+            />
+          </div>
         }
       />
       <p className="tiny dim" style={{ margin: '-6px 0 14px' }}>

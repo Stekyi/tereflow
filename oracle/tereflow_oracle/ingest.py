@@ -1,4 +1,4 @@
-"""Incremental, resumable, classification-aware Comtrade ingestion into Oracle."""
+﻿"""Incremental, resumable, classification-aware Comtrade ingestion into Oracle."""
 from __future__ import annotations
 import json
 import uuid
@@ -326,3 +326,12 @@ def default_years(back: int = 4) -> list[int]:
     last = datetime.now(timezone.utc).year - 1
     return list(range(last - back + 1, last + 1))
 
+
+def incremental_years(conn, iso3: str, base: int = 5) -> list[int]:
+    "Base years that are not yet complete in both flows, plus the current year."
+    now = datetime.now(timezone.utc).year
+    want = list(range(now - base, now))
+    cur = conn.cursor()
+    cur.execute("SELECT year, COUNT(DISTINCT flow) FROM tf_ingest_state WHERE reporter_iso3 = :1 AND status = 'SUCCESS' GROUP BY year", [iso3])
+    done = {y for y, n in cur if n >= 2}
+    return sorted({y for y in want if y not in done} | {now})

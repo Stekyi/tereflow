@@ -11,7 +11,7 @@ import requests
 
 from .config import load_env, need
 from . import db, analytics, opportunity, dashboard, ords
-from .ingest import Ingestor, ISO3_M49, default_years
+from .ingest import Ingestor, ISO3_M49, default_years, incremental_years
 from .comtrade import Comtrade
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -72,10 +72,23 @@ def cmd_ingest(conn, a):
     countries = [c.upper() for c in a.country] or active_countries(conn)
     if not countries:
         sys.exit("No active countries in Oracle. Run sync-countries or pass --country.")
-    years = a.years or default_years(a.years_back)
     client = Comtrade(pace_s=float(os.environ.get("TEREFLOW_CALL_PACE_MS", "1200")) / 1000)
     ing = Ingestor(conn, client, force=a.force, dry_run=a.dry_run)
-    s = ing.run(countries, years)
+    if a.incremental:
+        # The closed base years rarely change, so a routine run only fills gaps in the base and then follows the current year.
+        s = None
+        for c in countries:
+            yrs = incremental_years(conn, c, a.base_years)
+            print(f"{c}: incremental years {yrs}")
+            r = ing.run([c], yrs)
+            if s is None:
+                s = r
+            else:
+                s.success += r.success; s.skipped += r.skipped; s.no_data += r.no_data
+                s.failed += r.failed; s.rows += r.rows
+                s.stopped_on_rate_limit = s.stopped_on_rate_limit or r.stopped_on_rate_limit
+    else:
+        s = ing.run(countries, a.years or default_years(a.years_back))
     print(f"run {s.run_id}: {s.status} success={s.success} skipped={s.skipped} no_data={s.no_data} failed={s.failed} rows={s.rows:,}")
     if not a.dry_run and s.status in ("SUCCESS", "PARTIAL") and not a.no_analytics:
         for c in countries:
@@ -136,6 +149,8 @@ def main(argv=None):
     i.add_argument("--force", action="store_true")
     i.add_argument("--dry-run", action="store_true")
     i.add_argument("--no-analytics", action="store_true")
+    i.add_argument("--incremental", action="store_true", help="fill gaps in the base years, then only the current year")
+    i.add_argument("--base-years", type=int, default=5)
     an = sub.add_parser("analytics")
     an.add_argument("--country", nargs="*", default=[])
     a = p.parse_args(argv)

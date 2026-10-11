@@ -96,7 +96,17 @@ try {
   const countries = JSON.parse(out['snap:/api/countries']).countries ?? [];
   for (const c of countries.filter((x) => x.is_active && x.slug)) {
     const p = `/api/dashboard/${c.slug}`;
-    const body = await get(p);
+    // A dashboard with figures but no product families means the Worker swallowed an Oracle error while building it
+    // (it returns null for that part). Rebuild rather than store a half-empty page.
+    let body = '';
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      body = await get(p);
+      const d = JSON.parse(body);
+      const hasFigures = d.overview && (d.overview.export_usd > 0 || d.overview.import_usd > 0);
+      if (!hasFigures || d.families_import || d.families_export) break;
+      if (attempt === 4) throw new Error(`${p} has figures but no product families after 4 builds`);
+      await new Promise((res) => setTimeout(res, 3000));
+    }
     if (JSON.parse(body).inactive) continue;
     out[`snap:${p}`] = body;
     console.log(`  built ${p} (${body.length} bytes)`);

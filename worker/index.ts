@@ -8,6 +8,7 @@ import { premium } from './routes/premium';
 import { feedback } from './routes/feedback';
 import { portal } from './routes/portal';
 import { ghana } from './routes/ghana';
+import { serveSnapshot } from './lib/snapshot';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -55,6 +56,9 @@ app.use('*', async (c, next) => {
 app.get('/api/health', (c) =>
   c.json({ ok: true, app: c.env.APP_NAME ?? 'Tereflow', ts: new Date().toISOString() }),
 );
+
+// Stored snapshots of the heaviest anonymous pages. Mounted ahead of every route so a hit never runs their code.
+app.use('/api/*', serveSnapshot);
 
 // Mounted before /api/admin so the more specific prefix is matched first and
 // route resolution does not depend on the admin router having no catch-all.

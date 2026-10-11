@@ -101,6 +101,16 @@ Cloudflare D1 still holds users, sessions, the network feature, the country regi
 
 Weekly is enough: unchanged years cost two availability calls. Windows: `schedule-oracle.ps1`. OCI VM: `0 3 * * 1 cd /opt/tereflow/oracle && PYTHONPATH=. python -m tereflow_oracle ingest`.
 
+## Page snapshots (run after every ingest)
+
+The Worker runs on the free Cloudflare plan, where a request that spends more than about 10 ms of CPU can fail with error 1102. The dashboard, product list and opportunities feed exceed that once an isolate is cold, and failures appeared a few minutes after each deploy. So the anonymous versions of those pages are built on the operator's machine and stored in KV:
+
+- `npm run snapshots` (about a minute) exports the non-personal D1 tables to a throwaway local database, runs the Worker locally against Oracle through ORDS (credentials from `.dev.vars`), captures `/api/countries`, `/api/opportunities`, `/api/products?limit=40` and `/api/dashboard/{slug}` for every active country, and writes them to the `CACHE` namespace as `snap:*` keys with a two-day expiry.
+- The deployed Worker (`worker/lib/snapshot.ts`) serves a stored snapshot (header `x-snapshot: hit`) only to anonymous readers asking for exactly those URLs. Signed-in readers, any other query string, and any URL without a snapshot go through the live route, so an empty KV changes nothing.
+- Re-run it after each ingest and after changing an admin setting that affects these pages (classifications, blue-ocean visibility). Until then anonymous readers see the previous build, for at most two days.
+
+After the first build on 11 Oct 2026, 60 of 60 requests at 4 and 9 minutes after a deploy succeeded, where before 13 of 18 and then 18 of 18 had failed.
+
 ## Secrets
 
 `.env`, `Wallet_tereflow/` and `test_oracle_connect.py` are gitignored. Variables are in `local/.env.example`. In production keep the wallet on the VM (or OCI Vault), never in GitHub or Cloudflare.

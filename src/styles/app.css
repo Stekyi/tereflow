@@ -2901,7 +2901,7 @@ textarea {
   background: var(--surface); border: 1px solid var(--line-soft); border-radius: 20px; box-shadow: var(--card-shadow);
 }
 .mm-stat strong { display: block; font-size: clamp(30px, 6vw, 46px); line-height: 1; letter-spacing: -0.03em; color: var(--brand); font-weight: 800; }
-.mm-stat span { display: block; margin-top: 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.mm-stat > span { display: block; margin-top: 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
 @media (min-width: 720px) { .mm-stats { grid-template-columns: repeat(5, 1fr); padding: 26px 30px; } }
 
 .mm-section-head { margin: 26px 0 8px; }
@@ -3047,4 +3047,33 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
   .mm-story *, .mm-hero::before, .mm-hero::after { animation: none !important; }
   .mm-story .sc1 { opacity: 1; }
+}
+/* ---------- Opportunities ---------- */
+.mm-opp { padding: 20px; margin-bottom: 14px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 18px; box-shadow: var(--card-shadow); transition: border-color .15s, box-shadow .15s; }
+.mm-opp:hover { border-color: var(--brand); box-shadow: var(--lift); }
+.mm-opp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.mm-opp-head h3 { margin: 8px 0 4px; font-size: 18px; line-height: 1.3; color: var(--ink); }
+.mm-opp-fig { text-align: right; flex: none; }
+.mm-opp-fig strong { display: block; font-size: 22px; letter-spacing: -0.02em; color: var(--brand); }
+.mm-opp-fig span { font-size: 13px; font-weight: 700; }
+.mm-opp-fig .up { color: var(--up); }
+.mm-opp-fig .down { color: var(--down); }
+.mm-opp-why { margin: 12px 0 8px; font-size: 14.5px; line-height: 1.6; color: var(--text); }
+.mm-opp-partners { margin: 0 0 4px; }
+.mm-opp-actions { margin-top: 8px; }
+@media (max-width: 560px) { .mm-opp-head { flex-direction: column; } .mm-opp-fig { text-align: left; } }
+/* The scene as a backdrop behind the headline, the way the footage sits behind MyMarkets' hero: full height on the
+   right, fading out toward the text so the words stay readable on the white page. */
+.mm-hero { grid-template-columns: 1fr; min-height: 420px; align-content: center; }
+.mm-hero .mm-hero-copy { position: relative; z-index: 1; max-width: 620px; }
+.mm-hero .mm-hero-scene {
+  position: absolute; z-index: -1; top: 0; right: 0; bottom: 0; width: 68%; height: 100%; max-width: none;
+  border-radius: 28px; box-shadow: none; opacity: .92;
+  -webkit-mask-image: linear-gradient(to left, #000 45%, transparent 100%);
+  mask-image: linear-gradient(to left, #000 45%, transparent 100%);
+}
+.mm-hero .mm-hero-scene .cap, .mm-hero .mm-hero-scene .lab { display: none; }
+@media (max-width: 899px) {
+  .mm-hero { min-height: 0; }
+  .mm-hero .mm-hero-scene { width: 100%; opacity: .26; -webkit-mask-image: none; mask-image: none; border-radius: 22px; }
 }

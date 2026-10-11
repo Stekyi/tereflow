@@ -1,309 +1,158 @@
 /**
- * Ghana opportunities, from Ghana's own statistics.
+ * Opportunities: where the data shows an opening.
  *
- * Everything on this page is precomputed and stored. Opening it does not call
- * StatBank.
- *
- * The design rule here is that a number never appears without what it rests on.
- * Score sits next to confidence, because a high score on two years of chapter
- * data is a real thing and hiding the second number would make the first one a
- * lie. Limitations are shown rather than tucked behind a tooltip, and when the
- * last ingest failed the page says so instead of quietly serving old figures as
- * though they were current.
+ * The cross-country feed behind /api/opportunities: the lines with the strongest recent movement in every market
+ * Tereflow has analysed, each with the evidence it rests on (value, three-year growth, the main partners) and a
+ * plain-language reason. It is a ranking of momentum, not a promise of profit, and the page says so.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, type OpportunityFeed, type TradeOpportunity } from '../lib/api';
+import { api } from '../lib/api';
 import { usePageTitle } from '../lib/pageTitle';
+import { Chips, Empty, Skeletons } from '../components/ui';
+import ProductModal from '../components/ProductModal';
+import { CountUp } from '../components/TradeStory';
+import { shortProductName } from '../../shared/product-name';
+import { fmtPct, fmtUsd, type ExploreOpportunity } from '../../shared/types';
 
-const CONFIDENCE_LABEL: Record<string, string> = {
-  high: 'High confidence',
-  medium: 'Medium confidence',
-  low: 'Low confidence',
-};
+type FlowFilter = 'all' | 'export' | 'import';
 
-const SIGNAL_LABEL: Record<string, string> = {
-  import_substitution: 'Import substitution',
-  supplier_diversification: 'Supplier diversification',
-  export_growth: 'Export growth',
-};
-
-const TREND_LABEL: Record<string, string> = {
-  growing: 'Growing',
-  declining: 'Declining',
-  stable: 'Stable',
-  volatile: 'Volatile',
-  insufficient_data: 'Not enough data',
-};
+function codeOf(o: ExploreOpportunity): string {
+  // Ids end in the product code ("united-kingdom-M-87036010").
+  return o.id.slice(o.id.lastIndexOf('-') + 1);
+}
 
 export default function Opportunities() {
-  const [feed, setFeed] = useState<OpportunityFeed | null>(null);
+  usePageTitle('Opportunities');
+  const [items, setItems] = useState<ExploreOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
-  const [showExcluded, setShowExcluded] = useState(false);
-
-  usePageTitle('Ghana opportunities');
+  const [flow, setFlow] = useState<FlowFilter>('all');
+  const [country, setCountry] = useState('all');
+  const [modal, setModal] = useState<{ hs: string; slug: string; flow: 'export' | 'import' } | null>(null);
 
   useEffect(() => {
-    setLoading(true);
     api
-      .ghanaOpportunities({ flow: 'import', limit: 60, includeExcluded: showExcluded })
-      .then((r) => {
-        setFeed(r);
-        setError(null);
-      })
+      .opportunities()
+      .then((r) => setItems(r.opportunities))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [showExcluded]);
+  }, []);
 
-  const shown = useMemo(() => feed?.opportunities ?? [], [feed]);
+  const countries = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const o of items) seen.set(o.slug, o.country);
+    return [...seen.entries()].map(([value, label]) => ({ value, label }));
+  }, [items]);
 
-  if (loading && !feed) return <div className="card">Loading Ghana import opportunities...</div>;
-  if (error) {
-    return (
-      <div className="card">
-        <p className="card-title">Could not load opportunities</p>
-        <p className="dim">{error}</p>
-      </div>
-    );
-  }
-  if (!feed) return null;
+  const shown = useMemo(
+    () => items.filter((o) => (flow === 'all' || o.flow === flow) && (country === 'all' || o.slug === country)),
+    [items, flow, country],
+  );
+
+  const flowOptions = [
+    { value: 'all' as FlowFilter, label: 'All openings' },
+    { value: 'export' as FlowFilter, label: 'To sell' },
+    { value: 'import' as FlowFilter, label: 'To supply' },
+  ];
+  const countryOptions = [{ value: 'all', label: 'All countries' }, ...countries];
 
   return (
     <>
-      <div className="card">
-        <p className="card-title">Ghana import opportunities</p>
-        <p className="dim">
-          What Ghana buys from abroad, ranked by how much a locally made alternative might matter.
-          Every figure comes from {feed.source} at {feed.classification} chapter level.
-        </p>
-        <p className="tiny dim">
-          The opportunity score here weighs market size, growth, import dependency, stability and
-          supplier concentration on Ghana's own statistics. It is a different measure from the
-          momentum score shown against products elsewhere, which reads how fast a line is moving in
-          world trade data. The two are not on the same scale and should not be compared.
-        </p>
-
-        {feed.serving_stale && (
-          <div className="callout warn" style={{ marginTop: 10 }}>
-            The most recent ingestion failed. These are the last figures that loaded cleanly
-            {feed.last_successful_run ? `, from ${formatDate(feed.last_successful_run.completed_at)}` : ''}.
-            Nothing has been substituted from another source.
-          </div>
-        )}
-
-        <div className="row wrap" style={{ gap: 14, marginTop: 12 }}>
-          <Fact label="Products ranked" value={String(feed.count)} />
-          <Fact
-            label="Last updated"
-            value={feed.last_successful_run ? formatDate(feed.last_successful_run.completed_at) : 'never'}
-          />
-          <Fact label="Classification" value={feed.classification} />
+      <section className="mm-country-hero">
+        <div className="mm-country-id">
+          <span className="mm-overline">Where the data shows an opening</span>
         </div>
+        <h1 className="mm-country-name">
+          Trade <em>opportunities</em>
+        </h1>
+        <p className="mm-country-sub">
+          The product lines moving fastest in each market, with the evidence behind them. <strong>To sell</strong> is
+          something a country already sells abroad and is growing. <strong>To supply</strong> is something it is buying
+          more of every year. A strong line is a place to look, not proof of a profitable business.
+        </p>
+      </section>
 
-        <label className="row" style={{ gap: 8, marginTop: 12, alignItems: 'center' }}>
-          <input
-            type="checkbox"
-            checked={showExcluded}
-            onChange={(e) => setShowExcluded(e.target.checked)}
-          />
-          <span className="tiny dim">
-            Show traditional commodities, which are kept out of the ranking by default
-          </span>
-        </label>
-      </div>
-
-      {shown.length === 0 && (
-        <div className="card">
-          <p className="card-title">Nothing to show yet</p>
-          <p className="dim">
-            No opportunities have been computed. Run the ingestion job to load Ghana&apos;s trade
-            statistics.
-          </p>
+      {!loading && !error && items.length > 0 && (
+        <div className="mm-stats" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div className="mm-stat">
+            <strong>
+              <CountUp text={String(shown.length)} />
+            </strong>
+            <span>Openings shown</span>
+          </div>
+          <div className="mm-stat">
+            <strong>
+              <CountUp text={String(shown.filter((o) => o.flow === 'export').length)} />
+            </strong>
+            <span>To sell</span>
+          </div>
+          <div className="mm-stat">
+            <strong>
+              <CountUp text={String(shown.filter((o) => o.flow === 'import').length)} />
+            </strong>
+            <span>To supply</span>
+          </div>
         </div>
       )}
 
-      {shown.map((o) => (
-        <OpportunityCard
-          key={`${o.product_code}-${o.trade_flow}`}
-          o={o}
-          open={open === o.product_code}
-          onToggle={() => setOpen(open === o.product_code ? null : o.product_code)}
-        />
-      ))}
+      <Chips options={flowOptions} value={flow} onChange={setFlow} />
+      <div style={{ height: 6 }} />
+      {countries.length > 1 && <Chips options={countryOptions} value={country} onChange={setCountry} />}
+      <div style={{ height: 14 }} />
+
+      {loading ? (
+        <Skeletons n={5} />
+      ) : error ? (
+        <Empty title="Could not load the openings" hint={error} />
+      ) : shown.length === 0 ? (
+        <Empty title="No openings match" hint="Try another country or clear the filter." />
+      ) : (
+        shown.map((o) => (
+          <article className="mm-opp" key={o.id}>
+            <div className="mm-opp-head">
+              <div>
+                <span className={`badge ${o.flow === 'export' ? 'up' : ''}`}>{o.flow === 'export' ? 'To sell' : 'To supply'}</span>
+                <h3>{shortProductName(o.name)}</h3>
+                <p className="tiny dim">
+                  <Link to={`/country/${o.slug}`}>{o.country}</Link> · {o.year}
+                </p>
+              </div>
+              <div className="mm-opp-fig">
+                <strong>{fmtUsd(o.value_usd)}</strong>
+                {o.growth_pct != null && (
+                  <span className={o.growth_pct >= 0 ? 'up' : 'down'}>{fmtPct(o.growth_pct)} a year</span>
+                )}
+              </div>
+            </div>
+            {o.rationale && <p className="mm-opp-why">{o.rationale}</p>}
+            {o.partners.length > 0 && (
+              <p className="tiny dim mm-opp-partners">
+                Main {o.flow === 'import' ? 'suppliers' : 'buyers'}:{' '}
+                {o.partners.slice(0, 4).map((p, i) => (
+                  <span key={`${o.id}-${p.iso3 ?? p.name}`}>
+                    {i > 0 && ', '}
+                    {p.name}
+                  </span>
+                ))}
+              </p>
+            )}
+            <div className="mm-opp-actions">
+              <button
+                className="mm-cta small"
+                type="button"
+                onClick={() => setModal({ hs: codeOf(o), slug: o.slug, flow: o.flow })}
+              >
+                See who trades it <span aria-hidden>{'\u2192'}</span>
+              </button>
+            </div>
+          </article>
+        ))
+      )}
+
+      {modal && (
+        <ProductModal hsCode={modal.hs} countrySlug={modal.slug} flow={modal.flow} onClose={() => setModal(null)} />
+      )}
     </>
   );
-}
-
-function OpportunityCard({
-  o,
-  open,
-  onToggle,
-}: {
-  o: TradeOpportunity;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div className="card" style={o.is_excluded ? { opacity: 0.62 } : undefined}>
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-        <div style={{ minWidth: 0 }}>
-          <p className="card-title" style={{ marginBottom: 2 }}>
-            {o.product_name}
-          </p>
-          <span className="tiny dim">
-            HS{o.product_code} {'\u00b7'} {SIGNAL_LABEL[o.signal_type] ?? o.signal_type}
-          </span>
-        </div>
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div className="num" style={{ fontSize: 22, fontWeight: 700 }}>
-            {o.opportunity_score.toFixed(1)}
-          </div>
-          {/* Confidence sits directly under the score on purpose. The two answer
-              different questions and showing one without the other is how a
-              number built on two years of data starts to look certain. */}
-          <span className={`badge ${o.confidence === 'high' ? 'on' : o.confidence === 'low' ? 'off' : 'watch'}`}>
-            {CONFIDENCE_LABEL[o.confidence] ?? o.confidence}
-          </span>
-        </div>
-      </div>
-
-      {o.is_excluded && (
-        <p className="tiny dim" style={{ marginTop: 8 }}>
-          Kept out of the ranking: {o.excluded_reason}
-        </p>
-      )}
-
-      <div className="row wrap" style={{ gap: 14, marginTop: 10 }}>
-        <Fact label={`${o.latest_year} imports`} value={usd(o.latest_import_value)} />
-        <Fact label="Trend" value={TREND_LABEL[o.trend] ?? o.trend} />
-        <Fact
-          label="3 year growth"
-          value={o.three_year_cagr == null ? 'Not available' : `${signed(o.three_year_cagr)}% a year`}
-        />
-        <Fact label="Top supplier" value={o.top_partner ?? 'Not reported'} />
-      </div>
-
-      <p style={{ marginTop: 10 }}>{o.explanation}</p>
-
-      <Link
-        className="btn ghost sm"
-        to={`/country/ghana?product=${encodeURIComponent(o.product_code)}&flow=${encodeURIComponent(o.trade_flow)}`}
-        style={{ marginTop: 8 }}
-      >
-        View Product Detail
-      </Link>
-
-      <button type="button" className="link-button tiny" onClick={onToggle} style={{ marginTop: 8 }}>
-        {open ? 'Hide the evidence' : 'Show the evidence and the limits'}
-      </button>
-
-      {open && (
-        <div style={{ marginTop: 10 }}>
-          <Section title="What this is built on">
-            <ul className="tiny">
-              {o.evidence.map((e) => (
-                <li key={e}>{e}</li>
-              ))}
-            </ul>
-          </Section>
-
-          {o.partner_shares.length > 0 && (
-            <Section title="Where it comes from">
-              <ul className="tiny">
-                {o.partner_shares.slice(0, 6).map((p) => (
-                  <li key={p.partner}>
-                    {p.partner}: {p.share_pct.toFixed(1)}% ({usd(p.value_usd)})
-                  </li>
-                ))}
-              </ul>
-              {o.supplier_concentration_hhi != null && (
-                <p className="tiny dim">
-                  Supplier concentration (HHI): {o.supplier_concentration_hhi.toFixed(2)} across{' '}
-                  {o.partner_count} reporting partners.
-                </p>
-              )}
-            </Section>
-          )}
-
-          {o.score_breakdown && (
-            <Section title="How the score is composed">
-              <ul className="tiny">
-                {Object.entries(o.score_breakdown).map(([component, value]) => (
-                  <li key={component}>{component.replaceAll('_', ' ')}: {value.toFixed(2)}</li>
-                ))}
-              </ul>
-            </Section>
-          )}
-
-          <Section title="How confident we are, and why">
-            <ul className="tiny">
-              {o.confidence_reasons.map((r) => (
-                <li key={r}>{r}</li>
-              ))}
-            </ul>
-          </Section>
-
-          {/* Shown, not hidden. These are the reasons somebody should not act on
-              this without doing their own work, and burying them would be the
-              dishonest half of presenting a score at all. */}
-          <Section title="What this data cannot tell you">
-            <ul className="tiny">
-              {o.data_limitations.map((l) => (
-                <li key={l}>{l}</li>
-              ))}
-            </ul>
-          </Section>
-
-          <p className="tiny dim" style={{ marginTop: 8 }}>
-            Source: {o.source}. Classification {o.classification}.
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div style={{ marginTop: 10 }}>
-      <p className="tiny" style={{ fontWeight: 650, marginBottom: 4 }}>
-        {title}
-      </p>
-      {children}
-    </div>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="tiny dim">{label}</div>
-      <div className="num" style={{ fontWeight: 620 }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function usd(v: number | null): string {
-  if (v == null || !isFinite(v)) return 'Not reported';
-  const abs = Math.abs(v);
-  const sign = v < 0 ? '-' : '';
-  if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(2)}B`;
-  if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(1)}M`;
-  if (abs >= 1e3) return `${sign}$${(abs / 1e3).toFixed(0)}K`;
-  return `${sign}$${abs.toFixed(0)}`;
-}
-
-function signed(v: number): string {
-  return `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
-}
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return 'unknown';
-  const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z');
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }

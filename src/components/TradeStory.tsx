@@ -13,6 +13,7 @@ export function TradeStory({ className }: { className?: string }) {
     <svg
       className={`mm-story ${className ?? ''}`}
       viewBox="0 0 400 260"
+      preserveAspectRatio="xMidYMid slice"
       role="img"
       aria-label="A ship at sea, the scale of trade, and a contract being signed as countries light up"
     >

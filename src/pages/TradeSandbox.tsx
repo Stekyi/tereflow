@@ -95,19 +95,21 @@ export default function TradeSandbox() {
 
   return (
     <>
-      <div className="hero tight">
-        <div className="row between" style={{ gap: 12, alignItems: 'flex-start' }}>
-          <div>
-            <p className="overline">Explore bilateral trade</p>
-            <h2>Trade Sandbox</h2>
-            <p>
-              Select an activated country as the primary reporter, then compare it with any country in the world.
-              Tereflow queries the primary country's ingested trade data for the selected partner.
-            </p>
-          </div>
-          <Link className="btn" to="/countries">Countries</Link>
+      <section className="mm-country-hero">
+        <div className="mm-country-id">
+          <span className="mm-overline">Explore bilateral trade</span>
         </div>
-      </div>
+        <h1 className="mm-country-name">
+          Trade <em>Sandbox</em>
+        </h1>
+        <p className="mm-country-sub">
+          Select an activated country as the primary reporter, then compare it with any country in the world. Tereflow
+          queries the primary country's ingested trade data for the selected partner.
+        </p>
+        <div className="mm-cta-row">
+          <Link className="mm-cta ghost" to="/countries">Countries</Link>
+        </div>
+      </section>
 
       <div className="card">
         <div className="sandbox-grid">

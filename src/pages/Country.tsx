@@ -276,43 +276,45 @@ export default function Country() {
 
   return (
     <>
-      <Header
-        name={data.entity.name}
-        iso3={data.entity.iso3}
-        sub={data.entity.continent ?? ''}
-        action={
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            <Link className="btn" to={`/sandbox?primary=${encodeURIComponent(data.entity.slug)}`}>
-              Open Trade Sandbox
-            </Link>
-            {data.blue_ocean_visibility !== 'hidden' &&
-              (data.blue_oceans !== null ? (
-                <a className="btn" href="#blue-oceans">
-                  Blue oceans
-                </a>
-              ) : user ? (
-                <Link className="btn gold" to="/upgrade">
-                  Blue oceans · Premium
-                </Link>
-              ) : (
-                <Link className="btn" to={`/join?next=/country/${data.entity.slug}`}>
-                  Blue oceans · Join free
-                </Link>
-              ))}
-            <FollowButton
-              kind="country"
-              value={data.entity.slug}
-              label={data.entity.name}
-              following={subs.has(subKey('country', data.entity.slug))}
-              onChange={toggleFollow}
-            />
-          </div>
-        }
-      />
-      <p className="tiny dim" style={{ margin: '-6px 0 14px' }}>
-        Trade figures for {o.year}
-        {o.coverage_note ? ` · ${o.coverage_note}` : ''}
-      </p>
+      <section className="mm-country-hero" aria-label={data.entity.name}>
+        <div className="mm-country-id">
+          <span className="flag" style={{ width: 52, height: 38, fontSize: 13 }}>
+            {data.entity.iso3 ?? '??'}
+          </span>
+          <span className="mm-overline">{data.entity.continent ?? 'Market'}</span>
+        </div>
+        <h1 className="mm-country-name">{splitName(data.entity.name)}</h1>
+        <p className="mm-country-sub">
+          Trade figures for {o.year}
+          {o.coverage_note ? ` · ${o.coverage_note}` : ''}
+        </p>
+        <div className="mm-cta-row">
+          <Link className="mm-cta" to={`/sandbox?primary=${encodeURIComponent(data.entity.slug)}`}>
+            Open Trade Sandbox <span aria-hidden>{'\u2192'}</span>
+          </Link>
+          {data.blue_ocean_visibility !== 'hidden' &&
+            (data.blue_oceans !== null ? (
+              <a className="mm-cta ghost" href="#blue-oceans">
+                Blue oceans
+              </a>
+            ) : user ? (
+              <Link className="mm-cta ghost" to="/upgrade">
+                Blue oceans · Premium
+              </Link>
+            ) : (
+              <Link className="mm-cta ghost" to={`/join?next=/country/${data.entity.slug}`}>
+                Blue oceans · Join free
+              </Link>
+            ))}
+          <FollowButton
+            kind="country"
+            value={data.entity.slug}
+            label={data.entity.name}
+            following={subs.has(subKey('country', data.entity.slug))}
+            onChange={toggleFollow}
+          />
+        </div>
+      </section>
       {t.node}
       {modal && (
         <GlobalProductModal
@@ -327,7 +329,7 @@ export default function Country() {
       <div style={{ height: 12 }} />
 
       <section id="overview" className="section-anchor" aria-label="Overview">
-      <div className="grid three" style={{ marginBottom: 16 }}>
+      <div className="grid three mm-country-stats" style={{ marginBottom: 16 }}>
         <Stat
           label={
             <>
@@ -364,6 +366,7 @@ export default function Country() {
       </section>
 
       <section id="imports" className="section-anchor" aria-label="Top imports">
+      <h2 className="mm-title mm-sec">What it <em>buys</em></h2>
       <label className="row small dim" style={{ gap: 6, marginBottom: 14, cursor: 'pointer' }}>
         <input
           type="checkbox"
@@ -406,6 +409,7 @@ export default function Country() {
       </section>
 
       <section id="exports" className="section-anchor" aria-label="Non-traditional exports">
+      <h2 className="mm-title mm-sec">What it <em>sells</em></h2>
       {grouped && data.families_export ? (
         <FamilyChart
           title="Top exports by product family"
@@ -427,6 +431,7 @@ export default function Country() {
       </section>
 
       <section id="balance" className="section-anchor" aria-label="Trade balance">
+      <h2 className="mm-title mm-sec">Trade <em>balance</em></h2>
       {data.trend.length > 1 ? (
         <div className="card">
           <p className="card-title">Merchandise trade balance</p>
@@ -678,6 +683,17 @@ export default function Country() {
           Analysis computed {new Date(data.computed_at + 'Z').toLocaleString()}
         </p>
       )}
+    </>
+  );
+}
+
+/** Sets the last word of a country name in the accent colour, the way the two-tone titles read. */
+function splitName(name: string) {
+  const words = name.split(' ');
+  if (words.length < 2) return name;
+  return (
+    <>
+      {words.slice(0, -1).join(' ')} <em>{words[words.length - 1]}</em>
     </>
   );
 }

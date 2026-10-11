@@ -255,6 +255,9 @@ def read_cached(conn, reporter: str, kind: str) -> dict | None:
 
 PRODUCT_FLOOR_USD = 100_000
 PARTNER_ROWS_FOR_TOP = 400
+# The Worker parses every country's feed on each cross-country request, so the feed has to stay small. Detailed
+# (HS8) countries score tens of thousands of lines and a 10 MB feed exceeds the Worker CPU limit (Cloudflare 1102).
+PRODUCT_FEED_MAX = 3000
 
 
 def load_products(conn, reporter: str) -> dict | None:
@@ -280,6 +283,9 @@ def load_products(conn, reporter: str) -> dict | None:
                       "years_available": m.get("years_available"), "trend": m.get("trend")})
     if not items:
         return None
+    total_scored = len(items)
+    items.sort(key=lambda i: (-i["score"], -i["value_usd"]))
+    del items[PRODUCT_FEED_MAX:]
     latest = max(i["year"] for i in items)
     top = sorted((i for i in items if i["year"] == latest), key=lambda i: -i["score"])[:PARTNER_ROWS_FOR_TOP]
     want = {(i["flow"], i["code"]) for i in top}
@@ -296,7 +302,7 @@ def load_products(conn, reporter: str) -> dict | None:
     for i in items:
         if (i["flow"], i["code"]) in parts:
             i["partners"] = parts[(i["flow"], i["code"])]
-    return {"reporter": reporter, "latest_year": latest, "count": len(items), "products": items}
+    return {"reporter": reporter, "latest_year": latest, "count": len(items), "total_scored": total_scored, "products": items}
 
 
 PRODUCT_SERIES_SQL = """SELECT year, SUM(value_usd), SUM(CASE WHEN net_weight_kg > 0 THEN net_weight_kg END)

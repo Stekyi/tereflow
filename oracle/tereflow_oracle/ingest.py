@@ -165,7 +165,18 @@ class Ingestor:
             cur.execute("UPDATE tf_ingest_run SET status=:1, finished_at=SYSTIMESTAMP, detail=:2 WHERE run_id=:3",
                         [s.status, f"ok={s.success} skipped={s.skipped} no_data={s.no_data} failed={s.failed} rows={s.rows}", run_id])
             self.conn.commit()
+            self.refresh_hs6_names()
         return s
+
+    def refresh_hs6_names(self) -> None:
+        """Keep the 6-digit name table current so deeper national codes without their own text still show a name."""
+        self.conn.cursor().execute("""MERGE INTO tf_hs6_name t
+          USING (SELECT cmd_code AS code, MAX(cmd_desc) KEEP (DENSE_RANK LAST ORDER BY year) AS name
+                   FROM tf_trade_facts WHERE cmd_desc IS NOT NULL AND LENGTH(cmd_code) = 6 GROUP BY cmd_code) s
+             ON (t.code = s.code)
+           WHEN MATCHED THEN UPDATE SET t.name = s.name, t.updated_at = SYSTIMESTAMP WHERE t.name <> s.name
+           WHEN NOT MATCHED THEN INSERT (code, name) VALUES (s.code, s.name)""")
+        self.conn.commit()
 
     def _usd_rate(self, prov, iso3, year, flow):
         """USD per unit of the source's currency, kept in tf_fx_rate so a rerun converts identically.

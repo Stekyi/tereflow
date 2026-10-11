@@ -1,4 +1,4 @@
-"""Read-only HTTP API over Oracle. Contract-compatible with the Worker's /api/trade/sandbox."""
+﻿"""Read-only HTTP API over Oracle. Contract-compatible with the Worker's /api/trade/sandbox."""
 from __future__ import annotations
 import hmac
 import json
@@ -99,7 +99,9 @@ def trade_sandbox(body: SandboxIn, _=Depends(auth)):
         pbind = {f"p{i}": p for i, p in enumerate(partners)}
         pin = ",".join(f":{k}" for k in pbind)
 
-        cur.execute(f"""SELECT partner_iso3, year, flow, cmd_code, cmd_desc, classification_level, value_usd, net_weight_kg
+        cur.execute(f"""SELECT partner_iso3, year, flow, cmd_code,
+                               NVL(cmd_desc, (SELECT n.name FROM tf_hs6_name n WHERE n.code = SUBSTR(cmd_code, 1, 6))),
+                               classification_level, value_usd, net_weight_kg
                         FROM tf_trade_facts
                         WHERE reporter_iso3=:rep AND partner_iso3 IN ({pin}) AND year IN ({yin})
                         ORDER BY partner_iso3, year, flow, cmd_code""", {"rep": p_iso, **pbind, **ybind})

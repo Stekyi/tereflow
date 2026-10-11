@@ -77,7 +77,7 @@ BEGIN
          FROM yrs y) AS totals_json,
       COALESCE((SELECT JSON_ARRAYAGG(JSON_OBJECT(
                 'hs_code' VALUE f.cmd_code,
-                'product_name' VALUE NVL(f.cmd_desc, f.cmd_code),
+                'product_name' VALUE NVL(f.cmd_desc, NVL((SELECT n.name FROM tf_hs6_name n WHERE n.code = SUBSTR(f.cmd_code, 1, 6)), f.cmd_code)),
                 'flow' VALUE DECODE(f.flow, 'X', 'export', 'import'),
                 'year' VALUE f.year,
                 'value_usd' VALUE f.value_usd,

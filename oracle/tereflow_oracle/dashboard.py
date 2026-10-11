@@ -1,4 +1,4 @@
-"""Country dashboard figures computed from Oracle trade facts.
+﻿"""Country dashboard figures computed from Oracle trade facts.
 
 A port of the trade-derived parts of worker/agent/analyse.ts (overview, ranked products,
 ranked partners, yearly trend). Constants match the D1 defaults in worker/lib/settings.ts.
@@ -27,7 +27,7 @@ GROWTH_BASE_DIVISOR = 20
 FLOW_NAME = {"X": "export", "M": "import"}
 
 PRODUCT_TOTALS_SQL = """
-SELECT flow, year, cmd_code, MAX(cmd_desc) AS cmd_desc, MAX(classification_level) AS lvl,
+SELECT flow, year, cmd_code, NVL(MAX(cmd_desc), (SELECT n.name FROM tf_hs6_name n WHERE n.code = SUBSTR(cmd_code, 1, 6))) AS cmd_desc, MAX(classification_level) AS lvl,
        NVL(MAX(CASE WHEN partner_iso3 = 'WLD' THEN value_usd END),
            SUM(CASE WHEN partner_iso3 <> 'WLD' THEN value_usd END)) AS v
 FROM tf_trade_facts WHERE reporter_iso3 = :rep
@@ -321,6 +321,10 @@ def load_product_detail(conn, reporter: str, flow: str, code: str) -> dict | Non
     cur.execute("""SELECT MAX(cmd_desc) KEEP (DENSE_RANK LAST ORDER BY year, value_usd), MAX(classification_level) KEEP (DENSE_RANK LAST ORDER BY year)
                    FROM tf_trade_facts WHERE reporter_iso3 = :rep AND flow = :fl AND cmd_code LIKE :code || '%' AND partner_iso3 <> 'WLD'""", b)
     name, level = cur.fetchone()
+    if not name:
+        cur.execute("SELECT name FROM tf_hs6_name WHERE code = :c", {"c": str(code)[:6]})
+        hit = cur.fetchone()
+        name = hit[0] if hit else None
     return {"reporter": b["rep"], "flow": flow, "code": code, "name": name, "level": level,
             "latest_year": latest, "series": series, "partners": partners}
 

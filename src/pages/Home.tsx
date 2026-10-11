@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../lib/api';
+import { api, type TradeNewsItem } from '../lib/api';
 import { useSession } from '../lib/auth';
 import { Chips, Empty, Skeletons } from '../components/ui';
 import { HeroScene } from '../components/Brand';
@@ -11,25 +11,65 @@ import { CONTINENTS, type ProductCard, type ProductSummary } from '../../shared/
 
 type FlowFilter = 'all' | 'export' | 'import';
 
-/**
- * One figure in the strip above the list.
- *
- * "To sell" and "To supply" rather than "Exports" and "Imports" because the
- * reader is deciding what to do, not reading a trade statistic: an export
- * opening is something they could sell, an import opening is a gap they could
- * fill.
- */
-function Kpi({ n, k }: { n: number; k: string }) {
+/** One big figure in the stats panel. "To sell" and "To supply" rather than "Exports" and "Imports", because the reader is deciding what to do. */
+function Stat({ n, k }: { n: number; k: string }) {
   return (
-    <div className="kpi">
-      <strong>{n}</strong>
-      <span className="tiny dim">{k}</span>
+    <div className="mm-stat">
+      <strong>{n.toLocaleString()}</strong>
+      <span>{k}</span>
     </div>
   );
 }
 
+/** Sets the last words of a heading in the accent colour, the way the two-tone titles read. */
+function splitHeading(text: string) {
+  const words = text.split(' ');
+  if (words.length < 3) return text;
+  const cut = Math.max(1, Math.ceil(words.length / 2));
+  return (
+    <>
+      {words.slice(0, cut).join(' ')} <em>{words.slice(cut).join(' ')}</em>
+    </>
+  );
+}
+
+/** Fades sections in as they scroll into view. Skipped for reduced motion, and without IntersectionObserver everything just shows. */
+function useReveal() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    const items = Array.from(root.querySelectorAll<HTMLElement>('[data-reveal]:not(.in)'));
+    if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      items.forEach((el) => el.classList.add('in'));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add('in');
+            io.unobserve(e.target);
+          }
+        }),
+      { rootMargin: '0px 0px -8% 0px' },
+    );
+    items.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  });
+  return ref;
+}
+
 export default function Home() {
   const { user, entitled, feedUnread } = useSession();
+  const revealRef = useReveal();
+  const [news, setNews] = useState<TradeNewsItem[]>([]);
+  useEffect(() => {
+    api
+      .tradeNews()
+      .then((r) => setNews(r.items.slice(0, 3)))
+      .catch(() => setNews([]));
+  }, []);
   const [budget, setBudget] = useBudget();
   const [q, setQ] = useState('');
   const [flow, setFlow] = useState<FlowFilter>('all');
@@ -106,18 +146,36 @@ export default function Home() {
   }, [q, flow, continent]);
 
   return (
-    <>
-      <div className="hero with-scene">
-        <HeroScene className="hero-scene" />
-        <span className="overline">Global trade intelligence</span>
-        <h2>Find a product worth trading</h2>
-        <p>Search a specific product to see who sells it, who buys it, and where the opening is.</p>
-      </div>
+    <div ref={revealRef} className="mm-home">
+      <section className="mm-hero" aria-label="Find a product worth trading">
+        <div className="mm-hero-copy">
+          <span className="mm-overline">Global trade intelligence</span>
+          <h1>
+            Find a product
+            <em> worth trading</em>
+          </h1>
+          <p>
+            See who sells it, who buys it, and where the opening is. Ranked by how fast each line is
+            moving, across every market Tereflow has analysed.
+          </p>
+          <div className="mm-cta-row">
+            <a className="mm-cta" href="#openings">
+              See the openings <span aria-hidden>{'\u2192'}</span>
+            </a>
+            <Link className="mm-cta ghost" to="/sandbox">
+              Open Trade Sandbox
+            </Link>
+          </div>
+          <p className="mm-sources">Built on UN Comtrade, HMRC and national statistics offices</p>
+        </div>
+        <HeroScene className="mm-hero-scene" />
+      </section>
 
-      <div className="typeahead" style={{ marginTop: 4 }}>
+      <div className="typeahead mm-search">
         <input
           type="search"
           placeholder="Try shea butter, cashew, mango, tiles"
+          aria-label="Search for a product"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -127,27 +185,28 @@ export default function Home() {
       <Chips options={flowOptions} value={flow} onChange={setFlow} />
       <div style={{ height: 6 }} />
       <Chips options={continentOptions} value={continent} onChange={setContinent} />
-      <div style={{ height: 14 }} />
+      <div style={{ height: 18 }} />
 
       {summary && summary.total > 0 && (
-        <div className="kpi-strip">
-          <Kpi n={summary.total} k="Openings" />
-          <Kpi n={summary.exports} k="To sell" />
-          <Kpi n={summary.imports} k="To supply" />
-          <Kpi n={summary.strong} k="Strong case" />
+        <div className="mm-stats" data-reveal>
+          <Stat n={summary.total} k="Openings" />
+          <Stat n={summary.exports} k="To sell" />
+          <Stat n={summary.imports} k="To supply" />
+          <Stat n={summary.strong} k="Strong case" />
           {summary.within_budget != null ? (
-            <Kpi n={summary.within_budget} k="Within budget" />
+            <Stat n={summary.within_budget} k="Within budget" />
           ) : (
-            <Kpi n={summary.markets} k={summary.markets === 1 ? 'Market' : 'Markets'} />
+            <Stat n={summary.markets} k={summary.markets === 1 ? 'Market' : 'Markets'} />
           )}
         </div>
       )}
 
       <BudgetBar budget={budget} onChange={setBudget} />
 
-      <div className="section-head">
-        <h2 style={{ fontSize: 16 }}>{listHeading}</h2>
+      <div className="mm-section-head" id="openings">
+        <h2>{splitHeading(listHeading)}</h2>
       </div>
+
       {searchNote && (
         <p className="tiny dim" style={{ margin: '2px 0 0' }}>
           {searchNote}
@@ -179,66 +238,84 @@ export default function Home() {
         ))
       )}
 
-      <div className="section-head" style={{ marginTop: 20 }}>
-        <h2 className="dim" style={{ fontSize: 15 }}>
-          More on Tereflow
-        </h2>
-      </div>
-
       {user && feedUnread > 0 && (
-        <Link
-          className="card tight"
-          to="/feed"
-          style={{ display: 'block', borderColor: 'var(--brand)' }}
-        >
-          <div className="row between">
-            <span>
-              <span style={{ fontWeight: 650, fontSize: 15 }}>{feedUnread} new in your feed</span>
-              <span className="tiny dim" style={{ display: 'block' }}>
-                From the markets and products you follow
-              </span>
-            </span>
-            <span className="dim">{'\u203a'}</span>
-          </div>
+        <Link className="mm-feed-note" to="/feed">
+          <strong>{feedUnread} new in your feed</strong>
+          <span>From the markets and products you follow</span>
+          <span aria-hidden>{'\u203a'}</span>
         </Link>
       )}
 
-      <Link className="list-item" to="/network">
-        <span className="grow">
-          <span className="name">Find people to trade with</span>
-          <span className="tiny dim">Buyers, sellers, suppliers and distributors you can message</span>
-        </span>
-        <span className="dim">{'\u203a'}</span>
-      </Link>
+      <section className="mm-block" data-reveal>
+        <h2 className="mm-title">
+          Stay ahead <em>of the market</em>
+        </h2>
+        <div className="mm-cards">
+          <Link className="mm-card" to="/sandbox">
+            <h3>Trade Sandbox</h3>
+            <p>Pick a country, add the partners you care about and compare the trade between them, product by product.</p>
+          </Link>
+          <Link className="mm-card" to="/countries">
+            <h3>Browse countries</h3>
+            <p>Summary figures, partners and blue oceans for every market on record.</p>
+          </Link>
+          <Link className="mm-card" to="/network">
+            <h3>Find people to trade with</h3>
+            <p>Buyers, sellers, suppliers and distributors you can message directly.</p>
+          </Link>
+          <Link className="mm-card cta" to={entitled ? '/feed' : '/upgrade'}>
+            <h3>{entitled ? 'Your premium feed' : 'Go premium'}</h3>
+            <p>
+              {entitled
+                ? 'Weekly read on the products and markets you follow.'
+                : 'Early signals, entry playbooks and a weekly watchlist read.'}
+            </p>
+            <span className="mm-cta small">{entitled ? 'Open feed' : 'See premium'} <span aria-hidden>{'\u2192'}</span></span>
+          </Link>
+        </div>
+      </section>
 
-      <Link className="list-item" to="/countries">
-        <span className="grow">
-          <span className="name">Browse countries</span>
-          <span className="tiny dim">Summary figures for every market on record</span>
-        </span>
-        <span className="dim">{'\u203a'}</span>
-      </Link>
+      <section className="mm-block" data-reveal>
+        <h2 className="mm-title">
+          How to <em>read it</em>
+        </h2>
+        <div className="mm-accordion">
+          <details open>
+            <summary>To sell</summary>
+            <p>An export opening: a product a country already sells abroad and that is growing fast. It is something you could sell, and the best market is the buyer taking the most of it.</p>
+          </details>
+          <details>
+            <summary>To supply</summary>
+            <p>An import opening: a product a country is buying more of every year. It is a gap you could fill, and the best market is the main supplier you would compete with.</p>
+          </details>
+          <details>
+            <summary>The score</summary>
+            <p>Out of 100, built from three-year growth, momentum, how reliable the figures are and the size of the trade. It shows how fast a line is moving, not how easy it is to enter.</p>
+          </details>
+        </div>
+      </section>
 
-      <Link
-        className="list-item"
-        to={entitled ? '/feed' : '/upgrade'}
-        style={{ borderColor: 'var(--brand)' }}
-      >
-        <span className="grow">
-          <span className="name">
-            <span className="badge premium" style={{ marginRight: 6 }}>
-              {'\u2605'}
-            </span>
-            {entitled ? 'Your premium feed' : 'Go premium'}
-          </span>
-          <span className="tiny dim">
-            {entitled
-              ? 'Weekly read on the products and markets you follow'
-              : 'Early signals, entry playbooks, and a weekly watchlist read'}
-          </span>
-        </span>
-        <span className="dim">{'\u203a'}</span>
-      </Link>
+      {news.length > 0 && (
+        <section className="mm-block" data-reveal>
+          <div className="mm-title-row">
+            <h2 className="mm-title">
+              Trade <em>newsroom</em>
+            </h2>
+            <Link className="mm-link" to="/news">All news {'\u203a'}</Link>
+          </div>
+          <div className="mm-news">
+            {news.map((n) => (
+              <a key={n.link} className="mm-news-card" href={n.link} target="_blank" rel="noopener noreferrer">
+                {n.image && <img src={n.image} alt="" loading="lazy" />}
+                <span className="mm-news-tag">{n.topic || n.region}</span>
+                <strong>{n.title}</strong>
+                <span className="mm-news-meta">{n.source}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
 
       {modalHs && (
         <ProductModal
@@ -248,6 +325,6 @@ export default function Home() {
           onClose={() => setModalHs(null)}
         />
       )}
-    </>
+    </div>
   );
 }

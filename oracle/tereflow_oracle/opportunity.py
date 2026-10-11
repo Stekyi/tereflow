@@ -1,4 +1,4 @@
-"""Deterministic metrics, opportunity scoring and blue oceans over Oracle trade facts.
+﻿"""Deterministic metrics, opportunity scoring and blue oceans over Oracle trade facts.
 
 A faithful port of worker/analytics/metrics.ts and worker/analytics/opportunities.ts
 (same constants, same formulas, same wording) so results do not change when the data
@@ -336,7 +336,7 @@ def exclusion_for(code: str, rules: list[dict]) -> str | None:
 YEARS_SQL = """
 SELECT flow, classification_level, cmd_code, year,
        SUM(value_usd) AS v, SUM(CASE WHEN net_weight_kg > 0 THEN net_weight_kg END) AS w,
-       MAX(cmd_desc) AS d
+       NVL(MAX(cmd_desc), (SELECT n.name FROM tf_hs6_name n WHERE n.code = SUBSTR(cmd_code, 1, 6))) AS d
 FROM tf_trade_facts
 WHERE reporter_iso3 = :rep AND partner_iso3 <> 'WLD' AND value_usd IS NOT NULL
 GROUP BY flow, classification_level, cmd_code, year

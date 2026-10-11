@@ -22,7 +22,7 @@ agg AS (
   FROM yrs GROUP BY reporter_iso3, flow, cmd_code, classification_level, ly, n
 ),
 descs AS (
-  SELECT flow, cmd_code, year, MAX(cmd_desc) AS cmd_desc
+  SELECT flow, cmd_code, year, NVL(MAX(cmd_desc), (SELECT n.name FROM tf_hs6_name n WHERE n.code = SUBSTR(cmd_code, 1, 6))) AS cmd_desc
   FROM tf_trade_facts WHERE reporter_iso3 = :rep AND partner_iso3 <> 'WLD' GROUP BY flow, cmd_code, year
 ),
 part AS (

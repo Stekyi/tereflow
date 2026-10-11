@@ -165,6 +165,40 @@ export default function App() {
         </Suspense>
       </main>
 
+      <footer className="mm-footer">
+        <div className="mm-footer-inner">
+          <div className="mm-footer-cols">
+            <div>
+              <span className="mm-footer-brand">Tereflow</span>
+              <p>Global trade intelligence: who sells it, who buys it, and where the opening is.</p>
+            </div>
+            <div>
+              <h4>Explore</h4>
+              <NavLink to="/">Products</NavLink>
+              <NavLink to="/countries">Countries</NavLink>
+              <NavLink to="/sandbox">Trade Sandbox</NavLink>
+              <NavLink to="/news">Trade news</NavLink>
+            </div>
+            <div>
+              <h4>Community</h4>
+              <NavLink to="/network">Network</NavLink>
+              <NavLink to="/messages">Messages</NavLink>
+              <NavLink to="/me">Me</NavLink>
+            </div>
+            <div>
+              <h4>Premium</h4>
+              <NavLink to="/upgrade">Go premium</NavLink>
+              <NavLink to="/opportunities">Opportunities</NavLink>
+              <NavLink to="/feed">Your feed</NavLink>
+            </div>
+          </div>
+          <p className="mm-footer-note">
+            Figures come from UN Comtrade, HMRC and national statistics offices, and can be revised. Scores show how fast a
+            line is moving, not how easy it is to enter. This is information, not advice.
+          </p>
+        </div>
+      </footer>
+
       {/* Primary navigation: mobile app-style bottom bar. Desktop uses the top navigation bar above. */}
       <nav className="tabbar" aria-label="Primary navigation">
         <Tab

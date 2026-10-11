@@ -2989,3 +2989,62 @@ textarea {
 .mm-country-hero { padding-bottom: 28px; }
 .mm-country-stats .stat::before, .mm-country-stats .stat::after { display: none; }
 .mm-country-stats .stat { padding-left: 0; border-left: 0; }
+/* ---------- Motion: the looping trade story and the hero backdrop ---------- */
+.mm-story { width: 100%; max-width: 460px; height: auto; justify-self: center; border-radius: 22px; box-shadow: var(--lift); background: #071826; }
+.mm-story .sc { opacity: 0; animation: mm-scene 21s infinite both; }
+.mm-story .sc1 { animation-delay: 0s; }
+.mm-story .sc2 { animation-delay: 7s; }
+.mm-story .sc3 { animation-delay: 14s; }
+.mm-story .cap { fill: #e2eaf1; font: 700 11px/1 system-ui, sans-serif; letter-spacing: .1em; text-transform: uppercase; }
+.mm-story .lab { fill: #9fb3c6; font: 700 9px/1 system-ui, sans-serif; letter-spacing: .12em; }
+@keyframes mm-scene { 0% { opacity: 0; } 3% { opacity: 1; } 31% { opacity: 1; } 34% { opacity: 0; } 100% { opacity: 0; } }
+
+/* beat 1 */
+.mm-story .ship { animation: mm-sail 21s ease-in-out infinite both; }
+@keyframes mm-sail { 0% { transform: translateX(-46px); } 31% { transform: translateX(24px); } 100% { transform: translateX(24px); } }
+.mm-story .bob { animation: mm-bob 3.2s ease-in-out infinite alternate; }
+@keyframes mm-bob { from { transform: translateY(-3px) rotate(-1.2deg); } to { transform: translateY(3px) rotate(1.2deg); } }
+.mm-story .waves { animation: mm-wave 5s linear infinite; }
+@keyframes mm-wave { from { transform: translateX(0); } to { transform: translateX(-40px); } }
+.mm-story .sun { animation: mm-sun 4s ease-in-out infinite alternate; }
+@keyframes mm-sun { from { opacity: .75; } to { opacity: 1; } }
+.mm-story .glass { transform-origin: 200px 134px; animation: mm-look 3.4s ease-in-out infinite alternate; }
+@keyframes mm-look { from { transform: rotate(-8deg); } to { transform: rotate(5deg); } }
+
+/* beat 2: the beam settles as the pans swing */
+.mm-story .beam { transform-origin: 200px 86px; animation: mm-beam 21s ease-in-out infinite both; animation-delay: 7s; }
+.mm-story .panL { animation: mm-panL 21s ease-in-out infinite both; animation-delay: 7s; }
+.mm-story .panR { animation: mm-panR 21s ease-in-out infinite both; animation-delay: 7s; }
+@keyframes mm-beam { 0%, 2% { transform: rotate(-8deg); } 8% { transform: rotate(6deg); } 14% { transform: rotate(-4deg); } 20% { transform: rotate(3deg); } 26%, 100% { transform: rotate(0deg); } }
+@keyframes mm-panL { 0%, 2% { transform: translateY(16px); } 8% { transform: translateY(-12px); } 14% { transform: translateY(8px); } 20% { transform: translateY(-6px); } 26%, 100% { transform: translateY(0); } }
+@keyframes mm-panR { 0%, 2% { transform: translateY(-16px); } 8% { transform: translateY(12px); } 14% { transform: translateY(-8px); } 20% { transform: translateY(6px); } 26%, 100% { transform: translateY(0); } }
+
+/* beat 3: sign, grow, light up */
+.mm-story .sign { stroke-dasharray: 100; animation: mm-draw 21s ease-out infinite both; animation-delay: 14.3s; }
+.mm-story .trend { stroke-dasharray: 100; animation: mm-draw 21s ease-out infinite both; animation-delay: 15.2s; }
+@keyframes mm-draw { 0% { stroke-dashoffset: 100; } 9% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 0; } }
+.mm-story .seal { transform-box: fill-box; transform-origin: center; animation: mm-pop 21s cubic-bezier(.3,1.6,.5,1) infinite both; animation-delay: 15s; }
+@keyframes mm-pop { 0% { transform: scale(0); } 4% { transform: scale(1); } 100% { transform: scale(1); } }
+.mm-story .bar { transform-box: fill-box; transform-origin: 50% 100%; animation: mm-grow 21s ease-out infinite both; }
+.mm-story .b1 { animation-delay: 14.4s; } .mm-story .b2 { animation-delay: 14.7s; } .mm-story .b3 { animation-delay: 15s; } .mm-story .b4 { animation-delay: 15.3s; }
+@keyframes mm-grow { 0% { transform: scaleY(0); } 6% { transform: scaleY(1); } 100% { transform: scaleY(1); } }
+.mm-story .d { animation: mm-light 21s ease-out infinite both; }
+.mm-story .d1 { animation-delay: 15.6s; } .mm-story .d2 { animation-delay: 16.1s; } .mm-story .d3 { animation-delay: 16.6s; } .mm-story .d4 { animation-delay: 17.1s; }
+@keyframes mm-light { 0% { opacity: .12; } 3% { opacity: 1; } 100% { opacity: 1; } }
+.mm-story .route { animation: mm-fadein 21s ease-out infinite both; animation-delay: 16s; }
+@keyframes mm-fadein { 0% { opacity: 0; } 5% { opacity: .7; } 100% { opacity: .7; } }
+
+/* the hero backdrop drifts, like the footage behind their headline */
+.mm-hero { position: relative; isolation: isolate; }
+.mm-hero::before, .mm-hero::after {
+  content: ''; position: absolute; z-index: -1; border-radius: 50%; filter: blur(60px); pointer-events: none; opacity: .5;
+}
+.mm-hero::before { width: 360px; height: 360px; left: -80px; top: -60px; background: radial-gradient(circle, rgba(52,199,123,.38), transparent 70%); animation: mm-drift1 16s ease-in-out infinite alternate; }
+.mm-hero::after { width: 420px; height: 420px; right: -100px; bottom: -120px; background: radial-gradient(circle, rgba(109,59,212,.18), transparent 70%); animation: mm-drift2 19s ease-in-out infinite alternate; }
+@keyframes mm-drift1 { from { transform: translate(0, 0); } to { transform: translate(90px, 50px); } }
+@keyframes mm-drift2 { from { transform: translate(0, 0); } to { transform: translate(-80px, -40px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-story *, .mm-hero::before, .mm-hero::after { animation: none !important; }
+  .mm-story .sc1 { opacity: 1; }
+}

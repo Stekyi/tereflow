@@ -79,7 +79,7 @@ export function Stat({
   deltaTone,
 }: {
   label: ReactNode;
-  value: string;
+  value: ReactNode;
   delta?: ReactNode;
   deltaTone?: 'up' | 'down' | null;
 }) {

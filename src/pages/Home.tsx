@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type TradeNewsItem } from '../lib/api';
 import { useSession } from '../lib/auth';
 import { Chips, Empty, Skeletons } from '../components/ui';
-import { HeroScene } from '../components/Brand';
+import { CountUp, TradeStory } from '../components/TradeStory';
 import { BudgetBar } from '../components/BudgetBar';
 import { useBudget } from '../lib/budget';
 import ProductModal, { ProductCardRow } from '../components/ProductModal';
@@ -15,7 +15,7 @@ type FlowFilter = 'all' | 'export' | 'import';
 function Stat({ n, k }: { n: number; k: string }) {
   return (
     <div className="mm-stat">
-      <strong>{n.toLocaleString()}</strong>
+      <strong><CountUp text={n.toLocaleString()} /></strong>
       <span>{k}</span>
     </div>
   );
@@ -168,7 +168,7 @@ export default function Home() {
           </div>
           <p className="mm-sources">Built on UN Comtrade, HMRC and national statistics offices</p>
         </div>
-        <HeroScene className="mm-hero-scene" />
+        <TradeStory className="mm-hero-scene" />
       </section>
 
       <div className="typeahead mm-search">

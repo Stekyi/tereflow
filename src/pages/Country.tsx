@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Area,
@@ -22,6 +22,7 @@ import { Term } from '../components/Term';
 import { disambiguateProductNames, shortProductName } from '../../shared/product-name';
 import { BarRow, Empty, FollowButton, Skeletons, Stat, useToast } from '../components/ui';
 import GlobalProductModal from '../components/ProductModal';
+import { CountUp } from '../components/TradeStory';
 import SectionNav, { type Section } from '../components/SectionNav';
 import {
   EXPORT_CATEGORY_HINT,
@@ -336,7 +337,7 @@ export default function Country() {
               Total exports <span className="dim">({o.year})</span>
             </>
           }
-          value={fmtUsd(o.export_usd)}
+          value={<CountUp text={fmtUsd(o.export_usd)} />}
           delta={o.export_yoy_pct != null ? `${fmtPct(o.export_yoy_pct)} yr/yr` : null}
           deltaTone={o.export_yoy_pct != null ? (o.export_yoy_pct >= 0 ? 'up' : 'down') : null}
         />
@@ -346,13 +347,13 @@ export default function Country() {
               Total imports <span className="dim">({o.year})</span>
             </>
           }
-          value={fmtUsd(o.import_usd)}
+          value={<CountUp text={fmtUsd(o.import_usd)} />}
           delta={o.import_yoy_pct != null ? `${fmtPct(o.import_yoy_pct)} yr/yr` : null}
           deltaTone={o.import_yoy_pct != null ? (o.import_yoy_pct >= 0 ? 'up' : 'down') : null}
         />
         <Stat
           label={<Term k="trade_balance">Trade balance</Term>}
-          value={fmtUsd(o.balance_usd)}
+          value={<CountUp text={fmtUsd(o.balance_usd)} />}
           delta={
             o.balance_usd >= 0 ? (
               <Term k="surplus">Surplus</Term>

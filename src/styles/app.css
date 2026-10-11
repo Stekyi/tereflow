@@ -3077,3 +3077,10 @@ textarea {
   .mm-hero { min-height: 0; }
   .mm-hero .mm-hero-scene { width: 100%; opacity: .26; -webkit-mask-image: none; mask-image: none; border-radius: 22px; }
 }
+/* ---------- Scroll reveal: cards fade and rise in as they enter the viewport (src/lib/scrollReveal.ts) ---------- */
+.sr { opacity: 0; transform: translateY(18px); }
+.sr.is-in {
+  opacity: 1;
+  transform: none;
+  transition: opacity .55s ease var(--sr-delay, 0ms), transform .55s ease var(--sr-delay, 0ms);
+}

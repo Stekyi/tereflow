@@ -1,10 +1,11 @@
-import { Suspense, lazy, useState } from 'react';
+﻿import { Suspense, lazy, useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Skeletons } from './components/ui';
 import { Logo } from './components/Brand';
 import FeedbackButton from './components/FeedbackButton';
 import { useSession } from './lib/auth';
 import { PageTitleContext } from './lib/pageTitle';
+import { startScrollReveal } from './lib/scrollReveal';
 
 const Home = lazy(() => import('./pages/Home'));
 const Countries = lazy(() => import('./pages/Countries'));
@@ -71,6 +72,9 @@ export default function App() {
   // change unmounts the old page, whose cleanup clears the name, so a page that
   // reports nothing falls back to its static label below.
   const [pageTitle, setPageTitle] = useState<string | null>(null);
+
+  // One observer fades cards in on every page as they scroll into view.
+  useEffect(() => startScrollReveal(), []);
 
   const isRoot = ROOTS.has(location.pathname);
   const title = pageTitle ?? TITLES[location.pathname] ?? 'Tereflow';

@@ -1,4 +1,4 @@
-import type { D1Database } from '@cloudflare/workers-types';
+﻿import type { D1Database } from '@cloudflare/workers-types';
 import { disambiguateProductNames, shortProductName } from '../../shared/product-name';
 import { hs2Sector, hs6Label } from '../agent/codes';
 import { oracleFetch, type OracleConfig } from './oracle';
@@ -181,6 +181,7 @@ export function buildFamilies(
   year: number,
   countryTotal: number | null,
   limit = 12,
+  linesTotal: number | null = null,
 ): FamilyBreakdown | null {
   if (rows.length === 0) return null;
   const groups = new Map<string, Row[]>();
@@ -193,6 +194,9 @@ export function buildFamilies(
     if (list) list.push(r);
     else groups.set(hs4, [r]);
   }
+
+  // Oracle sends only the largest groups, so the total of every line comes with it rather than being re-summed here.
+  if (linesTotal != null && linesTotal >= total) total = linesTotal;
 
   const families: ProductFamily[] = [];
   for (const [code, members] of groups) {
@@ -281,10 +285,11 @@ export async function loadProductFamiliesOracle(
     const body = (await res.json()) as {
       year: number;
       country_total_usd: number | null;
+      lines_total_usd?: number | null;
       lines: Array<{ hs_code: string; product_name: string | null; value_usd: number }>;
     };
     const lines = body.lines.map((l) => ({ ...l, product_name: hs6Label(l.hs_code, l.product_name) }));
-    return buildFamilies(lines, body.year, body.country_total_usd, limit);
+    return buildFamilies(lines, body.year, body.country_total_usd, limit, body.lines_total_usd ?? null);
   } catch {
     return null;
   }

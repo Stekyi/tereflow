@@ -212,7 +212,15 @@ def load_lines(conn, reporter: str, flow: str, prows: list | None = None) -> dic
     total = sum(float(r[5]) for r in cur_rows)
     lines = [{"hs_code": r[2], "product_name": r[3], "value_usd": float(r[5])}
              for r in cur_rows if float(r[5]) > 0 and len(r[2]) >= 6 and not r[2].startswith("99")]
-    return {"year": year, "country_total_usd": total, "lines": lines}
+    # The page shows the largest families only, so ship the lines of the biggest HS4 groups and the exact total of
+    # all lines (shares are measured against it). Shipping every line made this payload several MB at HS8 detail.
+    lines_total = sum(l["value_usd"] for l in lines)
+    by_group: dict[str, float] = {}
+    for l in lines:
+        by_group[l["hs_code"][:4]] = by_group.get(l["hs_code"][:4], 0.0) + l["value_usd"]
+    keep = set(sorted(by_group, key=by_group.get, reverse=True)[:LINE_GROUPS_KEPT])
+    lines = [l for l in lines if l["hs_code"][:4] in keep]
+    return {"year": year, "country_total_usd": total, "lines_total_usd": lines_total, "lines": lines}
 
 
 def refresh_dashboard(conn, reporter: str) -> int:
@@ -253,6 +261,7 @@ def read_cached(conn, reporter: str, kind: str) -> dict | None:
     return json.loads(raw)
 
 
+LINE_GROUPS_KEPT = 24   # HS4 groups per flow; the page shows 12 families
 PRODUCT_FLOOR_USD = 100_000
 PARTNER_ROWS_FOR_TOP = 400
 # The Worker parses every country's feed on each cross-country request, so the feed has to stay small. Detailed

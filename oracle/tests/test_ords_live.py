@@ -52,16 +52,28 @@ def test_sandbox_matches_python_api(auth):
     py = TestClient(app).post("/api/trade/sandbox", json={"primary": "ghana", "partners": ["NGA", "JPN"]},
                               headers={"Authorization": "Bearer t"}).json()
     od = requests.get(f"{URL}/tf/sandbox?primary=ghana&partners=NGA,JPN", headers=auth, timeout=120).json()
+    kept_codes: set = set()
     assert py["primary"] == od["primary"] and py["years"] == od["years"] and py["note"] == od["note"]
     for a, b in zip(py["partners"], od["partners"]):
         for k in ("iso3", "classification_level", "reporter_basis", "years", "unreported_rows"):
             assert a[k] == b[k], k
         key = lambda p: (p["hs_code"], p["flow"], p["year"], p["value_usd"], p["qty_kg"], p["classification_level"])
-        assert sorted(map(key, a["products"])) == sorted(map(key, b["products"]))
+        # ORDS keeps each partner's top 150 products per flow by five-year value; the reference API returns all of them.
+        sums: dict = {}
+        for p in a["products"]:
+            sums[(p["flow"], p["hs_code"])] = sums.get((p["flow"], p["hs_code"]), 0.0) + p["value_usd"]
+        keep = set()
+        for flow in {f for f, _ in sums}:
+            ranked = sorted(((v, c) for (f, c), v in sums.items() if f == flow), reverse=True)[:150]
+            keep |= {(flow, c) for _, c in ranked}
+        expected = [p for p in a["products"] if (p["flow"], p["hs_code"]) in keep]
+        kept_codes |= {(p["year"], p["flow"], p["hs_code"]) for p in expected}
+        assert sorted(map(key, expected)) == sorted(map(key, b["products"]))
         for x, y in zip(a["totals"], b["totals"]):
             for k in ("export_usd", "import_usd"):
                 assert (x[k] is None and y[k] is None) or x[k] == pytest.approx(y[k], abs=1e-3)
-    ta = sorted((t["year"], t["flow"], t["hs_code"], round(t["value_usd"], 2)) for t in py["primary_product_totals"])
+    ta = sorted((t["year"], t["flow"], t["hs_code"], round(t["value_usd"], 2)) for t in py["primary_product_totals"]
+                if (t["year"], t["flow"], t["hs_code"]) in kept_codes)
     tb = sorted((t["year"], t["flow"], t["hs_code"], round(t["value_usd"], 2)) for t in od["primary_product_totals"])
     assert ta == tb
 

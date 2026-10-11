@@ -58,21 +58,47 @@ BEGIN
            SELECT DISTINCT TRIM(REGEXP_SUBSTR(l_exclude, '[^,]+', 1, LEVEL)) c
            FROM dual CONNECT BY LEVEL <= REGEXP_COUNT(l_exclude, '[^,]+'))
          WHERE c IS NOT NULL),
+  -- The partner rows are read once and reused: each scan of a partner's rows costs about a second at 8-digit detail,
+  -- and this handler used to make six to eight of them.
+  pf0 AS (
+    SELECT /*+ MATERIALIZE */ f.partner_iso3, f.flow, f.year, f.cmd_code, f.cmd_desc, f.classification_level, f.value_usd, f.net_weight_kg
+      FROM tf_trade_facts f JOIN plist pl ON pl.p = f.partner_iso3
+     WHERE f.reporter_iso3 = l_p_iso AND f.year BETWEEN l_y0 AND l_last
+  ),
+  -- The exclusion list is a set of code prefixes. Testing it per trade row (millions of rows times hundreds of prefixes)
+  -- took minutes, so it is tested once per distinct code and every other step joins to the result.
+  okc AS (
+    SELECT /*+ MATERIALIZE */ d.cmd_code FROM (
+      SELECT DISTINCT f.cmd_code FROM pf0 f) d
+     WHERE NOT EXISTS (SELECT 1 FROM xl WHERE d.cmd_code LIKE xl.c || '%')
+  ),
+  -- The page shows the largest lines only, so each partner and flow keeps its top 150 products by five-year value.
+  -- Without this the response was tens of megabytes (every 8-digit line, every year, every partner).
+  topc AS (
+    SELECT /*+ MATERIALIZE */ partner_iso3, flow, cmd_code FROM (
+      SELECT f.partner_iso3, f.flow, f.cmd_code,
+             ROW_NUMBER() OVER (PARTITION BY f.partner_iso3, f.flow ORDER BY SUM(f.value_usd) DESC NULLS LAST) rn
+        FROM pf0 f
+       WHERE f.value_usd IS NOT NULL
+         AND f.cmd_code IN (SELECT cmd_code FROM okc)
+       GROUP BY f.partner_iso3, f.flow, f.cmd_code)
+    WHERE rn <= 150
+  ),
   pdata AS (
     SELECT pl.ord, pl.p, i.name,
       (SELECT 'HS' || MAX(TO_NUMBER(SUBSTR(f.classification_level, 3)))
-         FROM tf_trade_facts f
-        WHERE f.reporter_iso3 = l_p_iso AND f.partner_iso3 = pl.p AND f.year BETWEEN l_y0 AND l_last
+         FROM pf0 f
+        WHERE f.partner_iso3 = pl.p AND f.year BETWEEN l_y0 AND l_last
           AND REGEXP_LIKE(f.classification_level, '^HS[0-9]+$')) AS cls,
-      CASE WHEN EXISTS (SELECT 1 FROM tf_trade_facts f
-                         WHERE f.reporter_iso3 = l_p_iso AND f.partner_iso3 = pl.p AND f.year BETWEEN l_y0 AND l_last)
+      CASE WHEN EXISTS (SELECT 1 FROM pf0 f
+                         WHERE f.partner_iso3 = pl.p AND f.year BETWEEN l_y0 AND l_last)
            THEN 'primary' ELSE 'none' END AS basis,
       (SELECT JSON_ARRAYAGG(JSON_OBJECT(
                 'year' VALUE y.yr,
-                'export_usd' VALUE (SELECT SUM(f.value_usd) FROM tf_trade_facts f
-                   WHERE f.reporter_iso3 = l_p_iso AND f.partner_iso3 = pl.p AND f.year = y.yr AND f.flow = 'X' AND NOT EXISTS (SELECT 1 FROM xl WHERE f.cmd_code LIKE xl.c || '%')),
-                'import_usd' VALUE (SELECT SUM(f.value_usd) FROM tf_trade_facts f
-                   WHERE f.reporter_iso3 = l_p_iso AND f.partner_iso3 = pl.p AND f.year = y.yr AND f.flow = 'M' AND NOT EXISTS (SELECT 1 FROM xl WHERE f.cmd_code LIKE xl.c || '%')))
+                'export_usd' VALUE (SELECT SUM(f.value_usd) FROM pf0 f
+                   WHERE f.partner_iso3 = pl.p AND f.year = y.yr AND f.flow = 'X' AND f.cmd_code IN (SELECT cmd_code FROM okc)),
+                'import_usd' VALUE (SELECT SUM(f.value_usd) FROM pf0 f
+                   WHERE f.partner_iso3 = pl.p AND f.year = y.yr AND f.flow = 'M' AND f.cmd_code IN (SELECT cmd_code FROM okc)))
               ORDER BY y.yr RETURNING CLOB)
          FROM yrs y) AS totals_json,
       COALESCE((SELECT JSON_ARRAYAGG(JSON_OBJECT(
@@ -86,12 +112,13 @@ BEGIN
                 'reporter' VALUE l_p_iso,
                 'partner_iso3' VALUE pl.p)
               ORDER BY f.year, f.flow, f.cmd_code RETURNING CLOB)
-         FROM tf_trade_facts f
-        WHERE f.reporter_iso3 = l_p_iso AND f.partner_iso3 = pl.p AND f.year BETWEEN l_y0 AND l_last
-          AND f.value_usd IS NOT NULL AND NOT EXISTS (SELECT 1 FROM xl WHERE f.cmd_code LIKE xl.c || '%')), TO_CLOB('[]')) AS products_json,
-      (SELECT COUNT(*) FROM tf_trade_facts f
-        WHERE f.reporter_iso3 = l_p_iso AND f.partner_iso3 = pl.p AND f.year BETWEEN l_y0 AND l_last
-          AND f.value_usd IS NULL AND NOT EXISTS (SELECT 1 FROM xl WHERE f.cmd_code LIKE xl.c || '%')) AS unreported
+         FROM pf0 f
+        WHERE f.partner_iso3 = pl.p AND f.year BETWEEN l_y0 AND l_last
+          AND f.value_usd IS NOT NULL AND f.cmd_code IN (SELECT cmd_code FROM okc)
+          AND EXISTS (SELECT 1 FROM topc tc WHERE tc.partner_iso3 = pl.p AND tc.flow = f.flow AND tc.cmd_code = f.cmd_code)), TO_CLOB('[]')) AS products_json,
+      (SELECT COUNT(*) FROM pf0 f
+        WHERE f.partner_iso3 = pl.p AND f.year BETWEEN l_y0 AND l_last
+          AND f.value_usd IS NULL AND f.cmd_code IN (SELECT cmd_code FROM okc)) AS unreported
     FROM plist pl JOIN tf_iso3 i ON i.iso3 = pl.p
   )
   SELECT JSON_OBJECT(
@@ -117,12 +144,11 @@ BEGIN
         'flow' VALUE DECODE(t.flow, 'X', 'export', 'import'),
         'hs_code' VALUE t.hs_code,
         'value_usd' VALUE t.all_partner_value_usd) RETURNING CLOB)
-      FROM v_sandbox_product_totals t
+      FROM tf_product_totals t
       WHERE t.reporter_iso3 = l_p_iso AND t.year BETWEEN l_y0 AND l_last AND t.all_partner_value_usd IS NOT NULL
-        AND NOT EXISTS (SELECT 1 FROM xl WHERE t.hs_code LIKE xl.c || '%')
-        AND EXISTS (SELECT 1 FROM tf_trade_facts f JOIN plist pl ON pl.p = f.partner_iso3
-                    WHERE f.reporter_iso3 = t.reporter_iso3 AND f.year = t.year AND f.flow = t.flow
-                      AND f.cmd_code = t.hs_code)), TO_CLOB('[]')) FORMAT JSON,
+        AND t.hs_code IN (SELECT cmd_code FROM okc)
+        AND EXISTS (SELECT 1 FROM pf0 f WHERE f.year = t.year AND f.flow = t.flow AND f.cmd_code = t.hs_code
+                      AND EXISTS (SELECT 1 FROM topc tc WHERE tc.partner_iso3 = f.partner_iso3 AND tc.flow = f.flow AND tc.cmd_code = f.cmd_code))), TO_CLOB('[]')) FORMAT JSON,
     'note' VALUE 'All comparisons use the primary country''s stored partner-level trade facts from Oracle. Comparison countries do not need to be activated. No stored rows means no recorded transaction, and a value Comtrade did not report is not shown as zero. Each product total sums every partner for that product, year and flow. It is not the headline world row and not the sum of only the selected partners.'
     RETURNING CLOB)
   INTO l_out FROM dual;

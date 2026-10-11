@@ -49,6 +49,20 @@ LEFT JOIN part p ON p.reporter_iso3 = a.reporter_iso3 AND p.flow = a.flow
 """
 
 
+def refresh_product_totals(conn, reporter: str, commit: bool = True) -> int:
+    """All-partner yearly totals per product (the Trade Sandbox denominator), replaced for one reporter."""
+    cur = conn.cursor()
+    cur.execute("DELETE FROM tf_product_totals WHERE reporter_iso3 = :1", [reporter])
+    cur.execute("""INSERT INTO tf_product_totals (reporter_iso3, year, flow, hs_code, all_partner_value_usd, all_partner_weight_kg)
+                   SELECT reporter_iso3, year, flow, cmd_code, SUM(value_usd), SUM(net_weight_kg)
+                     FROM tf_trade_facts WHERE reporter_iso3 = :1 AND partner_iso3 <> 'WLD'
+                    GROUP BY reporter_iso3, year, flow, cmd_code""", [reporter])
+    n = cur.rowcount
+    if commit:
+        conn.commit()
+    return n
+
+
 def refresh_metrics(conn, reporter: str) -> int:
     """Replace one reporter's metrics in a single transaction."""
     cur = conn.cursor()
@@ -56,6 +70,7 @@ def refresh_metrics(conn, reporter: str) -> int:
         cur.execute("DELETE FROM tf_product_metrics WHERE reporter_iso3 = :1", [reporter])
         cur.execute(REFRESH_SQL, {"rep": reporter})
         n = cur.rowcount
+        refresh_product_totals(conn, reporter, commit=False)
         conn.commit()
         return n
     except Exception:

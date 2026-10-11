@@ -84,6 +84,11 @@ BEGIN
        GROUP BY f.partner_iso3, f.flow, f.cmd_code)
     WHERE rn <= 150
   ),
+  -- Years in which a kept product has partner rows, joined once so the totals step is a plain lookup.
+  kyfc AS (
+    SELECT /*+ MATERIALIZE */ DISTINCT f.year, f.flow, f.cmd_code
+      FROM pf0 f JOIN topc tc ON tc.partner_iso3 = f.partner_iso3 AND tc.flow = f.flow AND tc.cmd_code = f.cmd_code
+  ),
   pdata AS (
     SELECT pl.ord, pl.p, i.name,
       (SELECT 'HS' || MAX(TO_NUMBER(SUBSTR(f.classification_level, 3)))
@@ -147,8 +152,7 @@ BEGIN
       FROM tf_product_totals t
       WHERE t.reporter_iso3 = l_p_iso AND t.year BETWEEN l_y0 AND l_last AND t.all_partner_value_usd IS NOT NULL
         AND t.hs_code IN (SELECT cmd_code FROM okc)
-        AND EXISTS (SELECT 1 FROM pf0 f WHERE f.year = t.year AND f.flow = t.flow AND f.cmd_code = t.hs_code
-                      AND EXISTS (SELECT 1 FROM topc tc WHERE tc.partner_iso3 = f.partner_iso3 AND tc.flow = f.flow AND tc.cmd_code = f.cmd_code))), TO_CLOB('[]')) FORMAT JSON,
+        AND EXISTS (SELECT 1 FROM kyfc k WHERE k.year = t.year AND k.flow = t.flow AND k.cmd_code = t.hs_code)), TO_CLOB('[]')) FORMAT JSON,
     'note' VALUE 'All comparisons use the primary country''s stored partner-level trade facts from Oracle. Comparison countries do not need to be activated. No stored rows means no recorded transaction, and a value Comtrade did not report is not shown as zero. Each product total sums every partner for that product, year and flow. It is not the headline world row and not the sum of only the selected partners.'
     RETURNING CLOB)
   INTO l_out FROM dual;

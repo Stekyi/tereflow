@@ -1551,7 +1551,7 @@ function DashboardProvenance({ notes }: { notes: NonNullable<CountryDashboard['p
           const fx = last.currency && last.usd_per_unit ? `, converted from ${last.currency} at about ${last.usd_per_unit.toFixed(2)} dollars each` : '';
           return (
             <li key={key}>
-              {last.flow === 'export' ? 'Exports' : 'Imports'} {span}: {last.source}
+              {last.flow === 'export' || (last.flow as string) === 'X' ? 'Exports' : 'Imports'} {span}: {last.source}
               {last.level ? `, ${last.level} detail` : ''}
               {released ? `, latest release ${released}` : ''}
               {fx}.

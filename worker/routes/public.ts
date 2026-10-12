@@ -188,6 +188,7 @@ pub.get('/dashboard/:slug', async (c) => {
   const oracle = oracleConfig(c.env);
   const oracleDash = oracle && entity.iso3 ? { cfg: oracle, iso3: entity.iso3 } : null;
   let oracleComputedAt: string | null = null;
+  let oracleProvenance: CountryDashboard['provenance'];
   if (oracleDash) {
     try {
       const res = await oracleFetch(oracleDash.cfg, { route: 'dashboard', iso3: oracleDash.iso3 });
@@ -200,6 +201,7 @@ pub.get('/dashboard/:slug', async (c) => {
         const d = (await res.json()) as {
           overview: Overview; top_exports: RankedItem[]; top_imports: RankedItem[];
           partners_export: RankedItem[]; partners_import: RankedItem[]; trend: TrendPoint[]; computed_at: string | null;
+          provenance?: CountryDashboard['provenance'];
         };
         overview = {
           ...d.overview,
@@ -211,6 +213,7 @@ pub.get('/dashboard/:slug', async (c) => {
         topExports = labelled(d.top_exports); topImports = labelled(d.top_imports);
         partnersExport = d.partners_export; partnersImport = d.partners_import; trend = d.trend;
         oracleComputedAt = d.computed_at;
+        oracleProvenance = d.provenance;
       }
     } catch {
       return bad('Trade data service is unavailable', 502);
@@ -328,6 +331,7 @@ pub.get('/dashboard/:slug', async (c) => {
     families_import: familiesImport,
     families_export: familiesExport,
     computed_at: oracleComputedAt ?? computed?.at ?? null,
+    ...(oracleProvenance?.length ? { provenance: oracleProvenance } : {}),
   };
 
   // Cached only for anonymous readers. The payload's `opportunities` field

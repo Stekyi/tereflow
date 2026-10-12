@@ -90,6 +90,30 @@ export default function Me() {
         <span className="dim">›</span>
       </Link>
 
+      <Link className="list-item" to="/notifications">
+        <span className="grow">
+          <span className="name">Notifications</span>
+          <span className="tiny dim">Messages, enquiries and auctions</span>
+        </span>
+        <span className="dim">›</span>
+      </Link>
+
+      <Link className="list-item" to="/saved">
+        <span className="grow">
+          <span className="name">Saved opportunities</span>
+          <span className="tiny dim">Your private shortlist, notes and links</span>
+        </span>
+        <span className="dim">›</span>
+      </Link>
+
+      <Link className="list-item" to="/market/mine">
+        <span className="grow">
+          <span className="name">My listings</span>
+          <span className="tiny dim">Market Square listings and auctions</span>
+        </span>
+        <span className="dim">›</span>
+      </Link>
+
       {card?.is_published === 1 && (
         <Link className="list-item" to={`/network/${card.id}`}>
           <span className="grow">

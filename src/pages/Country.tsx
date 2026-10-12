@@ -23,6 +23,7 @@ import { disambiguateProductNames, shortProductName } from '../../shared/product
 import { BarRow, Empty, FollowButton, Skeletons, Stat, useToast } from '../components/ui';
 import GlobalProductModal, { fmtReleased } from '../components/ProductModal';
 import SandboxLink from '../components/SandboxLink';
+import SaveButton from '../components/SaveButton';
 import { CountUp } from '../components/TradeStory';
 import SectionNav, { type Section } from '../components/SectionNav';
 import {
@@ -784,7 +785,7 @@ function Ranked({
           max={max}
           action={
             !flow && sandboxSlug && i.code ? (
-              <SandboxLink primarySlug={sandboxSlug} partnerIso3={i.code} flow={partnerFlow}>Sandbox</SandboxLink>
+              <><SandboxLink primarySlug={sandboxSlug} partnerIso3={i.code} flow={partnerFlow}>Sandbox</SandboxLink><SaveButton countrySlug={sandboxSlug} partnerIso3={i.code} flow={partnerFlow} title={`${partnerFlow === 'import' ? 'Imports from' : 'Exports to'} ${i.name}`} /></>
             ) : follow && i.code ? (
               <FollowButton
                 kind="hs_code"

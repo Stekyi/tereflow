@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
+import { social } from '../lib/api-social';
 import { usePageTitle } from '../lib/pageTitle';
 import { Empty, Skeletons, useToast } from '../components/ui';
 import { INTENT_LABEL, type BusinessCard, type Rating } from '../../shared/types';
@@ -119,6 +120,8 @@ export default function CardDetail() {
           </div>
         </div>
       </div>
+
+      {user && !isMe && card.user_id && <FollowPerson userId={card.user_id} />}
 
       {card.headline && (
         <div className="card tight">
@@ -301,5 +304,26 @@ export default function CardDetail() {
         )}
       </div>
     </>
+  );
+}
+
+function FollowPerson({ userId }: { userId: string }) {
+  const [state, setState] = useState<{ following: boolean; followers: number } | null>(null);
+  useEffect(() => {
+    social.stats(userId).then((s) => setState({ following: s.am_following, followers: s.followers })).catch(() => setState(null));
+  }, [userId]);
+  if (!state) return null;
+  async function toggle() {
+    try {
+      if (state!.following) await social.unfollow(userId); else await social.follow(userId);
+      const s = await social.stats(userId);
+      setState({ following: s.am_following, followers: s.followers });
+    } catch { /* leave as is */ }
+  }
+  return (
+    <div className="row between" style={{ margin: '0 0 12px' }}>
+      <span className="tiny dim">{state.followers} follower{state.followers === 1 ? '' : 's'}</span>
+      <button type="button" className={state.following ? 'btn' : 'btn primary'} onClick={() => void toggle()}>{state.following ? 'Following' : 'Follow'}</button>
+    </div>
   );
 }

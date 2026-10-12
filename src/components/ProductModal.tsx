@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Bar,
@@ -16,6 +16,7 @@ import {
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
 import SandboxLink from './SandboxLink';
+import SaveButton from './SaveButton';
 import { analyseUnitValues } from '../../shared/unit-value';
 import { useBudget } from '../lib/budget';
 import { budgetFit, fmtQuantity } from '../../shared/budget';
@@ -412,6 +413,7 @@ function PartnerFlows({ flows, countrySlug }: { flows: NonNullable<ProductInsigh
                 </td>
                 <td className="align-right">
                   <SandboxLink primarySlug={countrySlug} partnerIso3={p.iso3} hs={flows.requested_code} flow={flows.trade_flow} />
+                  <SaveButton countrySlug={countrySlug} partnerIso3={p.iso3} hs={flows.requested_code} flow={flows.trade_flow} title={`${flows.country_name} ${flows.trade_flow} of ${flows.requested_code} ${flows.trade_flow === 'import' ? 'from' : 'to'} ${p.partner}`} />
                 </td>
               </tr>
             ))}

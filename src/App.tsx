@@ -1,4 +1,4 @@
-﻿import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Skeletons } from './components/ui';
 import { Logo } from './components/Brand';
@@ -19,6 +19,13 @@ const Network = lazy(() => import('./pages/Network'));
 const CardDetail = lazy(() => import('./pages/CardDetail'));
 const CardEditor = lazy(() => import('./pages/CardEditor'));
 const Messages = lazy(() => import('./pages/Messages'));
+const Market = lazy(() => import('./pages/Market'));
+const MarketNew = lazy(() => import('./pages/Market').then((m) => ({ default: m.MarketNew })));
+const MarketMine = lazy(() => import('./pages/Market').then((m) => ({ default: m.MarketMine })));
+const MarketDetail = lazy(() => import('./pages/Market').then((m) => ({ default: m.MarketDetail })));
+const Activity = lazy(() => import('./pages/Activity').then((m) => ({ default: m.Activity })));
+const Saved = lazy(() => import('./pages/Activity').then((m) => ({ default: m.Saved })));
+const Notifications = lazy(() => import('./pages/Activity').then((m) => ({ default: m.Notifications })));
 const Thread = lazy(() => import('./pages/Thread'));
 const Me = lazy(() => import('./pages/Me'));
 const Feed = lazy(() => import('./pages/Feed'));
@@ -57,6 +64,8 @@ const NAV: { to: string; label: string; d: string; stroke?: boolean; badge?: 'fe
   { to: '/sandbox', label: 'Sandbox', d: 'M4 4h16v16H4zM8 8h8M8 12h8M8 16h5', stroke: true },
   { to: '/opportunities', label: 'Opportunities', d: 'M4 19 10 13l4 3 6-8', stroke: true },
   { to: '/network', label: 'Network', d: 'M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 13a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm0 1.5c-3 0-6 1.5-6 3.5v2h12v-2c0-2-3-3.5-6-3.5zm8-1c-.9 0-1.8.14-2.6.4 1.6.9 2.6 2.2 2.6 3.6v2h6v-2c0-2-3-4-6-4z' },
+  { to: '/market', label: 'Market', d: 'M3 9l2-5h14l2 5M4 9v11h16V9M9 20v-6h6v6', stroke: true },
+  { to: '/activity', label: 'Activity', d: 'M4 12h4l3-8 4 16 3-8h2', stroke: true },
   { to: '/feed', label: 'Feed', d: 'M5 5h14v14H5zM8 9h8M8 12h8M8 15h5', stroke: true, badge: 'feed' },
   { to: '/messages', label: 'Messages', d: 'M21 6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3v4l5-4h6a2 2 0 0 0 2-2z', badge: 'messages' },
   { to: '/me', label: 'Me', d: 'M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm0 2c-4 0-8 2-8 5v2h16v-2c0-3-4-5-8-5z' },
@@ -138,6 +147,13 @@ export default function App() {
             <Route path="/network" element={<Network />} />
             <Route path="/network/:id" element={<CardDetail />} />
             <Route path="/messages" element={<Messages />} />
+            <Route path="/market" element={<Market />} />
+            <Route path="/market/new" element={<MarketNew />} />
+            <Route path="/market/mine" element={<MarketMine />} />
+            <Route path="/market/:id" element={<MarketDetail />} />
+            <Route path="/activity" element={<Activity />} />
+            <Route path="/saved" element={<Saved />} />
+            <Route path="/notifications" element={<Notifications />} />
             <Route path="/messages/:id" element={<Thread />} />
             <Route path="/me" element={<Me />} />
             <Route path="/me/card" element={<CardEditor />} />

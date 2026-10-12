@@ -37,6 +37,7 @@ export type OracleRoute =
   | { route: 'lines'; iso3: string; flow: 'X' | 'M' }
   | { route: 'products'; iso3: string }
   | { route: 'product'; iso3: string; flow: 'X' | 'M'; code: string }
+  | { route: 'monthly'; iso3: string; flow: 'X' | 'M'; code: string }
   | { route: 'stats' }
   | { route: 'sandbox'; primary: string; partners: string[]; exclude?: string[] };
 
@@ -80,6 +81,7 @@ function target(cfg: OracleConfig, r: OracleRoute): { url: string; init: Request
       case 'lines': return { url: `${cfg.base}/tf/lines/${enc(r.iso3)}?flow=${r.flow}`, init: {} };
       case 'products': return { url: `${cfg.base}/tf/products/${enc(r.iso3)}`, init: {} };
       case 'product': return { url: `${cfg.base}/tf/product/${enc(r.iso3)}/${r.flow}/${enc(r.code)}`, init: {} };
+      case 'monthly': return { url: `${cfg.base}/tf/monthly/${enc(r.iso3)}/${r.flow}/${enc(r.code)}`, init: {} };
       case 'stats': return { url: `${cfg.base}/tf/stats`, init: {} };
       case 'sandbox': {
         const ex = r.exclude?.length ? `&exclude=${enc(r.exclude.join(','))}` : '';
@@ -93,6 +95,7 @@ function target(cfg: OracleConfig, r: OracleRoute): { url: string; init: Request
     case 'lines': return { url: `${cfg.base}/api/lines/${enc(r.iso3)}?flow=${r.flow}`, init: {} };
     case 'products': return { url: `${cfg.base}/api/products/${enc(r.iso3)}`, init: {} };
     case 'product': return { url: `${cfg.base}/api/product/${enc(r.iso3)}/${r.flow}/${enc(r.code)}`, init: {} };
+    case 'monthly': return { url: `${cfg.base}/api/monthly/${enc(r.iso3)}/${r.flow}/${enc(r.code)}`, init: {} };
     case 'stats': return { url: `${cfg.base}/api/stats`, init: {} };
     case 'sandbox':
       return {

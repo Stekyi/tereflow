@@ -31,6 +31,7 @@ import type {
 } from '../../shared/types';
 import type { ProvenanceNote } from '../../shared/types';
 import { reexportSignal } from '../../shared/reexport';
+import { seasonality, type MonthlyRow } from '../../shared/seasonality';
 
 /**
  * Product views (the modal, the product page, the market view) built from the Oracle feeds.
@@ -487,5 +488,12 @@ export async function buildProductInsightOracle(
   const mine = series.series.map((r) => ({ year: r.year, value_usd: r.value_usd, qty_kg: r.qty_kg }));
   const theirs = (other?.series ?? []).map((r) => ({ year: r.year, value_usd: r.value_usd, qty_kg: r.qty_kg }));
   const [xs, ms] = focus.flow === 'export' ? [mine, theirs] : [theirs, mine];
-  return { ...built, reexport: reexportSignal(xs, ms) };
+  const monthly = await oracleJson<{ source: string | null; rows: MonthlyRow[] }>(cfg, {
+    route: 'monthly', iso3: focus.e.iso3, flow: focus.flow === 'export' ? 'X' : 'M', code: hs,
+  }).catch(() => null);
+  return {
+    ...built,
+    reexport: reexportSignal(xs, ms),
+    seasonality: monthly ? { ...seasonality(monthly.rows), source: monthly.source } : null,
+  };
 }

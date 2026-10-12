@@ -605,6 +605,46 @@ function ReexportBlock({ signal }: { signal: NonNullable<ProductInsight['reexpor
     </div>
   );
 }
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const SEASON_TITLE: Record<string, string> = {
+  seasonal: 'Seasonal',
+  'mildly-seasonal': 'Mildly seasonal',
+  'not-seasonal': 'Not seasonal',
+  insufficient: 'Not enough monthly data to tell',
+};
+
+function SeasonalityBlock({ signal }: { signal: NonNullable<ProductInsight['seasonality']> | null }) {
+  if (!signal) {
+    return (
+      <p className="tiny dim" style={{ margin: '10px 0 0' }}>
+        <strong>Seasonality</strong>: monthly figures are not stored for this country yet.
+      </p>
+    );
+  }
+  const max = signal.index ? Math.max(...signal.index, 1) : 1;
+  return (
+    <div className="tiny dim" style={{ margin: '10px 0 0' }}>
+      <strong>{SEASON_TITLE[signal.verdict]}</strong>
+      <p style={{ margin: '4px 0 0' }}>
+        {signal.reason}
+        {signal.years.length > 0 && ` Years used: ${signal.years[0]} to ${signal.years[signal.years.length - 1]}.`}
+      </p>
+      {signal.index && (
+        <div role="img" aria-label={`Monthly index, peak in ${MONTH_ABBR[(signal.peak_month ?? 1) - 1]}`}
+          style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 64, margin: '8px 0 2px' }}>
+          {signal.index.map((v, i) => (
+            <div key={MONTH_ABBR[i]} title={`${MONTH_ABBR[i]}: ${v} times an average month`}
+              style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ height: Math.max(2, (v / max) * 48), background: i + 1 === signal.peak_month ? 'var(--accent, #0f9d58)' : 'var(--line, #cfd4dc)', borderRadius: 2 }} />
+              <span style={{ fontSize: 9 }}>{MONTH_ABBR[i][0]}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <p style={{ margin: '4px 0 0' }}>{signal.source ? `Source: ${signal.source}. ` : ''}{signal.limitations.join(' ')}</p>
+    </div>
+  );
+}
 /* ---------- focused product history ---------- */
 
 function ProductHistoryChart({ rows }: { rows: NonNullable<ProductInsight['time_series']> }) {
@@ -999,6 +1039,7 @@ export default function ProductModal({
                     <ProductHistoryChart rows={insight.time_series} />
                     <ProvenanceBlock notes={insight.provenance ?? []} rows={insight.time_series} />
                 {insight.reexport && <ReexportBlock signal={insight.reexport} />}
+                {insight.seasonality !== undefined && <SeasonalityBlock signal={insight.seasonality} />}
                   </div>
                 )}
 

@@ -1,4 +1,4 @@
-﻿"""Command line: python -m tereflow_oracle <command>."""
+"""Command line: python -m tereflow_oracle <command>."""
 from __future__ import annotations
 import argparse
 import os
@@ -99,6 +99,12 @@ def cmd_ingest(conn, a):
     sys.exit(0 if s.status in ("SUCCESS",) else 2)
 
 
+def cmd_ingest_monthly(conn, a):
+    from . import monthly
+    years = a.years or default_years(6)
+    print(monthly.ingest_monthly(conn, a.country.upper(), years))
+
+
 def cmd_analytics(conn, a):
     for c in [x.upper() for x in a.country] or active_countries(conn):
         print(f"metrics {c}: {analytics.refresh_metrics(conn, c):,} products")
@@ -151,6 +157,9 @@ def main(argv=None):
     i.add_argument("--no-analytics", action="store_true")
     i.add_argument("--incremental", action="store_true", help="fill gaps in the base years, then only the current year")
     i.add_argument("--base-years", type=int, default=5)
+    mo = sub.add_parser("ingest-monthly")
+    mo.add_argument("--country", required=True)
+    mo.add_argument("--years", nargs="*", type=int)
     an = sub.add_parser("analytics")
     an.add_argument("--country", nargs="*", default=[])
     a = p.parse_args(argv)
@@ -159,7 +168,7 @@ def main(argv=None):
         print("applied:", db.migrate(conn) or "nothing new")
         return
     {"sync-countries": cmd_sync_countries, "create-app-user": cmd_create_app_user, "ingest": cmd_ingest,
-     "analytics": cmd_analytics, "status": cmd_status, "check": cmd_check, "define-ords": cmd_define_ords}[a.cmd](conn, a)
+     "analytics": cmd_analytics, "ingest-monthly": cmd_ingest_monthly, "status": cmd_status, "check": cmd_check, "define-ords": cmd_define_ords}[a.cmd](conn, a)
 
 
 if __name__ == "__main__":

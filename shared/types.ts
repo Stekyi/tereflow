@@ -701,6 +701,8 @@ export interface ProductInsight {
   provenance?: ProvenanceNote[];
   /** Exports against imports of this product for the focused country; absent without a focus. */
   reexport?: import('./reexport').ReexportSignal | null;
+  /** Month-by-month pattern for the focused country; null when no monthly data is stored for it. */
+  seasonality?: (import('./seasonality').SeasonalitySignal & { source: string | null }) | null;
 
   /**
    * Where the demand is growing. Importing countries ranked by growth rather

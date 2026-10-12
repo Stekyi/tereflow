@@ -16,6 +16,7 @@ ROUTES = [
     ("lines/:iso3", "lines.plsql"),
     ("products/:iso3", "products.plsql"),
     ("product/:iso3/:flow/:code", "product.plsql"),
+    ("monthly/:iso3/:flow/:code", "monthly.plsql"),
     ("stats", "stats.plsql"),
     ("sandbox", "sandbox.plsql"),
 ]

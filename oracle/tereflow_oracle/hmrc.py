@@ -160,3 +160,32 @@ class Hmrc:
             out.rows.append(Row("WLD", code, None, round(v * usd_per_unit, 2), w or None, (s or None) if u else None, u if s else None))
         out.digest = f"{expect.checksum}"
         return out
+
+    MONTH_GROUP = "/groupby((CommodityId,MonthId),aggregate(Value with sum as v,NetMass with sum as w))"
+
+    def fetch_monthly(self, year, flow, usd_per_unit):
+        """Monthly totals per HS6 product for one year and flow, as {(hs6, month): (usd, kg)}.
+
+        Totals are summed over every partner. Refused unless the months add up to the source's own
+        annual total, so a short read can never be stored as a full year."""
+        self._lookups()
+        rows = self._pages("/OTS", {"$apply": self._apply(year, flow, self.MONTH_GROUP)})
+        out: dict[tuple[str, int], list[float]] = {}
+        for r in rows:
+            if r["CommodityId"] < 0:
+                continue
+            code = self._commodities.get(r["CommodityId"])
+            if not code or not re.fullmatch(r"\d{8}", code) or code == UNSPECIFIED:
+                continue
+            month = int(r["MonthId"]) % 100
+            if not 1 <= month <= 12:
+                continue
+            acc = out.setdefault((code[:6], month), [0.0, 0.0])
+            acc[0] += float(r["v"] or 0)
+            acc[1] += float(r["w"] or 0)
+        annual = self.total_local(year, flow)
+        read = sum(float(r["v"] or 0) for r in rows)
+        if not annual or abs(read - annual) > 0.001 * annual:
+            raise HmrcError(f"HMRC {year} {flow}: monthly rows sum to {read:,.0f} but the annual total is "
+                            f"{annual:,.0f}; refusing to store")
+        return {k: (round(v * usd_per_unit, 2), w or None) for k, (v, w) in out.items()}

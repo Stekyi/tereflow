@@ -1,4 +1,4 @@
-﻿"""Read-only HTTP API over Oracle. Contract-compatible with the Worker's /api/trade/sandbox."""
+"""Read-only HTTP API over Oracle. Contract-compatible with the Worker's /api/trade/sandbox."""
 from __future__ import annotations
 import hmac
 import json
@@ -258,6 +258,20 @@ def product_detail(iso3: str, flow: str, code: str, _=Depends(auth)):
         d = dash.load_product_detail(c, iso3, f, code)
     if d is None:
         raise HTTPException(404, f"No stored trade for {iso3.upper()} {f} {code}")
+    return d
+
+
+@app.get("/api/monthly/{iso3}/{flow}/{code}")
+def monthly(iso3: str, flow: str, code: str, _=Depends(auth)):
+    f = {"X": "X", "EXPORT": "X", "M": "M", "IMPORT": "M"}.get(flow.upper())
+    if f is None:
+        raise HTTPException(400, "flow must be X, M, export or import")
+    if not code.isdigit() or not 2 <= len(code) <= 10:
+        raise HTTPException(400, "code must be 2 to 10 digits")
+    with pool().acquire() as c:
+        d = dash.load_monthly(c, iso3, f, code)
+    if d is None:
+        raise HTTPException(404, f"No monthly data for {iso3.upper()} {f} {code[:6]}")
     return d
 
 

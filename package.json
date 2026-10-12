@@ -45,6 +45,7 @@
     "test:sandbox-link": "node scripts/test-sandbox-link.mjs",
     "test:unit-value": "node scripts/test-unit-value.mjs",
     "test:reexport": "node scripts/test-reexport.mjs",
+    "test:seasonality": "node scripts/test-seasonality.mjs",
     "test:pipeline": "node scripts/test-ghana-pipeline.mjs",
     "ingest:context": "node scripts/ingest-context.mjs",
     "test:context": "node scripts/e2e-context.mjs",

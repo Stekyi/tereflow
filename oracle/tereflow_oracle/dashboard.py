@@ -1,4 +1,4 @@
-﻿"""Country dashboard figures computed from Oracle trade facts.
+"""Country dashboard figures computed from Oracle trade facts.
 
 A port of the trade-derived parts of worker/agent/analyse.ts (overview, ranked products,
 ranked partners, yearly trend). Constants match the D1 defaults in worker/lib/settings.ts.
@@ -372,3 +372,19 @@ def load_stats(conn) -> dict:
     n, facts = cur.fetchone()
     cur.execute("SELECT TO_CHAR(MAX(finished_at), 'YYYY-MM-DD\"T\"HH24:MI:SS') FROM tf_ingest_run WHERE status IN ('SUCCESS', 'PARTIAL')")
     return {"countries_with_data": int(n), "facts": int(facts), "last_run": cur.fetchone()[0]}
+
+MONTHLY_SQL = """SELECT year, month, SUM(value_usd), SUM(CASE WHEN net_weight_kg > 0 THEN net_weight_kg END)
+  FROM tf_trade_monthly WHERE reporter_iso3 = :rep AND flow = :fl AND cmd_code LIKE :code || '%'
+  GROUP BY year, month ORDER BY year, month"""
+
+
+def load_monthly(conn, reporter: str, flow: str, code: str) -> dict | None:
+    """Monthly values for one product (read at its HS6 heading), or None when none are stored."""
+    code6 = str(code)[:6]
+    cur = conn.cursor()
+    cur.execute(MONTHLY_SQL, {"rep": reporter.upper(), "fl": flow, "code": code6})
+    rows = [{"year": int(y), "month": int(m), "value_usd": float(v), "qty_kg": None if w is None else float(w)} for y, m, v, w in cur]
+    if not rows:
+        return None
+    cur.execute("SELECT MAX(source) FROM tf_trade_monthly WHERE reporter_iso3 = :rep AND flow = :fl", {"rep": reporter.upper(), "fl": flow})
+    return {"reporter": reporter.upper(), "flow": flow, "code": code6, "source": cur.fetchone()[0], "rows": rows}

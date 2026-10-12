@@ -1,4 +1,4 @@
-﻿import type { ScoreBand } from './opportunity';
+import type { ScoreBand } from './opportunity';
 export type EntityKind = 'country' | 'intl_org' | 'regional_body';
 export type SourceCategory = 'export' | 'import' | 'commerce';
 export type SourceFmt = 'html' | 'csv' | 'json' | 'api' | 'sdmx' | 'xlsx' | 'pdf';
@@ -699,6 +699,8 @@ export interface ProductInsight {
   }[];
   /** Source, detail level, release and currency conversion behind each year of time_series. */
   provenance?: ProvenanceNote[];
+  /** Exports against imports of this product for the focused country; absent without a focus. */
+  reexport?: import('./reexport').ReexportSignal | null;
 
   /**
    * Where the demand is growing. Importing countries ranked by growth rather

@@ -30,6 +30,7 @@ import type {
   ProductSubscriber,
 } from '../../shared/types';
 import type { ProvenanceNote } from '../../shared/types';
+import { reexportSignal } from '../../shared/reexport';
 
 /**
  * Product views (the modal, the product page, the market view) built from the Oracle feeds.
@@ -467,10 +468,11 @@ export async function buildProductInsightOracle(
     ? rows.find((r) => r.e.slug === focusSlug && r.flow === (focusFlow ?? 'export')) ?? rows.find((r) => r.e.slug === focusSlug) ?? null
     : null;
   const series = focus ? await oracleProductDetail(cfg, focus.e.iso3, focus.flow === 'export' ? 'X' : 'M', hs).catch(() => null) : null;
+  const other = focus ? await oracleProductDetail(cfg, focus.e.iso3, focus.flow === 'export' ? 'M' : 'X', hs).catch(() => null) : null;
   const named = rows.find((r) => r.name)?.name ?? null;
   const fullName = hs.length === 6 ? hs6Label(hs, named) : hs2Label(hs);
   const subscribers = await loadSubscribers(env, hs, fullName);
-  return buildInsight({
+  const built = buildInsight({
     hs,
     focusSlug,
     focusFlow,
@@ -481,4 +483,9 @@ export async function buildProductInsightOracle(
     category: classify(hs, global, new Set()),
     fullName,
   });
+  if (!focus || !series) return built;
+  const mine = series.series.map((r) => ({ year: r.year, value_usd: r.value_usd, qty_kg: r.qty_kg }));
+  const theirs = (other?.series ?? []).map((r) => ({ year: r.year, value_usd: r.value_usd, qty_kg: r.qty_kg }));
+  const [xs, ms] = focus.flow === 'export' ? [mine, theirs] : [theirs, mine];
+  return { ...built, reexport: reexportSignal(xs, ms) };
 }

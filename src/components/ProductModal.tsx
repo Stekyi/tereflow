@@ -585,6 +585,26 @@ function ProvenanceBlock({
   );
 }
 
+const REEXPORT_TITLE: Record<NonNullable<ProductInsight['reexport']>['verdict'], string> = {
+  possible: 'Possible re-export pattern',
+  'one-directional': 'Trade runs one way',
+  'volumes-differ': 'No re-export pattern',
+  insufficient: 'Not enough years to tell',
+};
+
+function ReexportBlock({ signal }: { signal: NonNullable<ProductInsight['reexport']> }) {
+  return (
+    <div className="tiny dim" style={{ margin: '10px 0 0' }}>
+      <strong>{REEXPORT_TITLE[signal.verdict]}</strong>
+      <p style={{ margin: '4px 0 0' }}>
+        {signal.reason}
+        {signal.export_to_import_ratio != null && ` Exports to imports: ${signal.export_to_import_ratio} to 1${signal.years.length ? ` over ${signal.years[0]} to ${signal.years[signal.years.length - 1]}` : ''}.`}
+        {signal.unit_value_ratio != null && ` Export price per kg is ${signal.unit_value_ratio} times the import price.`}
+      </p>
+      <p style={{ margin: '4px 0 0' }}>{signal.limitations.join(' ')}</p>
+    </div>
+  );
+}
 /* ---------- focused product history ---------- */
 
 function ProductHistoryChart({ rows }: { rows: NonNullable<ProductInsight['time_series']> }) {
@@ -978,6 +998,7 @@ export default function ProductModal({
                     </p>
                     <ProductHistoryChart rows={insight.time_series} />
                     <ProvenanceBlock notes={insight.provenance ?? []} rows={insight.time_series} />
+                {insight.reexport && <ReexportBlock signal={insight.reexport} />}
                   </div>
                 )}
 

@@ -29,6 +29,7 @@ import type {
   ProductInsight,
   ProductSubscriber,
 } from '../../shared/types';
+import type { ProvenanceNote } from '../../shared/types';
 
 /**
  * Product views (the modal, the product page, the market view) built from the Oracle feeds.
@@ -51,7 +52,8 @@ export interface ProductDetailPayload {
   name: string | null;
   level: string | null;
   latest_year: number;
-  series: Array<{ year: number; value_usd: number; qty_kg: number | null }>;
+  series: Array<{ year: number; value_usd: number; qty_kg: number | null; qty?: number | null; qty_unit?: string | null }>;
+  provenance?: ProvenanceNote[];
   partners: Array<{ iso3: string; value_usd: number; qty_kg: number | null }>;
 }
 
@@ -202,6 +204,8 @@ export function timeSeriesFrom(p: ProductDetailPayload | null): ProductInsight['
       year: r.year,
       value_usd: r.value_usd,
       qty_kg: qty,
+      qty: r.qty && r.qty > 0 && r.qty_unit ? r.qty : null,
+      qty_unit: r.qty && r.qty > 0 && r.qty_unit ? r.qty_unit : null,
       unit_value_usd_t: qty ? r.value_usd / (qty / 1000) : null,
       yoy_pct: prev && prev > 0 ? ((r.value_usd - prev) / prev) * 100 : null,
     };
@@ -220,7 +224,7 @@ export function partnerBreakdownFrom(p: ProductDetailPayload | null, countryName
     year: p.latest_year,
     total_usd: total,
     partner_count: p.partners.length,
-    source: 'UN Comtrade',
+    source: p.provenance?.find((n) => n.year === p.latest_year)?.source ?? 'UN Comtrade',
     is_chapter_level: hs.length === 2,
     requested_code: hs,
     partners: p.partners.map((r) => ({
@@ -307,6 +311,7 @@ export function buildInsight(i: InsightInput): ProductInsight {
     sellers,
     buyers,
     time_series: focus ? timeSeriesFrom(i.series) : [],
+    provenance: focus ? i.series?.provenance ?? [] : [],
     target_markets: targetMarkets,
     related: relatedFor(data, hs),
 

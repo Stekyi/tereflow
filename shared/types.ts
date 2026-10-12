@@ -1,4 +1,4 @@
-import type { ScoreBand } from './opportunity';
+﻿import type { ScoreBand } from './opportunity';
 export type EntityKind = 'country' | 'intl_org' | 'regional_body';
 export type SourceCategory = 'export' | 'import' | 'commerce';
 export type SourceFmt = 'html' | 'csv' | 'json' | 'api' | 'sdmx' | 'xlsx' | 'pdf';
@@ -408,7 +408,7 @@ export interface MarketProducts {
   category: ExportCategory;
   exporters: MarketCountryRank[];
   importers: MarketCountryRank[];
-  /** Each country's general trading partners — not specific to this product. */
+  /** Each country's general trading partners â€” not specific to this product. */
   partners_by_slug: Record<string, { export: RankedItem[]; import: RankedItem[] }>;
 }
 
@@ -594,6 +594,19 @@ export const PRICE_PREMIUM_LABEL: Record<PricePremium, string> = {
   unknown: 'No price reported',
 };
 
+/** Where one year's figures for a country came from, and what was done to them on the way in. */
+export interface ProvenanceNote {
+  year: number;
+  /** Product detail the source reports at, such as HS6 or HS8. */
+  level: string | null;
+  source: string;
+  /** Release marker the source gave: a month for national offices, a timestamp for Comtrade. */
+  released: string | null;
+  /** Set when the source reports in local currency and the figures were converted to dollars. */
+  currency: string | null;
+  usd_per_unit: number | null;
+}
+
 /** One country's position in one product, on one side of the trade. */
 export interface ProductCountryRow {
   rank: number;
@@ -678,9 +691,14 @@ export interface ProductInsight {
     year: number;
     value_usd: number;
     qty_kg: number | null;
+    /** Supplementary quantity in the source's own unit (items, litres, square metres), when it reports one. */
+    qty?: number | null;
+    qty_unit?: string | null;
     unit_value_usd_t: number | null;
     yoy_pct: number | null;
   }[];
+  /** Source, detail level, release and currency conversion behind each year of time_series. */
+  provenance?: ProvenanceNote[];
 
   /**
    * Where the demand is growing. Importing countries ranked by growth rather
@@ -1083,7 +1101,7 @@ export function fmtMoney(minor: number, currency: string): string {
 }
 
 export function fmtUsd(v: number | null | undefined): string {
-  if (v == null || !isFinite(v)) return '—';
+  if (v == null || !isFinite(v)) return 'â€”';
   const abs = Math.abs(v);
   // The sign goes outside the currency symbol. "$-3.33B" reads as a dollar
   // amount that happens to start with a minus; "-$3.33B" reads as a deficit,
@@ -1097,7 +1115,7 @@ export function fmtUsd(v: number | null | undefined): string {
 }
 
 export function fmtPct(v: number | null | undefined, digits = 1): string {
-  if (v == null || !isFinite(v)) return '—';
+  if (v == null || !isFinite(v)) return 'â€”';
   const sign = v > 0 ? '+' : '';
   return `${sign}${v.toFixed(digits)}%`;
 }

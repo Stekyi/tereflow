@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   /* Ivory paper rather than stark white. Warmth is most of what separates a
      premium surface from a utilitarian one. */
   --bg: #f7f8fb;
@@ -3084,3 +3084,37 @@ textarea {
   transform: none;
   transition: opacity .55s ease var(--sr-delay, 0ms), transform .55s ease var(--sr-delay, 0ms);
 }
+
+/* Full-bleed dark hero, as MyMarkets does: the moving scene fills the band behind the headline under a dark wash,
+   the headline turns white with the brand accent, and the copy sits in the left half. */
+.mm-hero {
+  width: 100vw; margin-left: calc(50% - 50vw); margin-top: -4px; padding: 72px max(20px, calc(50vw - 640px)) 64px;
+  min-height: 560px; background: #06121c; color: #fff; border-radius: 0;
+}
+.mm-hero .mm-hero-scene {
+  inset: 0; width: 100%; height: 100%; border-radius: 0; opacity: 1;
+  -webkit-mask-image: none; mask-image: none; object-fit: cover;
+}
+.mm-hero .mm-hero-scene svg, svg.mm-hero-scene { width: 100%; height: 100%; }
+.mm-hero > .mm-hero-copy::before {
+  content: ""; position: absolute; z-index: -1; inset: -72px -40vw -64px calc(-50vw);
+  background: linear-gradient(90deg, rgba(6,18,28,.96) 0%, rgba(6,18,28,.86) 45%, rgba(6,18,28,.2) 80%, transparent 100%);
+}
+.mm-hero-copy h1 { color: #fff; font-size: clamp(38px, 6vw, 64px); }
+.mm-hero-copy h1 em { color: #35e08f; }
+.mm-hero-copy p { color: rgba(255,255,255,.82); font-size: 18px; }
+.mm-hero-copy .mm-sources { color: rgba(255,255,255,.6); }
+.mm-hero .mm-overline { color: #35e08f; }
+.mm-hero .mm-cta { background: #35e08f; border-color: #35e08f; color: #06121c; }
+.mm-hero .mm-cta:hover { background: #5ff0aa; border-color: #5ff0aa; }
+.mm-hero .mm-cta.ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.7); }
+.mm-hero .mm-cta.ghost:hover { background: rgba(255,255,255,.12); color: #fff; }
+.mm-hero::before, .mm-hero::after { display: none; }
+@media (max-width: 899px) {
+  .mm-hero { padding: 48px 20px 44px; min-height: 0; }
+  .mm-hero .mm-hero-scene { opacity: .5; }
+  .mm-hero > .mm-hero-copy::before { inset: -48px -20px -44px -20px; background: rgba(6,18,28,.6); }
+}
+
+html, body { overflow-x: clip; }
+.mm-hero { margin-bottom: 28px; }

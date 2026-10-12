@@ -1,4 +1,4 @@
-"""UK HM Revenue & Customs overseas trade statistics (uktradeinfo OData API): CN8 tariff lines.
+﻿"""UK HM Revenue & Customs overseas trade statistics (uktradeinfo OData API): CN8 tariff lines.
 
 Free, no key. Documented limits: 40,000 rows a page, 60 requests a minute. Values are in GBP and
 are converted to USD with the rate passed in. Flows 2 and 4 are EU and non-EU exports, 1 and 3 are
@@ -20,8 +20,20 @@ DATA = Path(__file__).parent / "data"
 ISO2_ISO3: dict[str, str] = json.loads((DATA / "iso2_iso3.json").read_text())
 SPECIAL_ISO3 = {"XS": "SRB", "CS": "SRB", "XK": "XKX", "AN": "ANT", "DH": "ARE", "DU": "ARE", "HA": "ARE"}
 NES = "_X"
+UNITS_FILE = DATA / "uk_supp_units.json"
 UNSPECIFIED = "99999999"
 MIN_INTERVAL = 1.1               # seconds between calls, under the 60 a minute limit
+
+
+_UNITS: dict[str, str] | None = None
+
+
+def _units() -> dict[str, str]:
+    """Supplementary unit per CN8 code (UK Trade Tariff measure 109), built by scripts/build-uk-units.py."""
+    global _UNITS
+    if _UNITS is None:
+        _UNITS = json.loads(UNITS_FILE.read_text()) if UNITS_FILE.exists() else {}
+    return _UNITS
 
 
 class HmrcError(Exception):
@@ -96,7 +108,7 @@ class Hmrc:
         return (f"filter(MonthId ge {year}01 and MonthId le {year}12 and (FlowTypeId eq {a} or FlowTypeId eq {b}))"
                 + tail)
 
-    GROUP = "/groupby((CommodityId,CountryId),aggregate(Value with sum as v,NetMass with sum as w))"
+    GROUP = "/groupby((CommodityId,CountryId),aggregate(Value with sum as v,NetMass with sum as w,SuppUnit with sum as s))"
 
     def availability(self, year, flow):
         """Lines the source will serve for the year (after grouping), plus a fingerprint that changes
@@ -129,17 +141,22 @@ class Hmrc:
         for r in rows:
             code = cn8(None) if r["CommodityId"] < 0 else self._commodities.get(r["CommodityId"], UNSPECIFIED)
             ptn = self._countries.get(r["CountryId"], NES)
-            acc = merged.setdefault((ptn, code), [0.0, 0.0])
+            acc = merged.setdefault((ptn, code), [0.0, 0.0, 0.0])
             acc[0] += float(r["v"] or 0)
             acc[1] += float(r["w"] or 0)
+            acc[2] += float(r.get("s") or 0)
         world: dict[str, list[float]] = {}
         out = FetchResult(requests_made=0)
-        for (ptn, code), (v, w) in merged.items():
-            out.rows.append(Row(ptn, code, None, round(v * usd_per_unit, 2), w or None, None, None))
-            acc = world.setdefault(code, [0.0, 0.0])
+        units = _units()
+        for (ptn, code), (v, w, s) in merged.items():
+            u = units.get(code) or None
+            out.rows.append(Row(ptn, code, None, round(v * usd_per_unit, 2), w or None, (s or None) if u else None, u if s else None))
+            acc = world.setdefault(code, [0.0, 0.0, 0.0])
             acc[0] += v
             acc[1] += w
-        for code, (v, w) in world.items():
-            out.rows.append(Row("WLD", code, None, round(v * usd_per_unit, 2), w or None, None, None))
+            acc[2] += s
+        for code, (v, w, s) in world.items():
+            u = units.get(code) or None
+            out.rows.append(Row("WLD", code, None, round(v * usd_per_unit, 2), w or None, (s or None) if u else None, u if s else None))
         out.digest = f"{expect.checksum}"
         return out

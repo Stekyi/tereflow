@@ -314,9 +314,20 @@ def load_products(conn, reporter: str) -> dict | None:
     return {"reporter": reporter, "latest_year": latest, "count": len(items), "total_scored": total_scored, "products": items}
 
 
-PRODUCT_SERIES_SQL = """SELECT year, SUM(value_usd), SUM(CASE WHEN net_weight_kg > 0 THEN net_weight_kg END)
+PRODUCT_SERIES_SQL = """SELECT year, SUM(value_usd), SUM(CASE WHEN net_weight_kg > 0 THEN net_weight_kg END),
+  SUM(CASE WHEN qty > 0 THEN qty END), MIN(qty_unit), MAX(qty_unit)
   FROM tf_trade_facts WHERE reporter_iso3 = :rep AND flow = :fl AND cmd_code LIKE :code || '%'
    AND partner_iso3 <> 'WLD' AND value_usd IS NOT NULL GROUP BY year ORDER BY year"""
+PROVENANCE_SQL = """SELECT s.year, s.classification_level, s.classification_source, s.last_released, f.currency, f.usd_per_unit
+  FROM tf_ingest_state s LEFT JOIN tf_fx_rate f ON f.source = s.classification_source AND f.year = s.year AND f.flow = s.flow
+ WHERE s.reporter_iso3 = :rep AND s.flow = :fl AND s.status = 'SUCCESS' ORDER BY s.year"""
+SOURCE_LABELS = {"NATIONAL:HMRC": "HM Revenue & Customs (UK overseas trade statistics)"}
+
+
+def source_label(key: str | None) -> str:
+    return SOURCE_LABELS.get(key or "", "UN Comtrade") if key else "UN Comtrade"
+
+
 PRODUCT_PARTNERS_SQL = """SELECT partner_iso3, SUM(value_usd) v, SUM(CASE WHEN net_weight_kg > 0 THEN net_weight_kg END)
   FROM tf_trade_facts WHERE reporter_iso3 = :rep AND flow = :fl AND cmd_code LIKE :code || '%'
    AND partner_iso3 <> 'WLD' AND value_usd > 0 AND year = :yr GROUP BY partner_iso3 ORDER BY v DESC FETCH FIRST 100 ROWS ONLY"""
@@ -327,7 +338,9 @@ def load_product_detail(conn, reporter: str, flow: str, code: str) -> dict | Non
     b = {"rep": reporter.upper(), "fl": flow, "code": code}
     cur = conn.cursor()
     cur.execute(PRODUCT_SERIES_SQL, b)
-    series = [{"year": int(y), "value_usd": float(v), "qty_kg": None if w is None else float(w)} for y, v, w in cur]
+    series = [{"year": int(y), "value_usd": float(v), "qty_kg": None if w is None else float(w),
+               "qty": None if (q is None or u1 != u2) else float(q), "qty_unit": u1 if (q is not None and u1 == u2) else None}
+              for y, v, w, q, u1, u2 in cur]
     if not series:
         return None
     latest = series[-1]["year"]
@@ -340,8 +353,11 @@ def load_product_detail(conn, reporter: str, flow: str, code: str) -> dict | Non
         cur.execute("SELECT name FROM tf_hs6_name WHERE code = :c", {"c": str(code)[:6]})
         hit = cur.fetchone()
         name = hit[0] if hit else None
+    cur.execute(PROVENANCE_SQL, {"rep": b["rep"], "fl": flow})
+    provenance = [{"year": int(y), "level": lv, "source": source_label(src), "released": rel,
+                   "currency": ccy, "usd_per_unit": None if fx is None else float(fx)} for y, lv, src, rel, ccy, fx in cur]
     return {"reporter": b["rep"], "flow": flow, "code": code, "name": name, "level": level,
-            "latest_year": latest, "series": series, "partners": partners}
+            "latest_year": latest, "series": series, "partners": partners, "provenance": provenance}
 
 
 def load_stats(conn) -> dict:

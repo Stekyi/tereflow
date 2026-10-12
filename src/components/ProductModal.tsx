@@ -500,6 +500,66 @@ function CountryTable({ title, rows }: { title: string; rows: ProductCountryRow[
   );
 }
 
+/* ---------- where the figures came from ---------- */
+
+function fmtReleased(r: string | null): string | null {
+  if (!r) return null;
+  if (/^\d{6}$/.test(r)) {
+    const d = new Date(Date.UTC(Number(r.slice(0, 4)), Number(r.slice(4)) - 1, 1));
+    return d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+  }
+  const d = new Date(r);
+  return Number.isNaN(d.getTime()) ? r : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/**
+ * One line per source and detail level, naming the years it covers, plus the conversion to dollars when
+ * the source reports in local currency, and the quantity in the source's own unit for the latest year.
+ */
+function ProvenanceBlock({
+  notes,
+  rows,
+}: {
+  notes: NonNullable<ProductInsight['provenance']>;
+  rows: NonNullable<ProductInsight['time_series']>;
+}) {
+  const years = new Set(rows.map((r) => r.year));
+  const shown = notes.filter((n) => years.has(n.year));
+  const latestQty = [...rows].reverse().find((r) => r.qty != null && r.qty_unit);
+  if (!shown.length && !latestQty) return null;
+  const groups = new Map<string, typeof shown>();
+  for (const n of shown) {
+    const key = `${n.source}|${n.level ?? ''}`;
+    groups.set(key, [...(groups.get(key) ?? []), n]);
+  }
+  return (
+    <div className="tiny dim" style={{ margin: '10px 0 0' }}>
+      <strong>Where these figures come from</strong>
+      <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+        {[...groups.values()].map((g) => {
+          const last = g[g.length - 1];
+          const span = g.length > 1 ? `${g[0].year} to ${last.year}` : String(last.year);
+          const released = fmtReleased(last.released);
+          const fx = last.currency && last.usd_per_unit ? `, converted from ${last.currency} at about ${last.usd_per_unit.toFixed(2)} dollars each` : '';
+          return (
+            <li key={`${last.source}|${last.level}`}>
+              {span}: {last.source}
+              {last.level ? `, ${last.level} detail` : ''}
+              {released ? `, latest release ${released}` : ''}
+              {fx}.
+            </li>
+          );
+        })}
+      </ul>
+      {latestQty && (
+        <p style={{ margin: '4px 0 0' }}>
+          {latestQty.year} quantity in the source's own unit: {NF0.format(latestQty.qty as number)} {latestQty.qty_unit}.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /* ---------- focused product history ---------- */
 
 function ProductHistoryChart({ rows }: { rows: NonNullable<ProductInsight['time_series']> }) {
@@ -892,6 +952,7 @@ export default function ProductModal({
                       {insight.focus_name} {insight.focus_flow}s of HS {insight.hs_code}, by year.
                     </p>
                     <ProductHistoryChart rows={insight.time_series} />
+                    <ProvenanceBlock notes={insight.provenance ?? []} rows={insight.time_series} />
                   </div>
                 )}
 

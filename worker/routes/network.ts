@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { bad, json, uid } from '../lib/db';
 import { currentUser } from '../lib/session';
+import { clearFor, notify } from '../lib/notify';
 import { clientKey, rateLimit, tooMany } from '../lib/ratelimit';
 import { INTENTS, type BusinessCard, type BusinessCardInput, type Intent } from '../../shared/types';
 
@@ -397,6 +398,7 @@ network.get('/conversations/:id/messages', async (c) => {
   )
     .bind(cid, user.id)
     .run();
+  await clearFor(c.env, user.id, 'message', cid);
 
   const otherId = convo.a_user_id === user.id ? convo.b_user_id : convo.a_user_id;
   const other = await c.env.DB.prepare(
@@ -446,6 +448,15 @@ async function sendMessage(env: Env, conversationId: string, senderId: string, r
       conversationId,
     ),
   ]);
+  const convo = await env.DB.prepare('SELECT a_user_id, b_user_id FROM conversations WHERE id = ?')
+    .bind(conversationId).first<{ a_user_id: string; b_user_id: string }>();
+  if (convo) {
+    const to = convo.a_user_id === senderId ? convo.b_user_id : convo.a_user_id;
+    const who = await env.DB.prepare(
+      'SELECT COALESCE(bc.display_name, u.full_name) AS name FROM users u LEFT JOIN business_cards bc ON bc.user_id = u.id WHERE u.id = ?',
+    ).bind(senderId).first<{ name: string }>();
+    await notify(env, to, 'message', conversationId, `${who?.name ?? 'Someone'}: ${body}`);
+  }
   return { id, conversation_id: conversationId, sender_id: senderId, body, mine: true };
 }
 

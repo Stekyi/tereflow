@@ -42,6 +42,7 @@
     "ghana": "node local/ghana.mjs",
     "test:analytics": "node scripts/test-analytics.mjs",
     "test:sandbox": "node scripts/test-trade-sandbox.mjs",
+    "test:sandbox-link": "node scripts/test-sandbox-link.mjs",
     "test:pipeline": "node scripts/test-ghana-pipeline.mjs",
     "ingest:context": "node scripts/ingest-context.mjs",
     "test:context": "node scripts/e2e-context.mjs",

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
@@ -17,7 +17,9 @@ export default function Auth() {
   const navigate = useNavigate();
   const t = useToast();
 
-  const next = params.get('next') || '/network';
+  const requestedNext = params.get('next') ?? '';
+  // Only a path inside this app; a full URL or a protocol-relative one would be an open redirect.
+  const next = /^\/(?!\/)[^\\]*$/.test(requestedNext) ? requestedNext : '/network';
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -95,7 +97,7 @@ export default function Auth() {
         </div>
 
         <button className="btn primary block" type="submit" disabled={busy}>
-          {busy ? 'Working…' : mode === 'register' ? 'Create free account' : 'Sign in'}
+          {busy ? 'Workingâ€¦' : mode === 'register' ? 'Create free account' : 'Sign in'}
         </button>
       </form>
 

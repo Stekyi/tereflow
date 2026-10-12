@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Area,
@@ -21,7 +21,8 @@ import { CHART } from '../lib/theme';
 import { Term } from '../components/Term';
 import { disambiguateProductNames, shortProductName } from '../../shared/product-name';
 import { BarRow, Empty, FollowButton, Skeletons, Stat, useToast } from '../components/ui';
-import GlobalProductModal from '../components/ProductModal';
+import GlobalProductModal, { fmtReleased } from '../components/ProductModal';
+import SandboxLink from '../components/SandboxLink';
 import { CountUp } from '../components/TradeStory';
 import SectionNav, { type Section } from '../components/SectionNav';
 import {
@@ -629,8 +630,8 @@ export default function Country() {
       <div className="section-head">
         <h2>Trading partners</h2>
       </div>
-      <Ranked title="Where exports go" items={data.partners_export} partnerSlug={partnerSlug} onGo={(s) => navigate(`/country/${s}`)} />
-      <Ranked title="Where imports come from" items={data.partners_import} partnerSlug={partnerSlug} onGo={(s) => navigate(`/country/${s}`)} />
+      <Ranked title="Where exports go" items={data.partners_export} partnerSlug={partnerSlug} sandboxSlug={slug} partnerFlow="export" onGo={(s) => navigate(`/country/${s}`)} />
+      <Ranked title="Where imports come from" items={data.partners_import} partnerSlug={partnerSlug} sandboxSlug={slug} partnerFlow="import" onGo={(s) => navigate(`/country/${s}`)} />
       </section>
 
       {sources && (
@@ -642,6 +643,7 @@ export default function Country() {
             <p className="tiny dim" style={{ marginTop: 0 }}>
               {sources.note}
             </p>
+            {data.provenance?.length ? <DashboardProvenance notes={data.provenance} /> : null}
             {sources.attempts?.length ? (
               <div className="tiny dim" style={{ marginTop: 10 }}>
                 <strong>Data used and validation</strong>
@@ -748,6 +750,8 @@ function Ranked({
   onProductClick,
   partnerSlug,
   onGo,
+  sandboxSlug,
+  partnerFlow,
 }: {
   title: string;
   items: RankedItem[];
@@ -758,6 +762,9 @@ function Ranked({
   // cover becomes a tap through to its own market and one we do not stays plain.
   partnerSlug?: Map<string, string>;
   onGo?: (slug: string) => void;
+  // Partner lists only: this country's slug and the flow, so each partner can open Sandbox.
+  sandboxSlug?: string;
+  partnerFlow?: 'export' | 'import';
 }) {
   if (!items.length) return null;
   const max = Math.max(...items.map((i) => i.share_pct), 1);
@@ -776,7 +783,9 @@ function Ranked({
           share={i.share_pct}
           max={max}
           action={
-            follow && i.code ? (
+            !flow && sandboxSlug && i.code ? (
+              <SandboxLink primarySlug={sandboxSlug} partnerIso3={i.code} flow={partnerFlow}>Sandbox</SandboxLink>
+            ) : follow && i.code ? (
               <FollowButton
                 kind="hs_code"
                 value={i.code}
@@ -1521,6 +1530,35 @@ function FamilyChart({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function DashboardProvenance({ notes }: { notes: NonNullable<CountryDashboard['provenance']> }) {
+  const groups = new Map<string, typeof notes>();
+  for (const n of notes) {
+    const key = `${n.flow}|${n.source}|${n.level ?? ''}`;
+    groups.set(key, [...(groups.get(key) ?? []), n]);
+  }
+  return (
+    <div className="tiny dim" style={{ marginTop: 10 }}>
+      <strong>Source behind each figure</strong>
+      <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+        {[...groups.entries()].map(([key, g]) => {
+          const last = g[g.length - 1];
+          const span = g.length > 1 ? `${g[0].year} to ${last.year}` : String(last.year);
+          const released = fmtReleased(last.released);
+          const fx = last.currency && last.usd_per_unit ? `, converted from ${last.currency} at about ${last.usd_per_unit.toFixed(2)} dollars each` : '';
+          return (
+            <li key={key}>
+              {last.flow === 'export' ? 'Exports' : 'Imports'} {span}: {last.source}
+              {last.level ? `, ${last.level} detail` : ''}
+              {released ? `, latest release ${released}` : ''}
+              {fx}.
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

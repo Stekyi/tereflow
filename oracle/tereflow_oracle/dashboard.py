@@ -195,6 +195,12 @@ def load_dashboard(conn, reporter: str, prows: list | None = None) -> dict | Non
     cur.execute("SELECT TO_CHAR(MAX(ingested_at), 'YYYY-MM-DD\"T\"HH24:MI:SS') FROM tf_trade_facts WHERE reporter_iso3 = :rep",
                 {"rep": reporter})
     d["computed_at"] = cur.fetchone()[0]
+    cur.execute("""SELECT s.flow, s.year, s.classification_level, s.classification_source, s.last_released, f.currency, f.usd_per_unit
+                   FROM tf_ingest_state s LEFT JOIN tf_fx_rate f ON f.source = s.classification_source AND f.year = s.year AND f.flow = s.flow
+                   WHERE s.reporter_iso3 = :rep AND s.status = 'SUCCESS' ORDER BY s.flow, s.year""", {"rep": reporter})
+    d["provenance"] = [{"flow": fl, "year": int(y), "level": lv, "source": source_label(src), "released": rel,
+                        "currency": ccy, "usd_per_unit": None if fx is None else float(fx)}
+                       for fl, y, lv, src, rel, ccy, fx in cur]
     return d
 
 

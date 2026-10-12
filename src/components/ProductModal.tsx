@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
+import SandboxLink from './SandboxLink';
 import { useBudget } from '../lib/budget';
 import { budgetFit, fmtQuantity } from '../../shared/budget';
 import { CHART } from '../lib/theme';
@@ -349,7 +350,7 @@ function Tile({
  * reader who conflates them has been misled by the layout rather than by any
  * individual number.
  */
-function PartnerFlows({ flows }: { flows: NonNullable<ProductInsight['partner_flows']> }) {
+function PartnerFlows({ flows, countrySlug }: { flows: NonNullable<ProductInsight['partner_flows']>; countrySlug: string | null }) {
   const top = flows.partners.slice(0, 12);
   const rest = flows.partners.length - top.length;
   const direction = flows.trade_flow === 'import' ? 'comes from' : 'goes to';
@@ -379,6 +380,7 @@ function PartnerFlows({ flows }: { flows: NonNullable<ProductInsight['partner_fl
               <th className="align-right">Value</th>
               <th className="align-right">Share</th>
               <th className="align-right">Unit value</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -393,6 +395,9 @@ function PartnerFlows({ flows }: { flows: NonNullable<ProductInsight['partner_fl
                   {p.unit_value_usd_per_kg == null
                     ? <span className="dim">Weight not reported</span>
                     : '$' + p.unit_value_usd_per_kg.toFixed(2) + '/kg'}
+                </td>
+                <td className="align-right">
+                  <SandboxLink primarySlug={countrySlug} partnerIso3={p.iso3} hs={flows.requested_code} flow={flows.trade_flow} />
                 </td>
               </tr>
             ))}
@@ -502,7 +507,7 @@ function CountryTable({ title, rows }: { title: string; rows: ProductCountryRow[
 
 /* ---------- where the figures came from ---------- */
 
-function fmtReleased(r: string | null): string | null {
+export function fmtReleased(r: string | null): string | null {
   if (!r) return null;
   if (/^\d{6}$/.test(r)) {
     const d = new Date(Date.UTC(Number(r.slice(0, 4)), Number(r.slice(4)) - 1, 1));
@@ -1045,7 +1050,7 @@ export default function ProductModal({
                     where Ghana's vehicles come from, the other says who is big
                     in vehicles worldwide. */}
                 {insight.partner_flows && (
-                  <PartnerFlows flows={insight.partner_flows} />
+                  <PartnerFlows flows={insight.partner_flows} countrySlug={focusSlug} />
                 )}
 
                 <div className="card">

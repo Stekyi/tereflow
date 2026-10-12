@@ -833,6 +833,8 @@ export interface CountryDashboard {
   families_import: FamilyBreakdown | null;
   families_export: FamilyBreakdown | null;
   computed_at: string | null;
+  /** Source, detail level, release and currency conversion behind each year of each flow. */
+  provenance?: (ProvenanceNote & { flow: Flow })[];
 }
 
 export interface FamilyMember {

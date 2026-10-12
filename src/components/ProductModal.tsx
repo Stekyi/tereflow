@@ -595,7 +595,7 @@ const REEXPORT_TITLE: Record<NonNullable<ProductInsight['reexport']>['verdict'],
   insufficient: 'Not enough years to tell',
 };
 
-function ReexportBlock({ signal }: { signal: NonNullable<ProductInsight['reexport']> }) {
+export function ReexportBlock({ signal }: { signal: NonNullable<ProductInsight['reexport']> }) {
   return (
     <div className="tiny dim" style={{ margin: '10px 0 0' }}>
       <strong>{REEXPORT_TITLE[signal.verdict]}</strong>
@@ -616,7 +616,7 @@ const SEASON_TITLE: Record<string, string> = {
   insufficient: 'Not enough monthly data to tell',
 };
 
-function SeasonalityBlock({ signal }: { signal: NonNullable<ProductInsight['seasonality']> | null }) {
+export function SeasonalityBlock({ signal }: { signal: NonNullable<ProductInsight['seasonality']> | null }) {
   if (!signal) {
     return (
       <p className="tiny dim" style={{ margin: '10px 0 0' }}>
@@ -655,7 +655,7 @@ const LEVEL_TITLE: Record<string, string> = {
   insufficient: 'Not enough partner data to measure concentration',
 };
 
-function SupplyBlock({ signal }: { signal: NonNullable<ProductInsight['supply']> }) {
+export function SupplyBlock({ signal }: { signal: NonNullable<ProductInsight['supply']> }) {
   return (
     <div className="tiny dim" style={{ margin: '10px 0 0' }}>
       <strong>{LEVEL_TITLE[signal.level]}</strong>
@@ -669,7 +669,7 @@ type RegulatoryState =
   | { available: true; source: string; scope: string; summary: RegulatorySummary; lines: number; limitations: string[] }
   | { available: false; reason: string; scope: string };
 
-function RegulatoryBlock({ hs }: { hs: string }) {
+export function RegulatoryBlock({ hs }: { hs: string }) {
   const [state, setState] = useState<RegulatoryState | 'loading' | 'failed'>('loading');
   useEffect(() => {
     let live = true;
@@ -701,7 +701,7 @@ function RegulatoryBlock({ hs }: { hs: string }) {
     </div>
   );
 }
-function DiscoveryBlock({ hs }: { hs: string }) {
+export function DiscoveryBlock({ hs }: { hs: string }) {
   const [d, setD] = useState<DiscoveryResult | null | 'failed'>(null);
   useEffect(() => {
     let live = true;
@@ -734,7 +734,7 @@ function DiscoveryBlock({ hs }: { hs: string }) {
     </div>
   );
 }
-function ProductionBlock({ slug, hs }: { slug: string; hs: string }) {
+export function ProductionBlock({ slug, hs }: { slug: string; hs: string }) {
   const [p, setP] = useState<(ProductionSignal & { data_as_of?: string | null }) | null | 'failed'>(null);
   useEffect(() => {
     let live = true;
@@ -1162,6 +1162,7 @@ export default function ProductModal({
                 {insight.supply && <SupplyBlock signal={insight.supply} />}
                 <RegulatoryBlock hs={insight.hs_code} />
                 {insight.focus_slug && <ProductionBlock slug={insight.focus_slug} hs={insight.hs_code} />}
+                {insight.focus_slug && <p className="tiny" style={{ margin: '10px 0 0' }}><Link to={`/feasibility/${insight.focus_slug}/${insight.hs_code}?flow=${insight.focus_flow ?? 'export'}`}>Open the full feasibility report</Link></p>}
                 <DiscoveryBlock hs={insight.hs_code} />
                   </div>
                 )}

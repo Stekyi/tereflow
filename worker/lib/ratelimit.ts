@@ -66,6 +66,10 @@ export const LIMITS = {
   closeAccount: { max: 5, windowSeconds: 900 },
   // Following a product or market is cheap, but it writes a row each time.
   subscription: { max: 60, windowSeconds: 3600 },
+  // Each lookup can make two requests to the UK Trade Tariff on the caller's behalf, so an anonymous
+  // loop would turn this Worker into a proxy for it. Responses are cached for hours, so repeat
+  // visitors to the same product do not count against the source.
+  lookup: { max: 120, windowSeconds: 300 },
 } satisfies Record<string, Limit>;
 
 export interface LimitResult {

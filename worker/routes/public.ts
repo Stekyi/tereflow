@@ -1,6 +1,8 @@
-﻿import { Hono } from 'hono';
+import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { attachSources, bad, getEntityBySlug, json } from '../lib/db';
+import { clientKey, rateLimit, tooMany } from '../lib/ratelimit';
+import { loadRegulatory } from '../lib/regulatory';
 import { currentUser, isEntitled } from '../lib/session';
 import { hs2Label, hs2Sector, hs6Label, HS6_LABEL } from '../agent/codes';
 import { shortProductName } from '../../shared/product-name';
@@ -1063,6 +1065,18 @@ function normaliseHs(raw: string): string {
   const s = raw.trim();
   return /^\d{7,10}$/.test(s) ? s.slice(0, 6) : s;
 }
+
+/**
+ * UK import rules for a product line, read live from the UK Trade Tariff. A separate route from the
+ * insight so a slow or unreachable tariff never holds up the rest of the read.
+ */
+pub.get('/regulatory/:hs', async (c) => {
+  const limit = await rateLimit(c.env, 'lookup', clientKey(c.req.raw));
+  if (!limit.ok) return tooMany(limit);
+  const hs = normaliseHs(c.req.param('hs'));
+  if (!/^\d{6,10}$/.test(hs)) return bad('hs must be 6 to 10 digits', 400);
+  return json(await loadRegulatory(hs), 200, { 'cache-control': 'public, max-age=3600' });
+});
 
 /**
  * The product insight behind the modal.

@@ -703,6 +703,8 @@ export interface ProductInsight {
   reexport?: import('./reexport').ReexportSignal | null;
   /** Month-by-month pattern for the focused country; null when no monthly data is stored for it. */
   seasonality?: (import('./seasonality').SeasonalitySignal & { source: string | null }) | null;
+  /** How exposed the focused country's flow is to a few partners; absent without a focus. */
+  supply?: import('./supply').SupplyConstraint | null;
 
   /**
    * Where the demand is growing. Importing countries ranked by growth rather

@@ -17,6 +17,7 @@ import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
 import SandboxLink from './SandboxLink';
 import SaveButton from './SaveButton';
+import type { RegulatorySummary } from '../../shared/regulatory';
 import { analyseUnitValues } from '../../shared/unit-value';
 import { useBudget } from '../lib/budget';
 import { budgetFit, fmtQuantity } from '../../shared/budget';
@@ -645,6 +646,59 @@ function SeasonalityBlock({ signal }: { signal: NonNullable<ProductInsight['seas
     </div>
   );
 }
+const LEVEL_TITLE: Record<string, string> = {
+  high: 'High supply concentration',
+  moderate: 'Moderate supply concentration',
+  low: 'Low supply concentration',
+  insufficient: 'Not enough partner data to measure concentration',
+};
+
+function SupplyBlock({ signal }: { signal: NonNullable<ProductInsight['supply']> }) {
+  return (
+    <div className="tiny dim" style={{ margin: '10px 0 0' }}>
+      <strong>{LEVEL_TITLE[signal.level]}</strong>
+      <p style={{ margin: '4px 0 0' }}>{signal.reason}</p>
+      <p style={{ margin: '4px 0 0' }}>{signal.limitations.join(' ')}</p>
+    </div>
+  );
+}
+
+type RegulatoryState =
+  | { available: true; source: string; scope: string; summary: RegulatorySummary; lines: number; limitations: string[] }
+  | { available: false; reason: string; scope: string };
+
+function RegulatoryBlock({ hs }: { hs: string }) {
+  const [state, setState] = useState<RegulatoryState | 'loading' | 'failed'>('loading');
+  useEffect(() => {
+    let live = true;
+    setState('loading');
+    fetch(`/api/regulatory/${encodeURIComponent(hs)}`, { headers: { accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d) => { if (live) setState(d as RegulatoryState); })
+      .catch(() => { if (live) setState('failed'); });
+    return () => { live = false; };
+  }, [hs]);
+
+  if (state === 'loading') return <p className="tiny dim" style={{ margin: '10px 0 0' }}>Checking UK import rules.</p>;
+  if (state === 'failed') return <p className="tiny dim" style={{ margin: '10px 0 0' }}><strong>UK import rules</strong>: could not be loaded right now.</p>;
+  if (!state.available) {
+    return <p className="tiny dim" style={{ margin: '10px 0 0' }}><strong>UK import rules</strong>: {state.reason} {state.scope}</p>;
+  }
+  const s = state.summary;
+  return (
+    <div className="tiny dim" style={{ margin: '10px 0 0' }}>
+      <strong>UK import rules</strong>
+      <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+        <li>Standard duty: {s.third_country_duty.length ? s.third_country_duty.join(' or ') : 'not listed'}{s.duty_suspended ? ', currently suspended' : ''}.</li>
+        {s.vat && <li>VAT: {s.vat}.</li>}
+        {s.controls.map((c) => <li key={c}>{c}.</li>)}
+        {s.country_restrictions.length > 0 && <li>Country restrictions include {s.country_restrictions.slice(0, 4).map((r) => r.area).join(', ')}{s.country_restrictions.length > 4 ? ' and others' : ''}.</li>}
+        {s.preference_areas > 0 && <li>{s.preference_areas} countries and groups have a preferential rate or quota.</li>}
+      </ul>
+      <p style={{ margin: '4px 0 0' }}>{state.source}. {state.scope} {state.limitations.join(' ')}</p>
+    </div>
+  );
+}
 /* ---------- focused product history ---------- */
 
 function ProductHistoryChart({ rows }: { rows: NonNullable<ProductInsight['time_series']> }) {
@@ -1040,6 +1094,8 @@ export default function ProductModal({
                     <ProvenanceBlock notes={insight.provenance ?? []} rows={insight.time_series} />
                 {insight.reexport && <ReexportBlock signal={insight.reexport} />}
                 {insight.seasonality !== undefined && <SeasonalityBlock signal={insight.seasonality} />}
+                {insight.supply && <SupplyBlock signal={insight.supply} />}
+                <RegulatoryBlock hs={insight.hs_code} />
                   </div>
                 )}
 

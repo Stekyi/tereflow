@@ -32,6 +32,7 @@ import type {
 import type { ProvenanceNote } from '../../shared/types';
 import { reexportSignal } from '../../shared/reexport';
 import { seasonality, type MonthlyRow } from '../../shared/seasonality';
+import { supplyConstraint } from '../../shared/supply';
 
 /**
  * Product views (the modal, the product page, the market view) built from the Oracle feeds.
@@ -495,5 +496,6 @@ export async function buildProductInsightOracle(
     ...built,
     reexport: reexportSignal(xs, ms),
     seasonality: monthly ? { ...seasonality(monthly.rows), source: monthly.source } : null,
+    supply: supplyConstraint(series.partners.map((p) => ({ name: partnerLabel(p.iso3) ?? p.iso3, value_usd: p.value_usd })), series.series.map((r) => r.value_usd)),
   };
 }

@@ -18,6 +18,7 @@ import { useSession } from '../lib/auth';
 import SandboxLink from './SandboxLink';
 import SaveButton from './SaveButton';
 import type { RegulatorySummary } from '../../shared/regulatory';
+import type { DiscoveryResult } from '../../shared/discovery';
 import { analyseUnitValues } from '../../shared/unit-value';
 import { useBudget } from '../lib/budget';
 import { budgetFit, fmtQuantity } from '../../shared/budget';
@@ -699,6 +700,39 @@ function RegulatoryBlock({ hs }: { hs: string }) {
     </div>
   );
 }
+function DiscoveryBlock({ hs }: { hs: string }) {
+  const [d, setD] = useState<DiscoveryResult | null | 'failed'>(null);
+  useEffect(() => {
+    let live = true;
+    setD(null);
+    fetch(`/api/discovery/${encodeURIComponent(hs)}`, { headers: { accept: 'application/json' }, credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((x) => { if (live) setD(x as DiscoveryResult); })
+      .catch(() => { if (live) setD('failed'); });
+    return () => { live = false; };
+  }, [hs]);
+  if (d === null || d === 'failed') return null;
+  const none = d.members.length === 0 && d.listings.length === 0;
+  return (
+    <div className="tiny dim" style={{ margin: '10px 0 0' }}>
+      <strong>Who trades this on Tereflow</strong>
+      {none && <p style={{ margin: '4px 0 0' }}>No members or open listings for this product yet.</p>}
+      {d.members.length > 0 && (
+        <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+          {d.members.slice(0, 5).map((m) => (
+            <li key={m.card_id}><Link to={`/network/${m.card_id}`}>{m.display_name}{m.company ? `, ${m.company}` : ''}</Link> ({m.country_iso3}; {m.intents.join(', ')})</li>
+          ))}
+        </ul>
+      )}
+      {d.listings.length > 0 && (
+        <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+          {d.listings.slice(0, 5).map((l) => <li key={l.id}><Link to={`/market/${l.id}`}>{l.title}</Link> ({l.mode === 'auction' ? 'auction' : l.kind.replace(/_/g, ' ')})</li>)}
+        </ul>
+      )}
+      <p style={{ margin: '4px 0 0' }}>{d.scope} {d.limitations.join(' ')}</p>
+    </div>
+  );
+}
 /* ---------- focused product history ---------- */
 
 function ProductHistoryChart({ rows }: { rows: NonNullable<ProductInsight['time_series']> }) {
@@ -1096,6 +1130,7 @@ export default function ProductModal({
                 {insight.seasonality !== undefined && <SeasonalityBlock signal={insight.seasonality} />}
                 {insight.supply && <SupplyBlock signal={insight.supply} />}
                 <RegulatoryBlock hs={insight.hs_code} />
+                <DiscoveryBlock hs={insight.hs_code} />
                   </div>
                 )}
 

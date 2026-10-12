@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Bar,
@@ -16,6 +16,7 @@ import {
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
 import SandboxLink from './SandboxLink';
+import { analyseUnitValues } from '../../shared/unit-value';
 import { useBudget } from '../lib/budget';
 import { budgetFit, fmtQuantity } from '../../shared/budget';
 import { CHART } from '../lib/theme';
@@ -354,6 +355,8 @@ function PartnerFlows({ flows, countrySlug }: { flows: NonNullable<ProductInsigh
   const top = flows.partners.slice(0, 12);
   const rest = flows.partners.length - top.length;
   const direction = flows.trade_flow === 'import' ? 'comes from' : 'goes to';
+  const uv = analyseUnitValues(flows.partners);
+  const uvByPartner = new Map(uv.rows.map((r) => [r.partner, r]));
 
   return (
     <div className="card">
@@ -380,6 +383,7 @@ function PartnerFlows({ flows, countrySlug }: { flows: NonNullable<ProductInsigh
               <th className="align-right">Value</th>
               <th className="align-right">Share</th>
               <th className="align-right">Unit value</th>
+              <th className="align-right">vs median</th>
               <th />
             </tr>
           </thead>
@@ -397,6 +401,16 @@ function PartnerFlows({ flows, countrySlug }: { flows: NonNullable<ProductInsigh
                     : '$' + p.unit_value_usd_per_kg.toFixed(2) + '/kg'}
                 </td>
                 <td className="align-right">
+                  {(() => {
+                    const r = uvByPartner.get(p.partner);
+                    return r ? (
+                      <span className={r.position === 'in-line' ? 'dim' : r.position === 'above' ? 'up' : 'down'}>
+                        {r.vs_median_pct > 0 ? '+' : ''}{r.vs_median_pct.toFixed(0)}%
+                      </span>
+                    ) : <span className="dim">{'\u2013'}</span>;
+                  })()}
+                </td>
+                <td className="align-right">
                   <SandboxLink primarySlug={countrySlug} partnerIso3={p.iso3} hs={flows.requested_code} flow={flows.trade_flow} />
                 </td>
               </tr>
@@ -409,6 +423,10 @@ function PartnerFlows({ flows, countrySlug }: { flows: NonNullable<ProductInsigh
         {fmtUsd(flows.total_usd)} across {flows.partner_count} partner
         {flows.partner_count === 1 ? '' : 's'}
         {rest > 0 ? ', ' + rest + ' smaller ones not shown' : ''}.
+      </p>
+      <p className="tiny dim" style={{ margin: '6px 0 0' }}>
+        {uv.median_usd_per_kg != null && <>Median unit value ${uv.median_usd_per_kg.toFixed(2)}/kg across {uv.covered} partners ({uv.covered_value_pct}% of the value); a gap of more than 15% is marked. </>}
+        {uv.limitations.join(' ')}
       </p>
     </div>
   );

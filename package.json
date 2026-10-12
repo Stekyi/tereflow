@@ -49,6 +49,7 @@
     "test:regulatory": "node scripts/test-regulatory.mjs",
     "test:supply": "node scripts/test-supply.mjs",
     "test:discovery": "node scripts/test-discovery.mjs",
+    "test:production": "node scripts/test-production.mjs",
     "test:pipeline": "node scripts/test-ghana-pipeline.mjs",
     "ingest:context": "node scripts/ingest-context.mjs",
     "test:context": "node scripts/e2e-context.mjs",

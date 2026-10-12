@@ -19,6 +19,7 @@ import SandboxLink from './SandboxLink';
 import SaveButton from './SaveButton';
 import type { RegulatorySummary } from '../../shared/regulatory';
 import type { DiscoveryResult } from '../../shared/discovery';
+import type { ProductionSignal } from '../../shared/production';
 import { analyseUnitValues } from '../../shared/unit-value';
 import { useBudget } from '../lib/budget';
 import { budgetFit, fmtQuantity } from '../../shared/budget';
@@ -733,6 +734,36 @@ function DiscoveryBlock({ hs }: { hs: string }) {
     </div>
   );
 }
+function ProductionBlock({ slug, hs }: { slug: string; hs: string }) {
+  const [p, setP] = useState<(ProductionSignal & { data_as_of?: string | null }) | null | 'failed'>(null);
+  useEffect(() => {
+    let live = true;
+    setP(null);
+    fetch(`/api/production/${encodeURIComponent(slug)}/${encodeURIComponent(hs)}`, { headers: { accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((x) => { if (live) setP(x); })
+      .catch(() => { if (live) setP('failed'); });
+    return () => { live = false; };
+  }, [slug, hs]);
+  if (p === null || p === 'failed') return null;
+  if (!p.available) {
+    // A product outside the crop list is not worth a line; a mapped crop with no data is.
+    return p.item ? <p className="tiny dim" style={{ margin: '10px 0 0' }}><strong>Domestic production</strong>: {p.reason}</p> : null;
+  }
+  const t = (n: number) => `${Math.round(n).toLocaleString('en-US')} t`;
+  return (
+    <div className="tiny dim" style={{ margin: '10px 0 0' }}>
+      <strong>Domestic production</strong>
+      <p style={{ margin: '4px 0 0' }}>
+        {p.item}: {t(p.latest_tonnes as number)} in {p.latest_year}
+        {p.change_5y_pct != null && `, ${p.change_5y_pct >= 0 ? 'up' : 'down'} ${Math.abs(p.change_5y_pct)}% over the last five years shown`}.
+        {p.production_to_export_ratio != null && ` That is ${p.production_to_export_ratio} times the weight exported.`}
+        {p.series.some((x) => x.year === p.latest_year && x.flag && x.flag !== 'A') && ' The latest figure is an estimate or from an external source, not an official national figure.'}
+      </p>
+      <p style={{ margin: '4px 0 0' }}>{p.source}{p.data_as_of ? `, file dated ${p.data_as_of}` : ''}. {p.scope} {p.limitations.join(' ')}</p>
+    </div>
+  );
+}
 /* ---------- focused product history ---------- */
 
 function ProductHistoryChart({ rows }: { rows: NonNullable<ProductInsight['time_series']> }) {
@@ -1130,6 +1161,7 @@ export default function ProductModal({
                 {insight.seasonality !== undefined && <SeasonalityBlock signal={insight.seasonality} />}
                 {insight.supply && <SupplyBlock signal={insight.supply} />}
                 <RegulatoryBlock hs={insight.hs_code} />
+                {insight.focus_slug && <ProductionBlock slug={insight.focus_slug} hs={insight.hs_code} />}
                 <DiscoveryBlock hs={insight.hs_code} />
                   </div>
                 )}

@@ -24,6 +24,7 @@ import { analyseUnitValues } from '../../shared/unit-value';
 import { unitCostTrend } from '../../shared/unit-cost';
 import { byproductAnalysis } from '../../shared/byproducts';
 import { landedCost, INCOTERMS, type Incoterm } from '../../shared/frameworks';
+import type { fxRisk, saturation } from '../../shared/prospect';
 import { useBudget } from '../lib/budget';
 import { budgetFit, fmtQuantity } from '../../shared/budget';
 import { CHART } from '../lib/theme';
@@ -612,6 +613,85 @@ export function UnitCostBlock({ rows }: { rows: NonNullable<ProductInsight['time
         </tbody>
       </table>
       <p style={{ margin: '4px 0 0' }}>{t.limitations.join(' ')}</p>
+    </div>
+  );
+}
+
+type ProspectResponse =
+  | { locked: true; title: string; teaser: string }
+  | { locked: false; available: false; reason: string }
+  | {
+      locked: false;
+      available: true;
+      country: string;
+      hs: string;
+      export_year: number;
+      buyers: Array<{
+        iso3: string; name: string; export_value_usd: number; share_pct: number | null; import_year: number | null;
+        saturation: ReturnType<typeof saturation> | null; saturation_note: string | null;
+        fx: ReturnType<typeof fxRisk> | null; fx_note: string | null;
+      }>;
+      home_fx: (ReturnType<typeof fxRisk> & { iso3: string; name: string }) | null;
+      sources: string[];
+      limitations: string[];
+    };
+
+const FX_LABEL: Record<string, string> = { low: 'Low', moderate: 'Moderate', high: 'High', insufficient: 'Not enough data' };
+
+export function ProspectBlock({ slug, hs }: { slug: string; hs: string }) {
+  const [r, setR] = useState<ProspectResponse | null | 'failed'>(null);
+  useEffect(() => {
+    let live = true;
+    setR(null);
+    fetch(`/api/prospect/${encodeURIComponent(slug)}/${encodeURIComponent(hs)}`, { headers: { accept: 'application/json' }, credentials: 'same-origin' })
+      .then((x) => (x.ok ? x.json() : Promise.reject(new Error(String(x.status)))))
+      .then((x) => { if (live) setR(x); })
+      .catch(() => { if (live) setR('failed'); });
+    return () => { live = false; };
+  }, [slug, hs]);
+  if (r === null || r === 'failed') return null;
+  if (r.locked) {
+    return (
+      <div className="tiny dim" style={{ margin: '10px 0 0' }}>
+        <strong>{r.title} <span className="badge premium">Premium</span></strong>
+        <p style={{ margin: '4px 0 0' }}>{r.teaser} <Link to="/upgrade">See Premium</Link></p>
+      </div>
+    );
+  }
+  if (!r.available) return <p className="tiny dim" style={{ margin: '10px 0 0' }}><strong>Business prospect view</strong>: {r.reason}</p>;
+  const usdM = (n: number) => (n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n / 1e3)}K`);
+  return (
+    <div className="tiny dim" style={{ margin: '10px 0 0' }}>
+      <strong>Business prospect view <span className="badge premium">Premium</span></strong>
+      <p style={{ margin: '4px 0 0' }}>
+        Main buyers of {r.country}&apos;s exports of this product in {r.export_year}, how crowded each buyer&apos;s supply already is, and how its currency has behaved against the dollar.
+      </p>
+      <table className="data-table" style={{ marginTop: 4 }}>
+        <thead>
+          <tr><th>Buyer</th><th className="align-right">Bought</th><th>Market saturation</th><th>Currency risk</th></tr>
+        </thead>
+        <tbody>
+          {r.buyers.map((b) => (
+            <tr key={b.iso3}>
+              <td>{b.name}</td>
+              <td className="align-right">{usdM(b.export_value_usd)}{b.share_pct != null ? ` (${b.share_pct}%)` : ''}</td>
+              <td title={b.saturation?.reason ?? b.saturation_note ?? ''}>
+                {b.saturation
+                  ? `${b.saturation.label}${b.saturation.top_supplier ? `: ${b.saturation.top_supplier} ${b.saturation.top_share_pct}%` : ''}`
+                  : <span className="dim">Not held yet</span>}
+              </td>
+              <td title={b.fx?.reason ?? b.fx_note ?? ''}>{b.fx ? FX_LABEL[b.fx.level] : <span className="dim">Unavailable</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {r.home_fx && r.home_fx.level !== 'insufficient' && (
+        <p style={{ margin: '4px 0 0' }}>
+          {r.home_fx.name} currency: {FX_LABEL[r.home_fx.level].toLowerCase()} risk. {r.home_fx.reason}
+          {r.home_fx.span_change_pct != null && ` Over ${r.home_fx.years[0]} to ${r.home_fx.years[r.home_fx.years.length - 1]} it moved ${r.home_fx.span_change_pct}% against the dollar.`}
+        </p>
+      )}
+      <p style={{ margin: '4px 0 0' }}>{r.sources.join(' ')} Hover a row for the reasoning. {r.limitations.join(' ')}</p>
     </div>
   );
 }
@@ -1310,6 +1390,7 @@ export default function ProductModal({
                 <RegulatoryBlock hs={insight.hs_code} />
                 {insight.focus_slug && <ProductionBlock slug={insight.focus_slug} hs={insight.hs_code} />}
                 {insight.focus_slug && insight.focus_flow !== 'import' && <ByproductBlock slug={insight.focus_slug} hs={insight.hs_code} />}
+                {insight.focus_slug && insight.focus_flow !== 'import' && /^\d{6}$/.test(insight.hs_code) && <ProspectBlock slug={insight.focus_slug} hs={insight.hs_code} />}
                 <LandedCostBlock key={insight.hs_code} unitValueUsdT={insight.unit_value_usd_t ?? null} />
                 {insight.focus_slug && <p className="tiny" style={{ margin: '10px 0 0' }}><Link to={`/feasibility/${insight.focus_slug}/${insight.hs_code}?flow=${insight.focus_flow ?? 'export'}`}>Open the full feasibility report</Link></p>}
                 <DiscoveryBlock hs={insight.hs_code} />

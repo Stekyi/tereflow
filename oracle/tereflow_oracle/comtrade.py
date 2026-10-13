@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import time
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -94,6 +95,9 @@ class Comtrade:
                 last = f"HTTP {r.status_code}"
                 continue
             if not r.ok:
+                if r.status_code == 403 and "call volume quota" in r.text.lower():
+                    m = re.search(r"replenished in (\d+):(\d+):(\d+)", r.text)
+                    raise RateLimited(int(m[1]) * 3600 + int(m[2]) * 60 + int(m[3]) if m else None)
                 raise ComtradeError(f"HTTP {r.status_code}: {r.text[:180]}")
             body = r.json()
             if body.get("error"):
@@ -169,6 +173,48 @@ class Comtrade:
                 return
             out.truncated = True
         out.rows.extend(self._to_result(data, m49_to_iso3, 0, False).rows)
+
+    def fetch_monthly_world(self, reporter_m49: int, year: int, flow: str) -> tuple[dict, bool]:
+        """Monthly World totals per HS6 product: {(code, month): (value_usd, net_weight_kg)}.
+
+        World only, not by partner, which keeps a country-year to roughly twelve times its product count
+        rather than twelve times its partner rows. The second value is True when a piece was cut short by
+        the cap and could not be split further."""
+        out: dict[tuple, tuple] = {}
+        flag = [False]
+        self._monthly_group(reporter_m49, year, flow, list(range(1, 13)), out, flag)
+        return out, flag[0]
+
+    def _monthly_group(self, rep, year, flow, months, out: dict, flag: list):
+        body = self._get("get/C/M/HS", {
+            "reporterCode": rep, "period": ",".join(f"{year}{m:02d}" for m in months), "cmdCode": "AG6",
+            "flowCode": flow, "partnerCode": 0, "maxRecords": API_CAP, "breakdownMode": "classic",
+            "customsCode": "C00", "motCode": 0, "partner2Code": 0})
+        data = body.get("data") or []
+        if len(data) >= API_CAP:
+            if len(months) > 1:
+                mid = (len(months) + 1) // 2
+                self._monthly_group(rep, year, flow, months[:mid], out, flag)
+                self._monthly_group(rep, year, flow, months[mid:], out, flag)
+                return
+            flag[0] = True
+        for r in data:
+            if (r.get("customsCode") or "C00") != "C00" or int(r.get("motCode") or 0) != 0 \
+               or int(r.get("partner2Code") or 0) != 0 or int(r.get("partnerCode") or 0) != 0:
+                continue
+            code = str(r.get("cmdCode") or "").strip()
+            if len(code) != 6 or not code.isdigit():
+                continue
+            period = str(r.get("period") or "")
+            month = int(r["refMonth"]) if r.get("refMonth") not in (None, "") else (int(period[4:6]) if len(period) == 6 else 0)
+            if not 1 <= month <= 12:
+                continue
+            pv = r.get("primaryValue")
+            if pv is None:
+                continue
+            k = (code, month)
+            ov, ow = out.get(k, (None, None))
+            out[k] = (_add(ov, float(pv)), _add(ow, _f(r.get("netWgt"))))
 
     @staticmethod
     def _to_result(data: list[dict], m49_to_iso3: dict, reqs: int, truncated: bool) -> FetchResult:

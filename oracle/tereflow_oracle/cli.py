@@ -100,9 +100,19 @@ def cmd_ingest(conn, a):
 
 
 def cmd_ingest_monthly(conn, a):
-    from . import monthly
+    from . import monthly, national
     years = a.years or default_years(6)
-    print(monthly.ingest_monthly(conn, a.country.upper(), years))
+    client = None
+    for c in [x.upper() for x in a.country]:
+        # The UK has its own monthly source; every other country comes from Comtrade.
+        if c in national.registry() and hasattr(national.registry()[c], "fetch_monthly"):
+            print(c, monthly.ingest_monthly(conn, c, years))
+            continue
+        client = client or Comtrade(pace_s=float(os.environ.get("TEREFLOW_CALL_PACE_MS", "1200")) / 1000)
+        res = monthly.ingest_monthly_comtrade(conn, client, c, years)
+        print(c, res)
+        if res.get("stopped_on_rate_limit"):
+            break
 
 
 def cmd_analytics(conn, a):
@@ -158,7 +168,7 @@ def main(argv=None):
     i.add_argument("--incremental", action="store_true", help="fill gaps in the base years, then only the current year")
     i.add_argument("--base-years", type=int, default=5)
     mo = sub.add_parser("ingest-monthly")
-    mo.add_argument("--country", required=True)
+    mo.add_argument("--country", nargs="+", required=True)
     mo.add_argument("--years", nargs="*", type=int)
     an = sub.add_parser("analytics")
     an.add_argument("--country", nargs="*", default=[])

@@ -46,4 +46,11 @@ assert.ok(e.services.some((s) => s.title.includes('Cold chain')));
 const f = byproductAnalysis('180100', 100_000_000, [{ hs4: '1803', exports_usd: 80_000_000, imports_usd: 9_000_000 }]);
 assert.equal(f.rows.find((r) => r.hs4 === '1803').verdict, 'covered');
 
+// a mixed heading is split line by line: coconut by-products are not offered for cashews
+const g = byproductAnalysis('080131', 100_000_000, []);
+assert.ok(g.rows.every((r) => r.hs4 !== '1513' && r.hs4 !== '5305'));
+assert.ok(g.rows.some((r) => r.hs4 === '0802'));
+assert.equal(byproductAnalysis('080111', 100_000_000, []).rows.some((r) => r.hs4 === '1513'), true);
+assert.equal(byproductAnalysis('080190', 100_000_000, []).rows.length, 0);
+
 console.log('byproducts: all invariants hold');

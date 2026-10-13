@@ -22,6 +22,8 @@ export interface UnitCostTrend {
   limitations: string[];
 }
 
+const JUMP_PCT = 100;
+
 /**
  * Price per kilogram for each year, from trade value over net weight. Where a year has no weight but
  * the source reports a quantity in its own unit, price per that unit is used instead. The two bases are
@@ -50,6 +52,10 @@ export function unitCostTrend(series: UnitCostInput[]): UnitCostTrend {
   }
   if (rows.some((r) => r.basis === 'unit')) {
     limitations.push('Years priced per unit use the unit the source reports and are not comparable with per-kilogram years.');
+  }
+  const jumps = rows.filter((r) => r.change_pct != null && Math.abs(r.change_pct) >= JUMP_PCT).map((r) => r.year);
+  if (jumps.length) {
+    limitations.push(`The price moved by ${JUMP_PCT}% or more in ${jumps.join(', ')}. That can be a real price move, but it can also come from a change in what was reported (value, weight or product mix), so check the source before relying on it.`);
   }
   limitations.push('This is customs value over reported quantity, an average price. It is not a quote or a contract price.');
   return { rows, years_total: series.length, years_priced: rows.length, limitations };

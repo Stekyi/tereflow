@@ -12,6 +12,17 @@ export interface ByproductCandidate {
  * commodity. Keyed by the 4-digit HS heading of the main commodity. A missing key means no suggestion is
  * made; nothing is guessed.
  */
+const COCONUT: ByproductCandidate[] = [
+  { hs4: '1513', name: 'Coconut oil', kind: 'processing', note: 'Pressed from copra.' },
+  { hs4: '5305', name: 'Coconut fibre (coir)', kind: 'residue', note: 'Husk fibre used in ropes, mats and growing media.' },
+];
+
+const CASHEW: ByproductCandidate[] = [
+  { hs4: '0802', name: 'Other nuts, shelled or in shell', kind: 'processing', note: 'Shelled kernels are the higher-value form of cashew in shell.' },
+  { hs4: '1515', name: 'Other fixed vegetable fats and oils', kind: 'residue', note: 'Cashew nut shell liquid is extracted from the shells; it sits in a broader oil heading, so treat the numbers as indicative.' },
+  { hs4: '2008', name: 'Prepared and preserved fruit and nuts', kind: 'processing', note: 'Roasted and flavoured cashews.' },
+];
+
 export const BYPRODUCTS_BY_HS4: Record<string, ByproductCandidate[]> = {
   '1801': [
     { hs4: '1802', name: 'Cocoa shells and husks', kind: 'residue', note: 'Waste of bean processing; used as mulch, fuel and fibre.' },
@@ -51,10 +62,12 @@ export const BYPRODUCTS_BY_HS4: Record<string, ByproductCandidate[]> = {
     { hs4: '1513', name: 'Coconut and palm kernel oil', kind: 'processing', note: 'Pressed from the kernel, a separate oil from palm oil.' },
     { hs4: '2306', name: 'Oilcake and other oil-extraction residue', kind: 'residue', note: 'Palm kernel cake is used as feed.' },
   ],
-  '0801': [
-    { hs4: '1513', name: 'Coconut oil', kind: 'processing', note: 'Pressed from copra.' },
-    { hs4: '5305', name: 'Coconut fibre (coir)', kind: 'residue', note: 'Husk fibre used in ropes, mats and growing media.' },
-  ],
+  // Heading 0801 mixes coconuts, Brazil nuts and cashews, so coconut by-products are keyed to the coconut lines only.
+  '080111': COCONUT,
+  '080112': COCONUT,
+  '080119': COCONUT,
+  '080131': CASHEW,
+  '080132': CASHEW,
   '5201': [
     { hs4: '1512', name: 'Cottonseed oil', kind: 'processing', note: 'Pressed from the seed left after ginning.' },
     { hs4: '5202', name: 'Cotton waste', kind: 'residue', note: 'Waste from spinning and ginning.' },
@@ -171,7 +184,7 @@ export function byproductAnalysis(
 ): ByproductAnalysis {
   const t = clampThresholds(thresholds);
   const hs4 = mainHs.slice(0, 4);
-  const candidates = BYPRODUCTS_BY_HS4[hs4] ?? [];
+  const candidates = byproductCandidates(mainHs);
   const byHs = new Map(data.map((d) => [d.hs4, d]));
   const eligible = mainExportsUsd != null && mainExportsUsd >= t.min_main_usd;
 
@@ -215,4 +228,14 @@ export function byproductAnalysis(
   if (!candidates.length) limitations.unshift('No by-products are listed yet for this heading, so no suggestion is made.');
 
   return { main_hs4: hs4, main_exports_usd: mainExportsUsd, thresholds: t, eligible, rows, services, limitations };
+}
+
+export function mainCodeFor(hs: string): string {
+  const h6 = hs.slice(0, 6);
+  return h6.length === 6 && BYPRODUCTS_BY_HS4[h6] ? h6 : hs.slice(0, 4);
+}
+
+/** A 6-digit key wins over the 4-digit heading, so a mixed heading can be split line by line. */
+export function byproductCandidates(hs: string): ByproductCandidate[] {
+  return BYPRODUCTS_BY_HS4[mainCodeFor(hs)] ?? [];
 }

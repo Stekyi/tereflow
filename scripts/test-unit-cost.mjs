@@ -41,4 +41,12 @@ assert.ok(c.limitations.some((l) => l.includes('1 of 3 years')));
 // nothing priceable gives no rows
 assert.equal(unitCostTrend([{ year: 2022, value_usd: 5, qty_kg: null }]).rows.length, 0);
 
+// a year-on-year move of 100% or more is flagged for checking, not presented as a plain trend
+const d = unitCostTrend([
+  { year: 2024, value_usd: 100, qty_kg: 100 },
+  { year: 2025, value_usd: 370, qty_kg: 100 },
+]);
+assert.ok(d.limitations.some((l) => l.includes('2025') && l.includes('check the source')));
+assert.ok(!unitCostTrend([{ year: 2022, value_usd: 100, qty_kg: 100 }, { year: 2023, value_usd: 150, qty_kg: 100 }]).limitations.some((l) => l.includes('check the source')));
+
 console.log('unit-cost: all invariants hold');

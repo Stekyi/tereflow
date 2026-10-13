@@ -4,7 +4,7 @@ import { bad, json } from '../lib/db';
 import { oracleConfig } from '../lib/oracle';
 import { oracleProductDetail, type ProductDetailPayload } from '../lib/oracle-insight';
 import { clientKey, rateLimit, tooMany } from '../lib/ratelimit';
-import { BYPRODUCTS_BY_HS4, byproductAnalysis, type ByproductInput } from '../../shared/byproducts';
+import { byproductAnalysis, byproductCandidates, mainCodeFor, type ByproductInput } from '../../shared/byproducts';
 
 /** By-product and logistics leads for one country's main export, checked against that country's own trade. Reads only. */
 export const byproducts = new Hono<{ Bindings: Env }>();
@@ -34,14 +34,14 @@ byproducts.get('/:country/:hs', async (c) => {
   };
 
   const cfg = oracleConfig(c.env);
-  const hs4 = hs.slice(0, 4);
-  const cands = BYPRODUCTS_BY_HS4[hs4] ?? [];
+  const hs4 = mainCodeFor(hs).slice(0, 4);
+  const cands = byproductCandidates(hs);
   let mainValue: number | null = null;
   let year: number | null = null;
   const data: ByproductInput[] = [];
 
   if (cfg) {
-    const main = await oracleProductDetail(cfg, iso3, 'X', hs4).catch(() => null);
+    const main = await oracleProductDetail(cfg, iso3, 'X', mainCodeFor(hs)).catch(() => null);
     const m = latest(main);
     mainValue = m?.value ?? null;
     year = m?.year ?? null;

@@ -23,6 +23,7 @@ import type { ProductionSignal } from '../../shared/production';
 import { analyseUnitValues } from '../../shared/unit-value';
 import { unitCostTrend } from '../../shared/unit-cost';
 import { byproductAnalysis } from '../../shared/byproducts';
+import { landedCost, INCOTERMS, type Incoterm } from '../../shared/frameworks';
 import { useBudget } from '../lib/budget';
 import { budgetFit, fmtQuantity } from '../../shared/budget';
 import { CHART } from '../lib/theme';
@@ -612,6 +613,57 @@ export function UnitCostBlock({ rows }: { rows: NonNullable<ProductInsight['time
       </table>
       <p style={{ margin: '4px 0 0' }}>{t.limitations.join(' ')}</p>
     </div>
+  );
+}
+
+export function LandedCostBlock({ unitValueUsdT }: { unitValueUsdT: number | null }) {
+  const [price, setPrice] = useState(unitValueUsdT ? Math.round(unitValueUsdT) : 1000);
+  const [tonnes, setTonnes] = useState(20);
+  const [freight, setFreight] = useState(2500);
+  const [ins, setIns] = useState(0.5);
+  const [duty, setDuty] = useState(0);
+  const [vat, setVat] = useState(0);
+  const [other, setOther] = useState(500);
+  const [sale, setSale] = useState(0);
+  const [term, setTerm] = useState<Incoterm>('FOB');
+  const lc = landedCost({ goods_per_tonne: price, tonnes, freight_total: freight, insurance_pct: ins, duty_pct: duty, vat_pct: vat, other_costs: other, sale_per_tonne: sale > 0 ? sale : null });
+  const info = INCOTERMS.find((t) => t.code === term);
+  const num = (v: string) => Number(v) || 0;
+  const usd0 = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
+  return (
+    <details className="tiny dim" style={{ margin: '10px 0 0' }}>
+      <summary><strong>Landed cost and margin calculator</strong></summary>
+      <p style={{ margin: '4px 0' }}>
+        Starts from this product's average unit value. Every figure is yours to change; Tereflow does not know your freight quote or the destination tariff.
+      </p>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <label>Price per tonne $<input type="number" min={0} value={price} onChange={(e) => setPrice(num(e.target.value))} style={{ width: 72 }} /></label>
+        <label>Tonnes <input type="number" min={0} value={tonnes} onChange={(e) => setTonnes(num(e.target.value))} style={{ width: 56 }} /></label>
+        <label>Freight $<input type="number" min={0} value={freight} onChange={(e) => setFreight(num(e.target.value))} style={{ width: 72 }} /></label>
+        <label>Insurance % <input type="number" min={0} step={0.1} value={ins} onChange={(e) => setIns(num(e.target.value))} style={{ width: 48 }} /></label>
+        <label>Duty % <input type="number" min={0} value={duty} onChange={(e) => setDuty(num(e.target.value))} style={{ width: 48 }} /></label>
+        <label>VAT % <input type="number" min={0} value={vat} onChange={(e) => setVat(num(e.target.value))} style={{ width: 48 }} /></label>
+        <label>Other charges $<input type="number" min={0} value={other} onChange={(e) => setOther(num(e.target.value))} style={{ width: 64 }} /></label>
+        <label>Sale price per tonne $<input type="number" min={0} value={sale} onChange={(e) => setSale(num(e.target.value))} style={{ width: 72 }} /></label>
+      </div>
+      {lc ? (
+        <>
+          <p style={{ margin: '6px 0 0' }}>
+            Goods {usd0(lc.goods)}, freight {usd0(lc.freight)}, insurance {usd0(lc.insurance)}, duty {usd0(lc.duty)}, VAT {usd0(lc.vat)}, other {usd0(lc.other)}.
+            {' '}<strong>Landed cost {usd0(lc.total)}, or {usd0(lc.per_tonne)} per tonne.</strong>
+            {lc.margin_pct != null && ` At a sale price of ${usd0(sale)} per tonne the margin is ${lc.margin_pct}% (${usd0(lc.margin_per_tonne as number)} per tonne).`}
+          </p>
+          <p style={{ margin: '4px 0 0' }}>{lc.limitations.join(' ')}</p>
+        </>
+      ) : <p style={{ margin: '6px 0 0' }}>Enter a positive price and tonnage.</p>}
+      <p style={{ margin: '6px 0 0' }}>
+        Trade term:{' '}
+        <select value={term} onChange={(e) => setTerm(e.target.value as Incoterm)}>
+          {INCOTERMS.map((t) => <option key={t.code} value={t.code}>{t.code}</option>)}
+        </select>
+        {info && ` ${info.name}: the seller carries cost up to ${info.seller_to}. ${info.buyer_note}`}
+      </p>
+    </details>
   );
 }
 
@@ -1258,6 +1310,7 @@ export default function ProductModal({
                 <RegulatoryBlock hs={insight.hs_code} />
                 {insight.focus_slug && <ProductionBlock slug={insight.focus_slug} hs={insight.hs_code} />}
                 {insight.focus_slug && insight.focus_flow !== 'import' && <ByproductBlock slug={insight.focus_slug} hs={insight.hs_code} />}
+                <LandedCostBlock key={insight.hs_code} unitValueUsdT={insight.unit_value_usd_t ?? null} />
                 {insight.focus_slug && <p className="tiny" style={{ margin: '10px 0 0' }}><Link to={`/feasibility/${insight.focus_slug}/${insight.hs_code}?flow=${insight.focus_flow ?? 'export'}`}>Open the full feasibility report</Link></p>}
                 <DiscoveryBlock hs={insight.hs_code} />
                   </div>

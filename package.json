@@ -44,6 +44,8 @@
     "test:sandbox": "node scripts/test-trade-sandbox.mjs",
     "test:sandbox-link": "node scripts/test-sandbox-link.mjs",
     "test:unit-value": "node scripts/test-unit-value.mjs",
+    "test:unit-cost": "node scripts/test-unit-cost.mjs",
+    "test:byproducts": "node scripts/test-byproducts.mjs",
     "test:reexport": "node scripts/test-reexport.mjs",
     "test:seasonality": "node scripts/test-seasonality.mjs",
     "test:regulatory": "node scripts/test-regulatory.mjs",

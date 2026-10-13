@@ -21,6 +21,8 @@ import type { RegulatorySummary } from '../../shared/regulatory';
 import type { DiscoveryResult } from '../../shared/discovery';
 import type { ProductionSignal } from '../../shared/production';
 import { analyseUnitValues } from '../../shared/unit-value';
+import { unitCostTrend } from '../../shared/unit-cost';
+import { byproductAnalysis } from '../../shared/byproducts';
 import { useBudget } from '../lib/budget';
 import { budgetFit, fmtQuantity } from '../../shared/budget';
 import { CHART } from '../lib/theme';
@@ -588,6 +590,31 @@ function ProvenanceBlock({
   );
 }
 
+export function UnitCostBlock({ rows }: { rows: NonNullable<ProductInsight['time_series']> }) {
+  const t = unitCostTrend(rows);
+  if (!t.rows.length) return null;
+  return (
+    <div className="tiny dim" style={{ margin: '10px 0 0' }}>
+      <strong>Unit cost by year</strong>
+      <table className="data-table" style={{ marginTop: 4 }}>
+        <thead>
+          <tr><th>Year</th><th className="align-right">Price</th><th className="align-right">Change</th></tr>
+        </thead>
+        <tbody>
+          {t.rows.map((r) => (
+            <tr key={r.year}>
+              <td>{r.year}</td>
+              <td className="align-right">${r.price.toFixed(r.price < 10 ? 2 : 0)} per {r.unit_label}</td>
+              <td className="align-right">{r.change_pct == null ? '\u2013' : `${r.change_pct > 0 ? '+' : ''}${r.change_pct.toFixed(0)}%`}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p style={{ margin: '4px 0 0' }}>{t.limitations.join(' ')}</p>
+    </div>
+  );
+}
+
 const REEXPORT_TITLE: Record<NonNullable<ProductInsight['reexport']>['verdict'], string> = {
   possible: 'Possible re-export pattern',
   'one-directional': 'Trade runs one way',
@@ -764,6 +791,73 @@ export function ProductionBlock({ slug, hs }: { slug: string; hs: string }) {
     </div>
   );
 }
+type ByproductResponse = ReturnType<typeof byproductAnalysis> & { country: string; year: number | null; has_data: boolean };
+
+const VERDICT_LABEL: Record<string, string> = {
+  'import-gap': 'Country imports this',
+  'under-processed': 'Little made locally',
+  covered: 'No gap shown',
+  'no-data': 'No trade recorded',
+};
+
+export function ByproductBlock({ slug, hs }: { slug: string; hs: string }) {
+  const [r, setR] = useState<ByproductResponse | null | 'failed'>(null);
+  const [minMain, setMinMain] = useState(5);
+  const [underPct, setUnderPct] = useState(10);
+  const [importGap, setImportGap] = useState(0.5);
+  useEffect(() => {
+    let live = true;
+    const qs = new URLSearchParams({
+      min_main_usd: String(minMain * 1e6),
+      under_ratio: String(underPct / 100),
+      import_gap_usd: String(importGap * 1e6),
+    });
+    const t = setTimeout(() => {
+      fetch(`/api/byproducts/${encodeURIComponent(slug)}/${encodeURIComponent(hs)}?${qs}`, { headers: { accept: 'application/json' } })
+        .then((x) => (x.ok ? x.json() : Promise.reject(new Error(String(x.status)))))
+        .then((x) => { if (live) setR(x); })
+        .catch(() => { if (live) setR('failed'); });
+    }, 300);
+    return () => { live = false; clearTimeout(t); };
+  }, [slug, hs, minMain, underPct, importGap]);
+  if (r === null || r === 'failed' || !r.has_data) return null;
+  if (!r.rows.length && !r.services.length) return null;
+  const money = (n: number | null) => (n == null ? 'none' : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n / 1e3)}K`);
+  return (
+    <div className="tiny dim" style={{ margin: '10px 0 0' }}>
+      <strong>By-products and logistics</strong>
+      {r.rows.length > 0 && (
+        <table className="data-table" style={{ marginTop: 4 }}>
+          <thead>
+            <tr><th>By-product</th><th className="align-right">Exports {r.year}</th><th className="align-right">Imports {r.year}</th><th>Read</th></tr>
+          </thead>
+          <tbody>
+            {r.rows.map((x) => (
+              <tr key={x.hs4}>
+                <td title={x.note}>{x.name} (HS {x.hs4})</td>
+                <td className="align-right">{money(x.exports_usd)}</td>
+                <td className="align-right">{money(x.imports_usd)}</td>
+                <td title={x.reason}>{VERDICT_LABEL[x.verdict]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {r.services.length > 0 && (
+        <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+          {r.services.map((s) => <li key={s.title}>{s.title}: {s.note}</li>)}
+        </ul>
+      )}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '6px 0 0' }}>
+        <label>Main exports at least $<input type="number" min={0} step={1} value={minMain} onChange={(e) => setMinMain(Number(e.target.value) || 0)} style={{ width: 56 }} />M</label>
+        <label>Under-processed below <input type="number" min={0} max={100} step={1} value={underPct} onChange={(e) => setUnderPct(Number(e.target.value) || 0)} style={{ width: 48 }} />% of raw exports</label>
+        <label>Import gap from $<input type="number" min={0} step={0.1} value={importGap} onChange={(e) => setImportGap(Number(e.target.value) || 0)} style={{ width: 56 }} />M</label>
+      </div>
+      <p style={{ margin: '4px 0 0' }}>{r.country}, trade of {r.year}, from UN Comtrade as held by Tereflow. {r.limitations.join(' ')}</p>
+    </div>
+  );
+}
+
 /* ---------- focused product history ---------- */
 
 function ProductHistoryChart({ rows }: { rows: NonNullable<ProductInsight['time_series']> }) {
@@ -1157,11 +1251,13 @@ export default function ProductModal({
                     </p>
                     <ProductHistoryChart rows={insight.time_series} />
                     <ProvenanceBlock notes={insight.provenance ?? []} rows={insight.time_series} />
+                    <UnitCostBlock rows={insight.time_series} />
                 {insight.reexport && <ReexportBlock signal={insight.reexport} />}
                 {insight.seasonality !== undefined && <SeasonalityBlock signal={insight.seasonality} />}
                 {insight.supply && <SupplyBlock signal={insight.supply} />}
                 <RegulatoryBlock hs={insight.hs_code} />
                 {insight.focus_slug && <ProductionBlock slug={insight.focus_slug} hs={insight.hs_code} />}
+                {insight.focus_slug && insight.focus_flow !== 'import' && <ByproductBlock slug={insight.focus_slug} hs={insight.hs_code} />}
                 {insight.focus_slug && <p className="tiny" style={{ margin: '10px 0 0' }}><Link to={`/feasibility/${insight.focus_slug}/${insight.hs_code}?flow=${insight.focus_flow ?? 'export'}`}>Open the full feasibility report</Link></p>}
                 <DiscoveryBlock hs={insight.hs_code} />
                   </div>

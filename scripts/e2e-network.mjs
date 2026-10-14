@@ -309,9 +309,11 @@ check(
 
 await kwesi.post('/api/auth/tier', { tier: 'premium' });
 r = await kwesi.get('/api/dashboard/ghana');
+// The gate is the difference between null (locked) and an array (unlocked). How many signals exist for a
+// country changes with the data, so the count is not part of the check.
 check(
   'real upgrade unlocks signals',
-  Array.isArray(r.json?.opportunities) && r.json.opportunities.length > 0,
+  Array.isArray(r.json?.opportunities) && r.json?.opportunities_locked === 0,
   `${r.json?.opportunities?.length} signal(s)`,
 );
 

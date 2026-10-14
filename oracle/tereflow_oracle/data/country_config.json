@@ -82,5 +82,35 @@
       "supplier_concentration": 0.1
     },
     "excluded": []
+  },
+  "NGA": {
+    "scoring": {
+      "market_size": 0.3,
+      "growth": 0.25,
+      "import_dependency": 0.2,
+      "stability": 0.15,
+      "supplier_concentration": 0.1
+    },
+    "excluded": []
+  },
+  "TGO": {
+    "scoring": {
+      "market_size": 0.3,
+      "growth": 0.25,
+      "import_dependency": 0.2,
+      "stability": 0.15,
+      "supplier_concentration": 0.1
+    },
+    "excluded": []
+  },
+  "CIV": {
+    "scoring": {
+      "market_size": 0.3,
+      "growth": 0.25,
+      "import_dependency": 0.2,
+      "stability": 0.15,
+      "supplier_concentration": 0.1
+    },
+    "excluded": []
   }
 }

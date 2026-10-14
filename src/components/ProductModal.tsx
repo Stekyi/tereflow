@@ -696,6 +696,24 @@ export function ProspectBlock({ slug, hs }: { slug: string; hs: string }) {
   );
 }
 
+export function CompanyLinksBlock({ name }: { name: string | null }) {
+  const q = (name ?? '').replace(/\(.*?\)/g, '').split(/[,;]/)[0].trim().split(/\s+/).slice(0, 3).join(' ');
+  if (!q) return null;
+  const enc = encodeURIComponent(q);
+  return (
+    <div className="tiny dim" style={{ margin: '10px 0 0' }}>
+      <strong>Find companies behind this trade</strong>
+      <p style={{ margin: '4px 0 0' }}>
+        UN Comtrade has no company names, so Tereflow cannot list them. These free searches open outside Tereflow, and we do not store or verify what they show:{' '}
+        <a href={`https://www.importyeti.com/search?q=${enc}`} target="_blank" rel="noopener noreferrer">US import shipments (ImportYeti)</a>
+        {' · '}
+        <a href={`https://opencorporates.com/companies?q=${enc}`} target="_blank" rel="noopener noreferrer">company registers (OpenCorporates)</a>.
+        {' '}ImportYeti covers only goods shipped into the United States. Search results match on the product wording, so expect noise.
+      </p>
+    </div>
+  );
+}
+
 export function LandedCostBlock({ unitValueUsdT }: { unitValueUsdT: number | null }) {
   const [price, setPrice] = useState(unitValueUsdT ? Math.round(unitValueUsdT) : 1000);
   const [tonnes, setTonnes] = useState(20);
@@ -1392,6 +1410,7 @@ export default function ProductModal({
                 {insight.focus_slug && insight.focus_flow !== 'import' && <ByproductBlock slug={insight.focus_slug} hs={insight.hs_code} />}
                 {insight.focus_slug && insight.focus_flow !== 'import' && /^\d{6}$/.test(insight.hs_code) && <ProspectBlock slug={insight.focus_slug} hs={insight.hs_code} />}
                 <LandedCostBlock key={insight.hs_code} unitValueUsdT={insight.unit_value_usd_t ?? null} />
+                <CompanyLinksBlock name={insight.name ?? null} />
                 {insight.focus_slug && <p className="tiny" style={{ margin: '10px 0 0' }}><Link to={`/feasibility/${insight.focus_slug}/${insight.hs_code}?flow=${insight.focus_flow ?? 'export'}`}>Open the full feasibility report</Link></p>}
                 <DiscoveryBlock hs={insight.hs_code} />
                   </div>

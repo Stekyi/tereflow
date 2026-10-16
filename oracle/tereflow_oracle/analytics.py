@@ -1,7 +1,11 @@
 ﻿"""Deterministic product metrics, rebuilt from tf_trade_facts after ingestion."""
 from __future__ import annotations
 
-REFRESH_SQL = """
+from . import markets
+
+REAL_COUNTRY = markets.REAL_COUNTRY_SQL
+
+REFRESH_SQL = f"""
 INSERT INTO tf_product_metrics (reporter_iso3, flow, cmd_code, classification_level, cmd_desc, latest_year,
   years_available, latest_value_usd, prior_value_usd, yoy_pct, cagr_3y_pct, partner_count,
   top_partner_iso3, top_partner_share_pct, supplier_hhi)
@@ -25,13 +29,15 @@ descs AS (
   SELECT flow, cmd_code, year, NVL(MAX(cmd_desc), (SELECT n.name FROM tf_hs6_name n WHERE n.code = SUBSTR(cmd_code, 1, 6))) AS cmd_desc
   FROM tf_trade_facts WHERE reporter_iso3 = :rep AND partner_iso3 <> 'WLD' GROUP BY flow, cmd_code, year
 ),
+-- Unattributed areas ("Other Asia, nes", "Areas, nes", free zones) stay in the all-partner total so shares are
+-- shares of the real trade, but they are never the top partner, never a supplier, and never count towards concentration.
 part AS (
   SELECT f.reporter_iso3, f.flow, f.cmd_code, f.year,
-         COUNT(CASE WHEN f.value_usd > 0 THEN 1 END) AS partner_count,
+         COUNT(CASE WHEN f.value_usd > 0 AND {REAL_COUNTRY} THEN 1 END) AS partner_count,
          SUM(f.value_usd) AS total,
-         MAX(f.value_usd) AS top_v,
-         SUM(f.value_usd * f.value_usd) AS sq,
-         MAX(f.partner_iso3) KEEP (DENSE_RANK LAST ORDER BY f.value_usd) AS top_partner
+         MAX(CASE WHEN {REAL_COUNTRY} THEN f.value_usd END) AS top_v,
+         SUM(CASE WHEN {REAL_COUNTRY} THEN f.value_usd * f.value_usd END) AS sq,
+         MAX(CASE WHEN {REAL_COUNTRY} THEN f.partner_iso3 END) KEEP (DENSE_RANK LAST ORDER BY CASE WHEN {REAL_COUNTRY} THEN f.value_usd END NULLS FIRST) AS top_partner
   FROM tf_trade_facts f WHERE f.reporter_iso3 = :rep AND f.partner_iso3 <> 'WLD' GROUP BY f.reporter_iso3, f.flow, f.cmd_code, f.year
 )
 SELECT a.reporter_iso3, a.flow, a.cmd_code, a.classification_level,

@@ -7,7 +7,7 @@ import { clientKey, rateLimit, tooMany } from '../lib/ratelimit';
 import { currentUser, isEntitled } from '../lib/session';
 import { ISO3_NAME } from '../../shared/country-names';
 import { fxRisk, saturation, type FxPoint, type FxRisk, type Saturation } from '../../shared/prospect';
-import { isMarket } from '../../shared/markets';
+import { isMarket, partnerName } from '../../shared/markets';
 
 /**
  * Premium prospect view for one country's export of one product: how crowded each main buyer's supply
@@ -33,7 +33,7 @@ async function worldBankRates(iso3: string): Promise<FxPoint[] | null> {
   }
 }
 
-const nameOf = (iso3: string) => ISO3_NAME[iso3] ?? iso3;
+const nameOf = (iso3: string) => partnerName(iso3, ISO3_NAME);
 
 prospect.get('/:country/:hs', async (c) => {
   const limited = await rateLimit(c.env, 'lookup', clientKey(c.req.raw));

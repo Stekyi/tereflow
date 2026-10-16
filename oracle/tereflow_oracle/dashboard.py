@@ -16,6 +16,7 @@ import math
 from datetime import datetime, timezone
 
 from .opportunity import NAMES
+from .markets import is_market, partner_name, REAL_COUNTRY_SQL
 
 RANKED_TOP_N = 12
 # Product lists are longer than partner lists: the traditional lines are hidden by default, so a short
@@ -151,7 +152,8 @@ def build_dashboard(reporter: str, product_rows: list[tuple], partner_rows: list
         for n, (iso, v) in enumerate(sorted(cur, key=lambda x: (-x[1], x[0]))[:RANKED_TOP_N]):
             past = ptot.get((flow, three_back, iso)) if three_back is not None else None
             last = ptot.get((flow, prev_y, iso)) if prev_y is not None else None
-            out.append({"rank": n + 1, "code": iso, "name": NAMES.get(iso, iso), "value_usd": v,
+            out.append({"rank": n + 1, "code": iso.strip(), "name": partner_name(iso, NAMES), "value_usd": v,
+                        "is_market": is_market(iso),
                         "share_pct": v / total * 100,
                         "cagr_3y": cagr(past, v, latest - three_back) if three_back is not None else None,
                         "yoy_pct": pct_change(last, v)})
@@ -308,12 +310,13 @@ def load_products(conn, reporter: str) -> dict | None:
                      SELECT f.flow, f.cmd_code, f.partner_iso3, f.value_usd,
                             ROW_NUMBER() OVER (PARTITION BY f.flow, f.cmd_code ORDER BY f.value_usd DESC) rn
                      FROM tf_trade_facts f
-                     WHERE f.reporter_iso3 = :rep AND f.year = :yr AND f.partner_iso3 <> 'WLD' AND f.value_usd > 0)
+                     WHERE f.reporter_iso3 = :rep AND f.year = :yr AND f.value_usd > 0
+                       AND """ + REAL_COUNTRY_SQL + """)
                    WHERE rn <= 5""", {"rep": reporter, "yr": latest})
     parts: dict[tuple, list] = {}
     for fl, code, p, v in cur:
         if (fl, code) in want:
-            parts.setdefault((fl, code), []).append({"iso3": p, "name": NAMES.get(p, p), "value_usd": float(v)})
+            parts.setdefault((fl, code), []).append({"iso3": p.strip(), "name": partner_name(p, NAMES), "value_usd": float(v)})
     for i in items:
         if (i["flow"], i["code"]) in parts:
             i["partners"] = parts[(i["flow"], i["code"])]

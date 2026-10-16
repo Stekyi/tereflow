@@ -12,6 +12,8 @@ from decimal import Decimal, ROUND_HALF_UP
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
+from .markets import is_market
+
 NAMES = json.loads((Path(__file__).parent / "data" / "iso3_name.json").read_text(encoding="utf-8"))
 CONFIG = json.loads((Path(__file__).parent / "data" / "country_config.json").read_text())
 
@@ -152,13 +154,21 @@ def compute_metrics(reporter: str, flow: str, level: str, code: str, desc: str |
     trend = classify_trend(years, changes, vol, min_years, latest.value)
     if trend == "insufficient_data":
         lim.append(f"At least {min_years} years of meaningful trade are needed to describe a trend.")
+    # Unattributed areas ("Other Asia, nes", "Areas, nes") are real trade but not a supplier, so they are not the
+    # top partner and do not count towards concentration. Shares are still shares of ALL partner trade, so a
+    # country holding 20% of a product that is mostly unattributed reads as 20%, not as 100%.
     ptotal = sum(latest.partners.values())
-    shares = sorted(((p, v, v / ptotal * 100 if ptotal > 0 else 0) for p, v in latest.partners.items()),
+    shares = sorted(((p.strip(), v, v / ptotal * 100 if ptotal > 0 else 0) for p, v in latest.partners.items() if is_market(p)),
                     key=lambda s: (-s[1], s[0]))
     top = shares[0] if shares else None
-    hhi = sum((s[2] / 100) ** 2 for s in shares) if len(shares) >= 2 else None
+    # Concentration among real suppliers, over their own total, so the index is not diluted by unattributed trade.
+    market_total = sum(s[1] for s in shares)
+    hhi = sum((s[1] / market_total) ** 2 for s in shares) if len(shares) >= 2 and market_total > 0 else None
     if len(shares) < 2:
         lim.append("Fewer than two partner countries reported, so supplier concentration cannot be assessed.")
+    unattributed = ptotal - market_total
+    if ptotal > 0 and unattributed / ptotal >= 0.2:
+        lim.append(f"{unattributed / ptotal * 100:.0f}% of this trade is reported against areas that are not a single country, so supplier shares cover only the rest.")
     return Metrics(reporter, flow, level, code, desc, latest.year, earliest.year, len(years), latest.value,
                    latest.weight, unit, yoy, c3, c5, trend, vol, top[0] if top else None,
                    top[2] if top else None, hhi, len(shares), lim)

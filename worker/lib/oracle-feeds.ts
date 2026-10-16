@@ -1,6 +1,7 @@
 import type { Env } from './db';
 import { oracleJson, type OracleConfig } from './oracle';
 import { ISO3_NAME } from '../agent/country-names';
+import { partnerName } from '../../shared/markets';
 import { hs6Label } from '../agent/codes';
 import type { ExploreOpportunity, Overview, RankedItem } from '../../shared/types';
 
@@ -99,7 +100,7 @@ export function itemName(i: FeedItem): string {
 }
 
 export function partnerLabel(iso3: string | null): string | null {
-  return iso3 ? (ISO3_NAME[iso3] ?? iso3) : null;
+  return iso3 ? partnerName(iso3, ISO3_NAME) : null;
 }
 
 /** Only the latest year of each line: older rows are products that stopped being reported. */

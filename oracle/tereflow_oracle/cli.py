@@ -115,6 +115,18 @@ def cmd_ingest_monthly(conn, a):
             break
 
 
+def cmd_ingest_tariffs(conn, a):
+    from . import tariffs
+    client = tariffs.Wits(max_calls=a.max_calls)
+    products = a.products or ["180100", "080131", "151590", "090111", "100630", "120740", "100590", "071410", "151110"]
+    years = a.years or [2021, 2022, 2023]
+    for c in [x.upper() for x in a.reporter]:
+        res = tariffs.load_tariffs(conn, client, c, products, years)
+        print(c, res)
+        if res.get("budget_used"):
+            break
+
+
 def cmd_analytics(conn, a):
     for c in [x.upper() for x in a.country] or active_countries(conn):
         print(f"metrics {c}: {analytics.refresh_metrics(conn, c):,} products")
@@ -170,6 +182,11 @@ def main(argv=None):
     mo = sub.add_parser("ingest-monthly")
     mo.add_argument("--country", nargs="+", required=True)
     mo.add_argument("--years", nargs="*", type=int)
+    tf = sub.add_parser("ingest-tariffs")
+    tf.add_argument("--reporter", nargs="+", required=True)
+    tf.add_argument("--products", nargs="*")
+    tf.add_argument("--years", nargs="*", type=int)
+    tf.add_argument("--max-calls", type=int, default=60)
     an = sub.add_parser("analytics")
     an.add_argument("--country", nargs="*", default=[])
     a = p.parse_args(argv)
@@ -178,7 +195,7 @@ def main(argv=None):
         print("applied:", db.migrate(conn) or "nothing new")
         return
     {"sync-countries": cmd_sync_countries, "create-app-user": cmd_create_app_user, "ingest": cmd_ingest,
-     "analytics": cmd_analytics, "ingest-monthly": cmd_ingest_monthly, "status": cmd_status, "check": cmd_check, "define-ords": cmd_define_ords}[a.cmd](conn, a)
+     "analytics": cmd_analytics, "ingest-monthly": cmd_ingest_monthly, "ingest-tariffs": cmd_ingest_tariffs, "status": cmd_status, "check": cmd_check, "define-ords": cmd_define_ords}[a.cmd](conn, a)
 
 
 if __name__ == "__main__":

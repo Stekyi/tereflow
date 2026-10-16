@@ -13,7 +13,7 @@ WORLD = "000"
 # WITS reports the European Union as one reporter; Belgium, France and the Netherlands have no tariff of their own.
 REPORTERS = {"USA": "840", "CHN": "156", "CIV": "384", "ZAF": "710", "EUN": "918", "NGA": "566", "GHA": "288", "TGO": "768", "LBR": "430", "SLE": "694"}
 MIN_PACE_S = 2.0
-TIMEOUT_S = 75
+TIMEOUT_S = 150
 
 
 class WitsError(Exception):

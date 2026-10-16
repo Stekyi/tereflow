@@ -7,6 +7,7 @@ import { clientKey, rateLimit, tooMany } from '../lib/ratelimit';
 import { currentUser, isEntitled } from '../lib/session';
 import { ISO3_NAME } from '../../shared/country-names';
 import { fxRisk, saturation, type FxPoint, type FxRisk, type Saturation } from '../../shared/prospect';
+import { isMarket } from '../../shared/markets';
 
 /**
  * Premium prospect view for one country's export of one product: how crowded each main buyer's supply
@@ -64,8 +65,8 @@ prospect.get('/:country/:hs', async (c) => {
   if (!cfg) return json({ locked: false, available: false, reason: 'Trade data is not connected.' }, 200, { 'cache-control': 'private, no-store' });
 
   const exp = await oracleProductDetail(cfg, home, 'X', hs).catch(() => null);
-  const buyersRaw = (exp?.partners ?? []).filter((p) => p.iso3 !== 'WLD' && p.value_usd > 0).slice(0, TOP_BUYERS);
-  const total = (exp?.partners ?? []).filter((p) => p.iso3 !== 'WLD').reduce((s, p) => s + p.value_usd, 0);
+  const buyersRaw = (exp?.partners ?? []).filter((p) => isMarket(p.iso3) && p.value_usd > 0).slice(0, TOP_BUYERS);
+  const total = (exp?.partners ?? []).filter((p) => isMarket(p.iso3)).reduce((s, p) => s + p.value_usd, 0);
   if (!exp || !buyersRaw.length) {
     return json({ locked: false, available: false, reason: `No export partners are held for ${entity?.name} in this product.` }, 200, { 'cache-control': 'private, no-store' });
   }
@@ -78,7 +79,7 @@ prospect.get('/:country/:hs', async (c) => {
     ]);
     let sat: Saturation | null = null;
     if (imp?.partners?.length) {
-      sat = saturation(imp.partners.filter((p) => p.iso3 !== 'WLD').map((p) => ({ name: nameOf(p.iso3), value_usd: p.value_usd })));
+      sat = saturation(imp.partners.filter((p) => isMarket(p.iso3)).map((p) => ({ name: nameOf(p.iso3), value_usd: p.value_usd })));
     }
     const fx: FxRisk | null = rates ? fxRisk(rates) : null;
     return {

@@ -25,6 +25,7 @@ import { unitCostTrend } from '../../shared/unit-cost';
 import { byproductAnalysis } from '../../shared/byproducts';
 import { landedCost, INCOTERMS, type Incoterm } from '../../shared/frameworks';
 import type { fxRisk, saturation } from '../../shared/prospect';
+import type { readTariff } from '../../shared/tariff';
 import { useBudget } from '../lib/budget';
 import { budgetFit, fmtQuantity } from '../../shared/budget';
 import { CHART } from '../lib/theme';
@@ -692,6 +693,71 @@ export function ProspectBlock({ slug, hs }: { slug: string; hs: string }) {
         </p>
       )}
       <p style={{ margin: '4px 0 0' }}>{r.sources.join(' ')} Hover a row for the reasoning. {r.limitations.join(' ')}</p>
+    </div>
+  );
+}
+
+type TariffResponse =
+  | { available: false; reason: string }
+  | {
+      available: true;
+      country: string;
+      hs: string;
+      export_year: number;
+      markets: Array<{
+        market: string; reporter: string; export_value_usd: number; applies_to: string[];
+        tariff: ReturnType<typeof readTariff>;
+      }>;
+      coverage: { markets_shown: number; markets_with_verified_tariff: number };
+      notes: string[];
+    };
+
+const TARIFF_STATUS_LABEL: Record<string, string> = { verified: 'Verified', 'specific-duty': 'Fixed amount per unit', unavailable: 'Unavailable' };
+
+export function TariffBlock({ slug, hs }: { slug: string; hs: string }) {
+  const [r, setR] = useState<TariffResponse | null | 'failed'>(null);
+  useEffect(() => {
+    let live = true;
+    setR(null);
+    fetch(`/api/tariffs/${encodeURIComponent(slug)}/${encodeURIComponent(hs)}`, { headers: { accept: 'application/json' } })
+      .then((x) => (x.ok ? x.json() : Promise.reject(new Error(String(x.status)))))
+      .then((x) => { if (live) setR(x); })
+      .catch(() => { if (live) setR('failed'); });
+    return () => { live = false; };
+  }, [slug, hs]);
+  if (r === null || r === 'failed') return null;
+  if (!r.available) return <p className="tiny dim" style={{ margin: '10px 0 0' }}><strong>Import tariffs</strong>: {r.reason}</p>;
+  return (
+    <div className="tiny dim" style={{ margin: '10px 0 0' }}>
+      <strong>Import tariffs in the main buying markets</strong>
+      <p style={{ margin: '4px 0 0' }}>
+        What {r.country}&apos;s main buyers charge on imports of this product. {r.coverage.markets_with_verified_tariff} of {r.coverage.markets_shown} markets have a verified rate loaded.
+      </p>
+      <table className="data-table" style={{ marginTop: 4 }}>
+        <thead>
+          <tr><th>Market</th><th>MFN tariff</th><th>Status</th><th>Source</th></tr>
+        </thead>
+        <tbody>
+          {r.markets.map((m) => (
+            <tr key={m.reporter}>
+              <td title={m.applies_to.length ? `Applies to: ${m.applies_to.join(', ')}` : undefined}>{m.market}</td>
+              <td title={m.tariff.headline}>
+                {m.tariff.status === 'verified' && m.tariff.rate_pct != null
+                  ? `${Math.round(m.tariff.rate_pct * 10) / 10}%${m.tariff.mixed ? ` avg (${m.tariff.min_rate_pct}% to ${m.tariff.max_rate_pct}%)` : ''}`
+                  : <span className="dim">{m.tariff.status === 'specific-duty' ? 'No % rate' : 'Not available'}</span>}
+              </td>
+              <td>{TARIFF_STATUS_LABEL[m.tariff.status]}{m.tariff.year ? `, ${m.tariff.year}` : ''}{m.tariff.hs_revision ? `, HS ${m.tariff.hs_revision}` : ''}</td>
+              <td>{m.tariff.source_url
+                ? <a href={m.tariff.source_url} target="_blank" rel="noopener noreferrer">UNCTAD TRAINS</a>
+                : <span className="dim">None</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {r.markets.find((m) => m.tariff.status === 'verified') && (
+        <p style={{ margin: '4px 0 0' }}>{r.markets.find((m) => m.tariff.status === 'verified')!.tariff.limitations.join(' ')}</p>
+      )}
+      <p style={{ margin: '4px 0 0' }}>{r.notes.join(' ')} Retrieved {r.markets.find((m) => m.tariff.retrieved_at)?.tariff.retrieved_at?.slice(0, 10) ?? 'not yet'}.</p>
     </div>
   );
 }
@@ -1409,6 +1475,7 @@ export default function ProductModal({
                 {insight.focus_slug && <ProductionBlock slug={insight.focus_slug} hs={insight.hs_code} />}
                 {insight.focus_slug && insight.focus_flow !== 'import' && <ByproductBlock slug={insight.focus_slug} hs={insight.hs_code} />}
                 {insight.focus_slug && insight.focus_flow !== 'import' && /^\d{6}$/.test(insight.hs_code) && <ProspectBlock slug={insight.focus_slug} hs={insight.hs_code} />}
+                {insight.focus_slug && insight.focus_flow !== 'import' && /^\d{6}$/.test(insight.hs_code) && <TariffBlock slug={insight.focus_slug} hs={insight.hs_code} />}
                 <LandedCostBlock key={insight.hs_code} unitValueUsdT={insight.unit_value_usd_t ?? null} />
                 <CompanyLinksBlock name={insight.name ?? null} />
                 {insight.focus_slug && <p className="tiny" style={{ margin: '10px 0 0' }}><Link to={`/feasibility/${insight.focus_slug}/${insight.hs_code}?flow=${insight.focus_flow ?? 'export'}`}>Open the full feasibility report</Link></p>}

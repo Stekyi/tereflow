@@ -40,7 +40,12 @@ def parse(body: dict) -> list[dict]:
                 idx = vals[1 + order.index(name)] if len(vals) > 1 + order.index(name) else None
                 if idx is None or idx == "":
                     return None
-                v = obs_attrs[name][int(idx)]
+                values = obs_attrs.get(name) or []
+                try:
+                    v = values[int(idx)]
+                except (IndexError, ValueError, TypeError):
+                    # The code points at a value the answer does not list: treat it as not reported, not as a crash.
+                    return None
                 return v.get("id") if isinstance(v, dict) else v
             def num(name):
                 v = attr(name)
@@ -49,12 +54,19 @@ def parse(body: dict) -> list[dict]:
                 except ValueError:
                     return None
             rate = vals[0]
+            total = num("TOTALNOOFLINES")
+            na = num("NBR_NA_LINES")
+            # Lines with no ad valorem equivalent (specific duties such as euros per tonne) carry no percentage.
+            # When every line is like that the 0 the source prints is a placeholder, not a rate.
+            all_na = total is not None and total > 0 and na is not None and na >= total
             rows.append({
-                "rate_pct": None if rate is None else float(rate),
+                "rate_pct": None if (rate is None or all_na) else float(rate),
+                "no_ad_valorem": all_na,
                 "hs_revision": attr("NOMENCODE"), "tariff_type": attr("TARIFFTYPE") or "MFN",
                 "rate_measure": attr("OBS_VALUE_MEASURE"),
-                "total_lines": num("TOTALNOOFLINES"), "pref_lines": num("NBR_PREF_LINES"), "mfn_lines": num("NBR_MFN_LINES"),
-                "min_rate_pct": num("MIN_RATE"), "max_rate_pct": num("MAX_RATE"),
+                "total_lines": total, "pref_lines": num("NBR_PREF_LINES"), "mfn_lines": num("NBR_MFN_LINES"),
+                "na_lines": na,
+                "min_rate_pct": None if all_na else num("MIN_RATE"), "max_rate_pct": None if all_na else num("MAX_RATE"),
             })
     return rows
 
@@ -126,10 +138,11 @@ def load_tariffs(conn, client: Wits, reporter_iso3: str, products: list[str], ye
                 cur.execute("DELETE FROM tf_tariff WHERE reporter_code=:r AND partner_code=:p AND cmd_code=:c AND year=:y AND tariff_type=:t",
                             {"r": code, "p": WORLD, "c": hs6, "y": year, "t": x["tariff_type"]})
                 cur.execute("""INSERT INTO tf_tariff (reporter_iso3, reporter_code, partner_code, cmd_code, year, tariff_type, hs_revision, rate_pct,
-                                                     rate_measure, total_lines, pref_lines, mfn_lines, min_rate_pct, max_rate_pct, source_url)
-                               VALUES (:i,:r,:p,:c,:y,:t,:h,:rate,:m,:tl,:pl,:ml,:mn,:mx,:u)""",
+                                                     rate_measure, total_lines, pref_lines, mfn_lines, na_lines, no_ad_valorem, min_rate_pct, max_rate_pct, source_url)
+                               VALUES (:i,:r,:p,:c,:y,:t,:h,:rate,:m,:tl,:pl,:ml,:nl,:nav,:mn,:mx,:u)""",
                             {"i": reporter_iso3, "r": code, "p": WORLD, "c": hs6, "y": year, "t": x["tariff_type"], "h": x["hs_revision"],
                              "rate": x["rate_pct"], "m": x["rate_measure"], "tl": x["total_lines"], "pl": x["pref_lines"], "ml": x["mfn_lines"],
+                             "nl": x["na_lines"], "nav": 1 if x["no_ad_valorem"] else 0,
                              "mn": x["min_rate_pct"], "mx": x["max_rate_pct"], "u": url_for(code, WORLD, hs6, year)})
                 stored += 1
             cur.execute("""MERGE INTO tf_tariff_state t USING (SELECT :r r, :c c, :y y FROM dual) s

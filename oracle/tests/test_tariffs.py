@@ -86,4 +86,26 @@ except WitsError as e:
     assert "budget" in str(e)
 
 assert url_for("918", "000", "180100", 2022).endswith("/reporter/918/partner/000/product/180100/year/2022/datatype/reported?format=JSON")
+
+# EU rice: every one of the 16 lines is "not available" (specific duties), and the source prints a rate of 0.
+# That 0 is a placeholder. It must not be stored or shown as a 0% tariff.
+RICE = {
+    "dataSets": [{"series": {"0:0:0:0:0": {"observations": {"0": [0, 0, None, 0, 0, 0, 16, 0, 0, 16, 0, 0]}}}}],
+    "structure": {"attributes": {"observation": [
+        {"id": "NOMENCODE", "values": [{"id": "H6"}]}, {"id": "EXCLUDEDFROM", "values": []}, {"id": "TARIFFTYPE", "values": [{"id": "MFN"}]},
+        {"id": "SUM_OF_RATES", "values": [{"id": "0"}]}, {"id": "MIN_RATE", "values": [{"id": "0"}]}, {"id": "MAX_RATE", "values": [{"id": "0"}]},
+        {"id": "TOTALNOOFLINES", "values": [{"id": "16"}]}, {"id": "NBR_PREF_LINES", "values": [{"id": "0"}]},
+        {"id": "NBR_MFN_LINES", "values": [{"id": "0"}]}, {"id": "NBR_NA_LINES", "values": [{"id": "16"}]},
+        {"id": "OBS_VALUE_MEASURE", "values": [{"id": "SimpleAverage"}]},
+    ]}},
+}
+rice = parse(RICE)[0]
+assert rice["rate_pct"] is None, rice
+assert rice["no_ad_valorem"] is True
+assert rice["min_rate_pct"] is None and rice["max_rate_pct"] is None
+assert rice["na_lines"] == 16 and rice["total_lines"] == 16
+# a genuine 0% (all lines counted as MFN lines) stays a real zero
+assert parse(REAL)[0]["no_ad_valorem"] is False
+zero = {**REAL, "dataSets": [{"series": {"0:0:0:0:0": {"observations": {"0": [0, 0, None, 0, 0, 0, 0, 0, 0, 0, 0, 0]}}}}]}
+assert parse(zero)[0]["rate_pct"] == 0.0
 print("tariffs: all invariants hold")

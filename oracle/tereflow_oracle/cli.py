@@ -121,6 +121,8 @@ def cmd_ingest_tariffs(conn, a):
     products = a.products or ["180100", "080131", "151590", "090111", "100630", "120740", "100590", "071410", "151110"]
     years = a.years or [2021, 2022, 2023]
     for c in [x.upper() for x in a.reporter]:
+        # A long slow run can outlive the database connection, so each reporter gets a fresh one.
+        conn = db.connect(app=a.app)
         res = tariffs.load_tariffs(conn, client, c, products, years)
         print(c, res)
         if res.get("budget_used"):

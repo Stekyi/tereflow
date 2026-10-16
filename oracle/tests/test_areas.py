@@ -53,4 +53,12 @@ assert m3.top_partner is None and m3.partner_count == 0 and m3.hhi is None
 y4 = YearTotal(2025, 100.0, None, {"USA ": 70.0, "DEU": 30.0})
 assert compute_metrics("GHA", "X", "HS6", "1", "x", [y4]).top_partner == "USA"
 
+# padded codes from the source are cleaned when rows are built, so they are never stored padded again
+from tereflow_oracle.comtrade import Comtrade  # noqa: E402
+_row = lambda code, iso, v: {"customsCode": "C00", "motCode": 0, "partner2Code": 0, "mosCode": 0, "cmdCode": "090111",
+                             "partnerCode": code, "partnerISO": iso, "primaryValue": v, "cmdDesc": "x"}
+_res = Comtrade._to_result([_row(899, "_X ", 5.0), _row(490, "S19", 7.0), _row(840, "USA ", 2.0)], {}, 0, False)
+assert sorted(r.partner_iso3 for r in _res.rows) == ["S19", "USA", "_X"], [r.partner_iso3 for r in _res.rows]
+assert all(r.partner_iso3 == r.partner_iso3.strip() for r in _res.rows)
+
 print("areas: all invariants hold")

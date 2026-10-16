@@ -230,6 +230,8 @@ class Comtrade:
             if pc is None:
                 continue
             iso = "WLD" if int(pc) == 0 else (r.get("partnerISO") or m49_to_iso3.get(int(pc)) or PARTNER_ISO3.get(int(pc)))
+            # The source pads some codes to three characters ("_X ", "X1 "). Stored padded, they defeat exact matches.
+            iso = iso.strip() if isinstance(iso, str) else iso
             if not iso:
                 continue
             pv = r.get("primaryValue")

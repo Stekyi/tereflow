@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, Fragment } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '../lib/api';
@@ -6,6 +6,7 @@ import { usePageTitle } from '../lib/pageTitle';
 import { Empty, Skeletons } from '../components/ui';
 import type { Entity } from '../../shared/types';
 import { ISO3_NAME } from '../../shared/country-names';
+import { nameFamilies } from '../../shared/product-family';
 import type { TradeSandboxPartner, TradeSandboxProduct, TradeSandboxProductTotal, TradeSandboxResponse } from '../../shared/trade-sandbox';
 
 const nf = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
@@ -287,6 +288,34 @@ function PartnerResult({
 
   const chart = partner.totals.map((t) => ({ year: t.year, exports: t.export_usd, imports: t.import_usd }));
 
+  const [openFam, setOpenFam] = useState<Set<string>>(new Set());
+  // Lines of one product (same HS4 and flow) fold into one family row; a requested product opens its family.
+  const tableRows = useMemo(() => {
+    const groups = new Map<string, ProductRow[]>();
+    for (const r of productRows) {
+      const key = `${r.flow}|${r.hs_code.slice(0, 4)}`;
+      groups.set(key, [...(groups.get(key) ?? []), r]);
+    }
+    const named = nameFamilies(new Map([...groups].filter(([, g]) => g.length > 1).map(([k, g]) => [k, g.map((r) => ({ code: r.hs_code, description: r.product_name, value: r.value_usd }))])));
+    const seen = new Set<string>();
+    const out: ({ kind: 'family'; key: string; hs4: string; name: string; flow: ProductRow['flow']; year: number; value_usd: number; share: number | null; lines: ProductRow[] } | { kind: 'row'; row: ProductRow })[] = [];
+    for (const r of productRows) {
+      const key = `${r.flow}|${r.hs_code.slice(0, 4)}`;
+      const g = groups.get(key)!;
+      if (g.length < 2) { out.push({ kind: 'row', row: r }); continue; }
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const fam = named.get(key)!;
+      const byCode = new Map(g.map((x) => [x.hs_code, x]));
+      const lines = fam.lines.map((l) => ({ ...byCode.get(l.code)!, product_name: l.name }));
+      const totals = lines.map((l) => totalByKey.get(`${selectedYear}|${l.flow}|${l.hs_code}`));
+      const value = lines.reduce((s, l) => s + l.value_usd, 0);
+      const share = totals.every((t) => t != null) ? marketShare(value, totals.reduce((s, t) => s + (t as number), 0)) : null;
+      out.push({ kind: 'family', key, hs4: r.hs_code.slice(0, 4), name: fam.name, flow: r.flow, year: selectedYear, value_usd: value, share, lines });
+    }
+    return out;
+  }, [productRows, totalByKey, selectedYear]);
+
   return (
     <>
       <div className="card">
@@ -355,14 +384,35 @@ function PartnerResult({
             <table className="sandbox-table">
               <thead><tr><th>Product</th><th>Flow</th><th>Year</th><th>Partner value</th><th>Market share</th><th>Trend</th></tr></thead>
               <tbody>
-                {productRows.map((p) => (
-                  <tr key={`${p.flow}-${p.hs_code}-${p.year}`} onClick={() => setProduct(p)} className="sandbox-row">
-                    <td><strong>{p.product_name}</strong><span className="tiny dim">HS {p.hs_code}</span></td>
-                    <td><span className={`badge ${p.flow === 'export' ? 'on' : 'moderate'}`}>{p.flow}</span></td>
-                    <td>{p.year}</td>
-                    <td>{money(p.value_usd)}</td>
-                    <td>{shareText(p.share)}</td>
-                    <td className={p.cagr == null ? 'dim' : p.cagr >= 0 ? 'up' : 'down'}>{p.cagr == null ? 'Not enough history' : `${p.cagr >= 0 ? '+' : ''}${p.cagr.toFixed(1)}%/yr`}</td>
+                {tableRows.map((r) => r.kind === 'family' ? (
+                  <Fragment key={r.key}>
+                    <tr className="sandbox-row" onClick={() => setOpenFam((s) => { const n = new Set(s); if (!n.delete(r.key)) n.add(r.key); return n; })}>
+                      <td><strong>{r.name}</strong><span className="tiny dim">{r.lines.length} variants, HS {r.hs4} {openFam.has(r.key) ? '\u25b4' : '\u25be'}</span></td>
+                      <td><span className={`badge ${r.flow === 'export' ? 'on' : 'moderate'}`}>{r.flow}</span></td>
+                      <td>{r.year}</td>
+                      <td>{money(r.value_usd)}</td>
+                      <td>{shareText(r.share)}</td>
+                      <td className="dim">See variants</td>
+                    </tr>
+                    {openFam.has(r.key) && r.lines.map((p) => (
+                      <tr key={`${p.flow}-${p.hs_code}-${p.year}`} onClick={() => setProduct(p)} className="sandbox-row">
+                        <td style={{ paddingLeft: 24 }}><strong>{p.product_name}</strong><span className="tiny dim">HS {p.hs_code}</span></td>
+                        <td><span className={`badge ${p.flow === 'export' ? 'on' : 'moderate'}`}>{p.flow}</span></td>
+                        <td>{p.year}</td>
+                        <td>{money(p.value_usd)}</td>
+                        <td>{shareText(p.share)}</td>
+                        <td className={p.cagr == null ? 'dim' : p.cagr >= 0 ? 'up' : 'down'}>{p.cagr == null ? 'Not enough history' : `${p.cagr >= 0 ? '+' : ''}${p.cagr.toFixed(1)}%/yr`}</td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                ) : (
+                  <tr key={`${r.row.flow}-${r.row.hs_code}-${r.row.year}`} onClick={() => setProduct(r.row)} className="sandbox-row">
+                    <td><strong>{r.row.product_name}</strong><span className="tiny dim">HS {r.row.hs_code}</span></td>
+                    <td><span className={`badge ${r.row.flow === 'export' ? 'on' : 'moderate'}`}>{r.row.flow}</span></td>
+                    <td>{r.row.year}</td>
+                    <td>{money(r.row.value_usd)}</td>
+                    <td>{shareText(r.row.share)}</td>
+                    <td className={r.row.cagr == null ? 'dim' : r.row.cagr >= 0 ? 'up' : 'down'}>{r.row.cagr == null ? 'Not enough history' : `${r.row.cagr >= 0 ? '+' : ''}${r.row.cagr.toFixed(1)}%/yr`}</td>
                   </tr>
                 ))}
               </tbody>

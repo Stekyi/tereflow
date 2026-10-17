@@ -69,14 +69,18 @@ export function ProductCardRow({
    */
   onOpen: (hsCode: string, countrySlug: string, flow: 'export' | 'import') => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const family = product.family;
   const band = product.band;
   const fit = budget > 0 ? budgetFit(budget, product.unit_value_usd_t) : null;
   const qty = fit ? fmtQuantity(fit) : null;
   return (
+    <>
     <button
       type="button"
       className="product-row"
-      onClick={() => onOpen(product.hs_code, product.slug, product.flow)}
+      onClick={() => (family ? setOpen((o) => !o) : onOpen(product.hs_code, product.slug, product.flow))}
+      aria-expanded={family ? open : undefined}
       aria-label={`${product.name}, ${product.country}, score ${product.score} of 100`}
     >
       <span className="flag">{product.iso3 ?? '??'}</span>
@@ -87,6 +91,7 @@ export function ProductCardRow({
             {product.flow === 'export' ? 'Export' : 'Import'}
           </span>
           {product.country}
+          {family && <> {'\u00b7'} {family.line_count} variants {open ? '\u25b4' : '\u25be'}</>}
           {product.value_usd > 0 && <> {'\u00b7'} {fmtUsd(product.value_usd)}</>}
           {product.growth_pct != null &&
             (isNewTrade(product.growth_pct) ? (
@@ -135,6 +140,28 @@ export function ProductCardRow({
         </span>
       </span>
     </button>
+    {family && open && (
+      <ul style={{ listStyle: 'none', margin: '0 0 8px 28px', padding: 0 }}>
+        {family.members.map((m) => (
+          <li key={m.hs_code}>
+            <button type="button" className="product-row" onClick={() => onOpen(m.hs_code, product.slug, product.flow)}>
+              <span className="grow">
+                <span className="name">{m.name}</span>
+                <span className="tiny dim product-row-meta">
+                  HS {m.hs_code}
+                  {m.value_usd > 0 && <> {'\u00b7'} {fmtUsd(m.value_usd)}</>}
+                  {m.growth_pct != null && !isNewTrade(m.growth_pct) && <> {'\u00b7'} {fmtPct(m.growth_pct, 0)}/yr</>}
+                </span>
+              </span>
+              <span className="product-row-score" style={{ flex: 'none', textAlign: 'right' }}>
+                <span className="tiny dim">{m.score > 0 ? `${m.score}/100` : 'Not scored'}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    )}
+    </>
   );
 }
 

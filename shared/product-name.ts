@@ -282,6 +282,7 @@ function commonPrefix(texts: string[]): number {
  */
 export function disambiguateProductNames(
   items: { code: string; description: string | null | undefined }[],
+  tailsOnly = false,
 ): Map<string, string> {
   const labels = new Map<string, string>();
   const groups = new Map<string, { code: string; description: string }[]>();
@@ -315,7 +316,7 @@ export function disambiguateProductNames(
     const base = clip(short, 34);
     for (const g of group) {
       const tail = stripNoise(g.description.slice(cut).trim()).replace(/[.;,]+$/, '');
-      labels.set(g.code, tail ? `${base} (${clip(tail, 40)})` : codeLabel(g.code));
+      labels.set(g.code, tail ? (tailsOnly ? upperFirst(clip(tail, 60)) : `${base} (${clip(tail, 40)})`) : codeLabel(g.code));
     }
   }
 

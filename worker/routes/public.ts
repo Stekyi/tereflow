@@ -6,6 +6,7 @@ import { loadRegulatory } from '../lib/regulatory';
 import { currentUser, isEntitled } from '../lib/session';
 import { hs2Label, hs2Sector, hs6Label, HS6_LABEL } from '../agent/codes';
 import { shortProductName } from '../../shared/product-name';
+import { nameFamilies } from '../../shared/product-family';
 import { ISO3_NAME } from '../../shared/country-names';
 import { expandQuery, scoreMatch, typedWords } from '../../shared/search-terms';
 import { opportunityScore, scoreBand } from '../../shared/opportunity';
@@ -975,8 +976,12 @@ pub.get('/products', async (c) => {
     .sort((a, b) => b.quality - a.quality || b.p.score - a.p.score || b.p.value_usd - a.p.value_usd)
     .map((x) => x.p);
 
+  // Fold tariff lines of one product (same HS4, country and flow) into a single family card. An exact code search is
+  // left as typed, so somebody asking for one line gets that line.
+  const listed = /^\d{6}$/.test(q) ? matched : foldFamilies(matched);
+
   const summary = {
-    total: matched.length,
+    total: listed.length,
     exports: matched.filter((p) => p.flow === 'export').length,
     imports: matched.filter((p) => p.flow === 'import').length,
     strong: matched.filter((p) => p.has_signal && p.score >= settings.scoreBandStrong).length,
@@ -987,8 +992,48 @@ pub.get('/products', async (c) => {
     priced: matched.filter((p) => p.unit_value_usd_t != null).length,
   };
 
-  return json({ products: matched.slice(0, limit), count: matched.length, summary, note: expanded.note });
+  return json({ products: listed.slice(0, limit), count: listed.length, summary, note: expanded.note });
 });
+
+/** Keeps the order of `cards`; a family sits where its best-ranked line was. */
+function foldFamilies(cards: ProductCard[]): ProductCard[] {
+  const groups = new Map<string, ProductCard[]>();
+  for (const p of cards) {
+    if (!/^\d{6}$/.test(p.hs_code)) continue;
+    const key = `${p.slug}|${p.flow}|${p.hs_code.slice(0, 4)}`;
+    groups.set(key, [...(groups.get(key) ?? []), p]);
+  }
+  const named = nameFamilies(new Map(
+    [...groups].filter(([, g]) => g.length > 1).map(([k, g]) => [k, g.map((p) => ({ code: p.hs_code, description: p.name_full || p.name, value: p.value_usd }))]),
+  ));
+  const done = new Set<string>();
+  const out: ProductCard[] = [];
+  for (const p of cards) {
+    const key = `${p.slug}|${p.flow}|${p.hs_code.slice(0, 4)}`;
+    const g = groups.get(key);
+    if (!g || g.length < 2) { out.push(p); continue; }
+    if (done.has(key)) continue;
+    done.add(key);
+    const fam = named.get(key)!;
+    const byCode = new Map(g.map((m) => [m.hs_code, m]));
+    const top = g.reduce((a, b) => (b.score > a.score ? b : a), g[0]);
+    out.push({
+      ...top,
+      name: fam.name,
+      name_full: fam.name,
+      value_usd: g.reduce((s, m) => s + m.value_usd, 0),
+      family: {
+        hs4: p.hs_code.slice(0, 4),
+        line_count: g.length,
+        members: fam.lines.map((l) => {
+          const m = byCode.get(l.code)!;
+          return { hs_code: l.code, name: l.name, value_usd: m.value_usd, growth_pct: m.growth_pct, score: m.score };
+        }),
+      },
+    });
+  }
+  return out;
+}
 
 interface SignalRow {
   entity_id: string;

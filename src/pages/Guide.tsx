@@ -130,7 +130,19 @@ export default function Guide() {
               </ul>
               {cards.length > 0 && <p className="tiny dim" style={{ margin: '6px 0' }}>Traded products</p>}
               <ul style={{ listStyle: 'none', padding: 0 }}>
-                {cards.map((c) => <li key={c.hs_code}><button type="button" className="btn" onClick={() => setPick({ hs: c.hs_code, name: `${c.name} (HS ${c.hs_code})` })}>{c.name} (HS {c.hs_code})</button>{' '}
+                {cards.map((c) => c.family ? (
+                  <li key={c.hs_code}>
+                    <span><strong>{c.name}</strong> <span className="tiny dim">{c.family.line_count} variants, pick one</span></span>
+                    <ul style={{ listStyle: 'none', paddingLeft: 16 }}>
+                      {c.family.members.map((m) => (
+                        <li key={m.hs_code}>
+                          <button type="button" className="btn" onClick={() => setPick({ hs: m.hs_code, name: `${m.name} (HS ${m.hs_code})` })}>{m.name} (HS {m.hs_code})</button>{' '}
+                          <Link className="tiny" to={`/country/${slug}?product=${m.hs_code}&flow=${role === 'supply' ? 'export' : 'import'}`}>details</Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ) : <li key={c.hs_code}><button type="button" className="btn" onClick={() => setPick({ hs: c.hs_code, name: `${c.name} (HS ${c.hs_code})` })}>{c.name} (HS {c.hs_code})</button>{' '}
                   <Link className="tiny" to={`/country/${slug}?product=${c.hs_code}&flow=${role === 'supply' ? 'export' : 'import'}`}>details</Link></li>)}
               </ul>
             </div>

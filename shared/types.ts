@@ -495,9 +495,16 @@ export interface ProductCard {
   has_signal: boolean;
   /** Set when this country's product detail was capped by the source. */
   partial_coverage: boolean;
+  /**
+   * Present when several tariff lines under one HS4 heading were folded into this card. `name` is then the base
+   * name, `value_usd` the sum of the lines, and every line is listed in `members` so nothing is hidden.
+   */
+  family?: {
+    hs4: string;
+    line_count: number;
+    members: { hs_code: string; name: string; value_usd: number; growth_pct: number | null; score: number }[];
+  };
 }
-
-/** One country's position in a single product, for the product modal. */
 export interface ProductCountry {
   rank: number;
   slug: string;

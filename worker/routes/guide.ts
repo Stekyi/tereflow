@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Env } from '../lib/db';
-import { bad, json } from '../lib/db';
+import { bad, json, uid } from '../lib/db';
 import { oracleConfig } from '../lib/oracle';
 import { oracleProductDetail, type ProductDetailPayload } from '../lib/oracle-insight';
 import { clientKey, rateLimit, tooMany } from '../lib/ratelimit';
@@ -33,6 +33,66 @@ const KB_COLUMNS = `id, parent_name, parent_code, byproduct_name, byproduct_code
   status, confidence, byproduct_hs_official, hs_codes_checked, derivation_checked, trade_evidence_usd, trade_evidence_year,
   trade_evidence_note, evidence_note, source_name, source_url, verified_at`;
 
+const MAX_RUNS = 50;
+
+/** Saved runs. Premium only, and scoped by user id in SQL so another person's run is simply not found. */
+async function runsUser(c: { req: { raw: Request }; env: Env }) {
+  const user = await currentUser(c.req.raw, c.env);
+  return user && isEntitled(user) ? user : null;
+}
+
+guide.post('/runs', async (c) => {
+  const user = await runsUser(c);
+  if (!user) return bad('Saving runs is a premium feature', 402);
+  const limited = await rateLimit(c.env, 'lookup', clientKey(c.req.raw));
+  if (!limited.ok) return tooMany(limited);
+  const b = (await c.req.json().catch(() => null)) as { country?: string; hs?: string; role?: string; budget?: number; via?: string } | null;
+  const hs = String(b?.hs ?? '').replace(/[\s.]/g, '');
+  if (!b?.country || !/^\d{6}$/.test(hs)) return bad('country and a 6-digit hs are required');
+  const count = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM guide_runs WHERE user_id = ?').bind(user.id).first<{ n: number }>();
+  if ((count?.n ?? 0) >= MAX_RUNS) return bad(`You can keep ${MAX_RUNS} saved runs. Delete one first.`, 409);
+  const role: Role = b.role === 'procurement' ? 'procurement' : 'supply';
+  const budget = Number.isFinite(Number(b.budget)) && Number(b.budget) > 0 ? Math.min(Number(b.budget), 1e9) : null;
+  const built = await buildGuide(c.env, b.country, hs, role, budget, b.via ?? null);
+  if ('response' in built) return built.response;
+  if (!built.body.available || !built.body.inputs) return bad('There is no guide for that product to save', 422);
+  const id = uid('gr_');
+  const title = `${built.body.inputs.product} in ${built.body.inputs.country}, ${role === 'supply' ? 'supply' : 'procurement'}`;
+  await c.env.DB.prepare('INSERT INTO guide_runs (id, user_id, country_slug, hs_code, role, budget_usd, title, result_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, user.id, b.country.trim().toLowerCase(), hs, role, budget, title, JSON.stringify(built.body)).run();
+  return json({ id, title }, 201);
+});
+
+guide.get('/runs', async (c) => {
+  const user = await runsUser(c);
+  if (!user) return bad('Saved runs are a premium feature', 402);
+  const { results } = await c.env.DB.prepare('SELECT id, title, country_slug, hs_code, role, budget_usd, created_at, result_json FROM guide_runs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?')
+    .bind(user.id, MAX_RUNS).all<{ id: string; title: string; country_slug: string; hs_code: string; role: string; budget_usd: number | null; created_at: string; result_json: string }>();
+  return json({
+    runs: (results ?? []).map(({ result_json, ...r }) => {
+      let risk: string | null = null;
+      try { risk = (JSON.parse(result_json) as { risk?: { level: string } }).risk?.level ?? null; } catch { /* keep null */ }
+      return { ...r, risk };
+    }),
+  }, 200, { 'cache-control': 'private, no-store' });
+});
+
+guide.get('/runs/:id', async (c) => {
+  const user = await runsUser(c);
+  if (!user) return bad('Saved runs are a premium feature', 402);
+  const row = await c.env.DB.prepare('SELECT id, title, created_at, result_json FROM guide_runs WHERE id = ? AND user_id = ?').bind(c.req.param('id'), user.id)
+    .first<{ id: string; title: string; created_at: string; result_json: string }>();
+  if (!row) return bad('Saved run not found', 404);
+  return json({ id: row.id, title: row.title, saved_at: row.created_at, result: JSON.parse(row.result_json) }, 200, { 'cache-control': 'private, no-store' });
+});
+
+guide.delete('/runs/:id', async (c) => {
+  const user = await runsUser(c);
+  if (!user) return bad('Saved runs are a premium feature', 402);
+  await c.env.DB.prepare('DELETE FROM guide_runs WHERE id = ? AND user_id = ?').bind(c.req.param('id'), user.id).run();
+  return json({ deleted: true });
+});
+
 guide.get('/:country/:hs', async (c) => {
   const limited = await rateLimit(c.env, 'lookup', clientKey(c.req.raw));
   if (!limited.ok) return tooMany(limited);
@@ -48,23 +108,30 @@ guide.get('/:country/:hs', async (c) => {
   const role: Role = q.get('role') === 'procurement' ? 'procurement' : 'supply';
   const rawBudget = Number(q.get('budget'));
   const budget = Number.isFinite(rawBudget) && rawBudget > 0 ? Math.min(rawBudget, 1e9) : null;
+  const built = await buildGuide(c.env, c.req.param('country'), hs, role, budget, q.get('via'));
+  return 'response' in built ? built.response : json(built.body, 200, { 'cache-control': 'private, max-age=300' });
+});
 
-  const key = c.req.param('country').trim().toLowerCase();
-  const entity = await c.env.DB.prepare("SELECT iso3, name FROM entities WHERE kind = 'country' AND (slug = ? OR lower(iso3) = ?)")
+type Built = { body: Record<string, unknown> & { available: boolean; inputs?: { country: string; product: string; [k: string]: unknown } }; response?: undefined } | { response: Response };
+
+/** The guide for one product in one country. Shared by the live route and the save route, so a saved run is exactly what the page showed. */
+async function buildGuide(env: Env, countryKey: string, hs: string, role: Role, budget: number | null, via: string | null): Promise<Built> {
+  const key = countryKey.trim().toLowerCase();
+  const entity = await env.DB.prepare("SELECT iso3, name FROM entities WHERE kind = 'country' AND (slug = ? OR lower(iso3) = ?)")
     .bind(key, key).first<{ iso3: string | null; name: string }>();
   const home = entity?.iso3?.toUpperCase();
-  if (!home) return bad('Unknown country', 404);
-  const cfg = oracleConfig(c.env);
-  if (!cfg) return json({ locked: false, available: false, reason: 'Trade data is not connected.' }, 200, { 'cache-control': 'private, no-store' });
+  if (!home) return { response: bad('Unknown country', 404) };
+  const cfg = oracleConfig(env);
+  if (!cfg) return { body: { locked: false, available: false, reason: 'Trade data is not connected.' } };
 
   const [exp, imp, homeRates, kb] = await Promise.all([
     oracleProductDetail(cfg, home, 'X', hs).catch(() => null),
     oracleProductDetail(cfg, home, 'M', hs).catch(() => null),
     worldBankRates(home),
-    c.env.DB.prepare(`SELECT ${KB_COLUMNS} FROM kb_relationship WHERE ? LIKE parent_code || '%'`).bind(hs).all<KbRow>(),
+    env.DB.prepare(`SELECT ${KB_COLUMNS} FROM kb_relationship WHERE ? LIKE parent_code || '%'`).bind(hs).all<KbRow>(),
   ]);
   if (!exp && !imp) {
-    return json({ locked: false, available: false, reason: `Tereflow holds no ${entity?.name} trade in this product.` }, 200, { 'cache-control': 'private, no-store' });
+    return { body: { locked: false, available: false, reason: `Tereflow holds no ${entity?.name} trade in this product.` } };
   }
 
   const buyers = partners(exp).sort((a, b) => b.value_usd - a.value_usd);
@@ -107,10 +174,9 @@ guide.get('/:country/:hs', async (c) => {
   const result = runGuide(facts);
 
   // When the user typed a by-product, say plainly which trade is being shown: its own code, or its parent's.
-  const via = q.get('via');
   let lens: { name: string; kind: string; confidence: string; parent_name: string; shown_through: 'own_code' | 'parent'; note: string } | null = null;
   if (via) {
-    const row = await c.env.DB.prepare('SELECT byproduct_name, byproduct_code, kind, confidence, parent_name, parent_code FROM kb_relationship WHERE id = ?')
+    const row = await env.DB.prepare('SELECT byproduct_name, byproduct_code, kind, confidence, parent_name, parent_code FROM kb_relationship WHERE id = ?')
       .bind(via).first<{ byproduct_name: string; byproduct_code: string | null; kind: string; confidence: string; parent_name: string; parent_code: string | null }>();
     if (row) {
       const own = row.byproduct_code === hs;
@@ -128,8 +194,8 @@ guide.get('/:country/:hs', async (c) => {
     }
   }
 
-  return json(
-    {
+  return {
+    body: {
       locked: false,
       available: true,
       inputs: { country: facts.country, product: facts.product, hs, role, budget_usd: budget },
@@ -142,7 +208,5 @@ guide.get('/:country/:hs', async (c) => {
       ...result,
       sources: ['Trade values, quantities and partners: UN Comtrade, as held by Tereflow.', 'Related goods: Tereflow by-product knowledge base.', 'Exchange rates: World Bank PA.NUS.FCRF.'],
     },
-    200,
-    { 'cache-control': 'private, max-age=300' },
-  );
-});
+  };
+}

@@ -67,6 +67,19 @@ export default function Guide() {
   const a = ans && ans !== 'failed' && !ans.locked && ans.available ? ans : null;
   const flow = role === 'supply' ? 'export' : 'import';
   const enc = encodeURIComponent;
+  const [saved, setSaved] = useState<'idle' | 'busy' | 'done' | 'full' | 'error'>('idle');
+  useEffect(() => { setSaved('idle'); }, [ans]);
+  const save = async () => {
+    if (!pick) return;
+    setSaved('busy');
+    try {
+      const res = await fetch('/api/guide/runs', {
+        method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ country: slug, hs: pick.hs, role, budget: Number(budget) > 0 ? Number(budget) : undefined, via: pick.via }),
+      });
+      setSaved(res.ok ? 'done' : res.status === 409 ? 'full' : 'error');
+    } catch { setSaved('error'); }
+  };
 
   const LinkBar = () => a && (
     <p className="tiny" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', margin: '6px 0' }}>
@@ -75,6 +88,10 @@ export default function Guide() {
       <Link to={`/country/${slug}`}>{a.inputs.country} home</Link>
       <Link to={`/sandbox?primary=${enc(slug)}&hs=${a.inputs.hs}&flow=${flow}`}>Open in sandbox</Link>
       <Link to={`/feasibility/${slug}/${a.inputs.hs}?flow=${flow}`}>Feasibility report</Link>
+      <button type="button" className="link-btn" disabled={saved === 'busy' || saved === 'done'} onClick={save}>
+        {saved === 'done' ? 'Saved' : saved === 'busy' ? 'Saving' : saved === 'full' ? 'Limit reached, delete one' : saved === 'error' ? 'Retry save' : 'Save this run'}
+      </button>
+      <Link to="/guide/runs">Saved runs and compare</Link>
     </p>
   );
 

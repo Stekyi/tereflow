@@ -9,6 +9,9 @@ import { startScrollReveal } from './lib/scrollReveal';
 
 const Feasibility = lazy(() => import('./pages/Feasibility'));
 const Guide = lazy(() => import('./pages/Guide'));
+const GuideRuns = lazy(() => import('./pages/GuideRuns').then((m) => ({ default: m.GuideRuns })));
+const GuideRunView = lazy(() => import('./pages/GuideRuns').then((m) => ({ default: m.GuideRunView })));
+const GuideCompare = lazy(() => import('./pages/GuideRuns').then((m) => ({ default: m.GuideCompare })));
 const Home = lazy(() => import('./pages/Home'));
 const Countries = lazy(() => import('./pages/Countries'));
 const Opportunities = lazy(() => import('./pages/Opportunities'));
@@ -143,6 +146,9 @@ export default function App() {
             <Route path="/countries" element={<Countries />} />
             <Route path="/feasibility/:slug/:hs" element={<Feasibility />} />
           <Route path="/guide" element={<Guide />} />
+          <Route path="/guide/runs" element={<GuideRuns />} />
+          <Route path="/guide/runs/:id" element={<GuideRunView />} />
+          <Route path="/guide/compare" element={<GuideCompare />} />
           <Route path="/opportunities" element={<Opportunities />} />
             <Route path="/country/:slug" element={<Country />} />
             <Route path="/registry" element={<Registry />} />

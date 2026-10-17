@@ -18,7 +18,7 @@ export const prospect = new Hono<{ Bindings: Env }>();
 const TOP_BUYERS = 3;
 const FX_FROM = 2012;
 
-async function worldBankRates(iso3: string): Promise<FxPoint[] | null> {
+export async function worldBankRates(iso3: string): Promise<FxPoint[] | null> {
   const to = new Date().getUTCFullYear();
   const url = `https://api.worldbank.org/v2/country/${iso3}/indicator/PA.NUS.FCRF?format=json&per_page=60&date=${FX_FROM}:${to}`;
   try {

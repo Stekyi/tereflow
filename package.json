@@ -48,6 +48,7 @@
     "test:byproducts": "node scripts/test-byproducts.mjs",
     "test:frameworks": "node scripts/test-frameworks.mjs",
     "test:prospect": "node scripts/test-prospect.mjs",
+    "test:guide": "node scripts/test-guide.mjs",
     "test:tariff": "node scripts/test-tariff.mjs",
     "test:markets": "node scripts/test-markets.mjs",
     "test:coverage": "node scripts/test-coverage.mjs",

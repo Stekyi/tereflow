@@ -8,6 +8,7 @@ import { PageTitleContext } from './lib/pageTitle';
 import { startScrollReveal } from './lib/scrollReveal';
 
 const Feasibility = lazy(() => import('./pages/Feasibility'));
+const Guide = lazy(() => import('./pages/Guide'));
 const Home = lazy(() => import('./pages/Home'));
 const Countries = lazy(() => import('./pages/Countries'));
 const Opportunities = lazy(() => import('./pages/Opportunities'));
@@ -141,6 +142,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/countries" element={<Countries />} />
             <Route path="/feasibility/:slug/:hs" element={<Feasibility />} />
+          <Route path="/guide" element={<Guide />} />
           <Route path="/opportunities" element={<Opportunities />} />
             <Route path="/country/:slug" element={<Country />} />
             <Route path="/registry" element={<Registry />} />
@@ -199,6 +201,7 @@ export default function App() {
               <NavLink to="/">Products</NavLink>
               <NavLink to="/countries">Countries</NavLink>
               <NavLink to="/sandbox">Trade Sandbox</NavLink>
+              <NavLink to="/guide">Problem to supply</NavLink>
               <NavLink to="/news">Trade news</NavLink>
             </div>
             <div>

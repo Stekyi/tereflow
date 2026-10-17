@@ -19,7 +19,7 @@ import { loadProductFamilies, loadProductFamiliesOracle } from '../lib/product-f
 import { loadTradeNews } from '../lib/trade-news';
 import { oracleConfig, oracleFetch, oracleJson } from '../lib/oracle';
 import {
-  buildMarketProducts, buildProductDetail, buildProductInsightOracle, catalogueFrom, loadCountryData, oracleProductDetail,
+  buildMarketProducts, buildProductDetail, buildProductInsightOracle, catalogueFrom, loadCountryData, loadCountryDataForCode, oracleCatalogue, oracleProductDetail,
 } from '../lib/oracle-insight';
 import {
   CONFIDENCE_WEIGHT, currentItems, feedEntities, flowName, itemName, oracleDashboard, oracleProducts, oracleSearch, partnerLabel, toExplore,
@@ -1202,7 +1202,7 @@ pub.get('/products/:hs', async (c) => {
   if (detailCfg) {
     try {
       const settings = await loadSettings(c.env);
-      const data = await loadCountryData(c.env, detailCfg);
+      const data = await loadCountryDataForCode(c.env, detailCfg, hs);
       const global = await loadClassifications(c.env.DB, '*');
       // Who ships and buys it: the partners of the largest exporter, or the largest importer if nobody exports it.
       const lead = (() => {
@@ -1730,8 +1730,10 @@ pub.get('/market/hs-codes', async (c) => {
   const hsCfg = oracleConfig(c.env);
   if (hsCfg) {
     try {
-      const data = await loadCountryData(c.env, hsCfg);
-      for (const r of catalogueFrom(data)) rows.set(r.hs_code, r);
+      // Matching codes are found inside Oracle, so the Worker never loads every country's feed for a typeahead keystroke.
+      const found = await oracleCatalogue(hsCfg, { tokens: expanded.tokens.slice(0, 8), codes: expanded.codes.slice(0, 20), limit: q ? 600 : 400 });
+      if (found) for (const r of found) rows.set(r.hs_code, r);
+      else for (const r of catalogueFrom(await loadCountryData(c.env, hsCfg))) rows.set(r.hs_code, r);
     } catch {
       return bad('Trade data service is unavailable', 502);
     }

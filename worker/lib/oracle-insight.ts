@@ -1,5 +1,5 @@
 import type { Env } from './db';
-import { oracleJson, type OracleConfig } from './oracle';
+import { oracleFetch, oracleJson, type OracleConfig } from './oracle';
 import {
   CONFIDENCE_WEIGHT,
   feedEntities,
@@ -455,6 +455,45 @@ export async function loadCountryData(env: Pick<Env, 'DB'>, cfg: OracleConfig): 
   return loaded.filter((x): x is CountryData => x != null);
 }
 
+/**
+ * The same shape as loadCountryData, but built from one HS chapter only: Oracle returns the chapter's lines across every
+ * country plus each country's latest year and trade totals, so the Worker does not parse every country's whole feed (that
+ * is what exceeded its CPU limit). Everything the product views read from the feed and dashboard is in this subset.
+ * Falls back to the full read when the database has no such route yet.
+ */
+export async function loadCountryDataForCode(env: Pick<Env, 'DB'>, cfg: OracleConfig, hs: string): Promise<CountryData[]> {
+  const res = await oracleFetch(cfg, { route: 'code', prefix: hs.slice(0, 2) });
+  if (res.status === 404 || res.status === 400) return loadCountryData(env, cfg);
+  if (!res.ok) throw new Error(`oracle ${res.status}`);
+  const body = (await res.json()) as {
+    latest: Record<string, number> | null;
+    totals: Record<string, { export_usd: number | null; import_usd: number | null }> | null;
+    products: Array<FeedItem & { reporter: string }> | null;
+  };
+  const byIso = new Map<string, FeedItem[]>();
+  for (const p of body.products ?? []) byIso.set(p.reporter, [...(byIso.get(p.reporter) ?? []), p]);
+  const entities = await feedEntities(env.DB);
+  return entities.flatMap((e) => {
+    const latest = body.latest?.[e.iso3];
+    if (!latest) return [];
+    const products = byIso.get(e.iso3) ?? [];
+    const t = body.totals?.[e.iso3];
+    const dash = t ? ({ overview: { export_usd: t.export_usd ?? 0, import_usd: t.import_usd ?? 0 } } as unknown as DashboardPayload) : null;
+    return [{ e, feed: { reporter: e.iso3, latest_year: latest, count: products.length, products }, dash }];
+  });
+}
+
+/** Distinct 6-digit products matching a search, aggregated inside Oracle. Null when the database has no such route yet. */
+export async function oracleCatalogue(
+  cfg: OracleConfig,
+  p: { tokens: string[]; codes: string[]; limit: number },
+): Promise<Array<{ hs_code: string; product_name: string | null; total_value: number }> | null> {
+  const res = await oracleFetch(cfg, { route: 'catalogue', tokens: p.tokens.join(','), codes: p.codes.join(','), limit: p.limit });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`oracle ${res.status}`);
+  return (await res.json()) as Array<{ hs_code: string; product_name: string | null; total_value: number }>;
+}
+
 export const oracleProductDetail = (cfg: OracleConfig, iso3: string, flow: 'X' | 'M', code: string) =>
   oracleJson<ProductDetailPayload>(cfg, { route: 'product', iso3, flow, code });
 
@@ -465,7 +504,7 @@ export async function buildProductInsightOracle(
   focusSlug: string | null,
   focusFlow: 'export' | 'import' | null,
 ): Promise<ProductInsight> {
-  const [settings, data, global] = await Promise.all([loadSettings(env), loadCountryData(env, cfg), loadClassifications(env.DB, '*')]);
+  const [settings, data, global] = await Promise.all([loadSettings(env), loadCountryDataForCode(env, cfg, hs), loadClassifications(env.DB, '*')]);
   const rows = rowsForCode(data, hs, settings);
   const focus = focusSlug
     ? rows.find((r) => r.e.slug === focusSlug && r.flow === (focusFlow ?? 'export')) ?? rows.find((r) => r.e.slug === focusSlug) ?? null

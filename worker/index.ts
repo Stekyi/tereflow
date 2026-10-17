@@ -19,6 +19,10 @@ import { feedback } from './routes/feedback';
 import { portal } from './routes/portal';
 import { ghana } from './routes/ghana';
 import { serveSnapshot } from './lib/snapshot';
+import { oracleConfig } from './lib/oracle';
+import {
+  closeOracleBreaker, pingOracle, readHealth, recordHealth,
+} from './lib/oracle-health';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -63,11 +67,19 @@ app.use('*', async (c, next) => {
   }
 });
 
-app.get('/api/health', (c) =>
-  c.json({ ok: true, app: c.env.APP_NAME ?? 'Tereflow', ts: new Date().toISOString() }),
-);
+app.get('/api/health', async (c) => {
+  const oracle = oracleConfig(c.env) ? await readHealth(c.env) : null;
+  return c.json({
+    ok: true,
+    app: c.env.APP_NAME ?? 'Tereflow',
+    ts: new Date().toISOString(),
+    // The last keep-alive result, read from KV rather than asking Oracle, so this stays cheap and cannot itself hang.
+    oracle: oracle ? { ok: oracle.ok, checked_at: oracle.checked_at, ms: oracle.ms, failures: oracle.failures } : null,
+  });
+});
 
-// Stored snapshots of the heaviest anonymous pages. Mounted ahead of every route so a hit never runs their code.
+// Stored snapshots of the heaviest anonymous pages. Mounted ahead of every route so a hit never runs their code. They also
+// survive an Oracle outage (they live in KV for two days).
 app.use('/api/*', serveSnapshot);
 
 // Mounted before /api/admin so the more specific prefix is matched first and
@@ -139,10 +151,24 @@ app.get('*', (c) => c.env.ASSETS.fetch(c.req.raw));
 
 export default {
   fetch: app.fetch,
+  /**
+   * Keep-alive only. Every few minutes it makes one light ORDS read, so Autonomous Database does not stop from idleness and
+   * the first real request is not the one that wakes it, and records whether Oracle answered (read by /api/health).
+   * Fetching and analysing still runs on a machine you control; see below.
+   */
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil(
+      (async () => {
+        const h = await pingOracle(env);
+        await recordHealth(env, h);
+        if (h.ok) closeOracleBreaker();
+      })(),
+    );
+  },
 } satisfies ExportedHandler<Env>;
 
 /**
- * There is deliberately no scheduled() handler.
+ * The only scheduled() work is the keep-alive above.
  *
  * Fetching and analysing runs on a machine you control, not on Workers. It
  * pushes finished analysis to /api/admin/ingest/*. See local/pipeline.ts.

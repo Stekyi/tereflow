@@ -127,7 +127,7 @@ function target(cfg: OracleConfig, r: OracleRoute): { url: string; init: Request
  * Fetches one route. The response is returned unread so a large body (the sandbox can be
  * tens of megabytes) can be streamed straight through rather than held in memory.
  */
-export async function oracleFetch(cfg: OracleConfig, r: OracleRoute, timeoutMs = 25_000): Promise<Response> {
+export async function oracleFetch(cfg: OracleConfig, r: OracleRoute, timeoutMs = 12_000): Promise<Response> {
   const { url, init } = target(cfg, r);
   const send = async (force: boolean) => {
     const auth = cfg.mode === 'ords' ? await ordsToken(cfg, force) : cfg.token;

@@ -209,10 +209,17 @@ def main(argv=None):
     an.add_argument("--country", nargs="*", default=[])
     ix = sub.add_parser("index-products")
     ix.add_argument("--country", nargs="*", default=[])
+    sd = sub.add_parser("sync-index-d1")
+    sd.add_argument("--force", action="store_true")
     a = p.parse_args(argv)
     conn = db.connect(app=a.app)
     if a.cmd == "migrate":
         print("applied:", db.migrate(conn) or "nothing new")
+        return
+    elif a.cmd == "sync-index-d1":
+        from . import d1sync
+        changed = d1sync.sync(conn, force=a.force)
+        print("synced to D1:", changed or "nothing changed")
         return
     elif a.cmd == "index-products":
         n = 0

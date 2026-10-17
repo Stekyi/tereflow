@@ -22,9 +22,10 @@ import {
   buildMarketProducts, buildProductDetail, buildProductInsightOracle, catalogueFrom, loadCountryData, loadCountryDataForCode, oracleCatalogue, oracleProductDetail,
 } from '../lib/oracle-insight';
 import {
-  CONFIDENCE_WEIGHT, currentItems, feedEntities, flowName, itemName, oracleDashboard, oracleProducts, oracleSearch, partnerLabel, toExplore,
+  CONFIDENCE_WEIGHT, currentItems, feedEntities, flowName, itemName, oracleDashboard, oracleProducts, partnerLabel, toExplore,
   type FeedItem,
 } from '../lib/oracle-feeds';
+import { searchProducts } from '../lib/product-index-d1';
 import { assessCoverage, itemRankable } from '../../shared/coverage';
 import { loadSettings, type Settings } from '../lib/settings';
 import {
@@ -840,14 +841,16 @@ pub.get('/products', async (c) => {
   // asking for "mango" is looking for the product, even when that product has
   // not earned an opportunity signal yet.
   let rows: SignalRow[] = [];
+  let dataSource: 'oracle' | 'd1' = 'oracle';
   const oracleCfg = oracleConfig(c.env);
   if (oracleCfg) {
     // Oracle holds the trade data. The search runs inside the database against a flat product index and returns only the
     // matching lines, so the Worker never has to parse every country's multi-megabyte feed (that is what exceeded its CPU limit).
+    // If Oracle fails, the copy of that index in D1 answers instead (`x-data-source: d1-fallback`).
     try {
       const entities = await feedEntities(c.env.DB, { continent: continent ?? undefined, slug: slug ?? undefined });
       const byIso = new Map(entities.map((e) => [e.iso3, e]));
-      const found = exact ? null : await oracleSearch(oracleCfg, {
+      const found = exact ? null : await searchProducts(c.env, oracleCfg, {
         tokens: expanded.tokens.slice(0, 8),
         codes: [...expanded.codes, ...(/^\d{6}$/.test(q) ? [q] : [])].slice(0, 20),
         prefix: /^\d{2,6}$/.test(q) ? q : '',
@@ -855,6 +858,7 @@ pub.get('/products', async (c) => {
         iso3s: [...byIso.keys()],
         limit: 500,
       });
+      if (found) dataSource = found.source;
       const items: Array<FeedItem & { reporter: string }> = found
         ? found.products.filter((i) => byIso.has(i.reporter))
         : [];
@@ -1015,7 +1019,11 @@ pub.get('/products', async (c) => {
     priced: matched.filter((p) => p.unit_value_usd_t != null).length,
   };
 
-  return json({ products: folded.list, count: folded.total, summary, note: expanded.note });
+  return json(
+    { products: folded.list, count: folded.total, summary, note: expanded.note },
+    200,
+    dataSource === 'd1' ? { 'x-data-source': 'd1-fallback' } : {},
+  );
 });
 
 /**
@@ -1731,7 +1739,7 @@ pub.get('/market/hs-codes', async (c) => {
   if (hsCfg) {
     try {
       // Matching codes are found inside Oracle, so the Worker never loads every country's feed for a typeahead keystroke.
-      const found = await oracleCatalogue(hsCfg, { tokens: expanded.tokens.slice(0, 8), codes: expanded.codes.slice(0, 20), limit: q ? 600 : 400 });
+      const found = await oracleCatalogue(c.env, hsCfg, { tokens: expanded.tokens.slice(0, 8), codes: expanded.codes.slice(0, 20), limit: q ? 600 : 400 });
       if (found) for (const r of found) rows.set(r.hs_code, r);
       else for (const r of catalogueFrom(await loadCountryData(c.env, hsCfg))) rows.set(r.hs_code, r);
     } catch {

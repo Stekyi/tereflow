@@ -1,5 +1,7 @@
 import type { Env } from './db';
 import { oracleFetch, oracleJson, type OracleConfig } from './oracle';
+import { d1Catalogue, d1CountryFeeds } from './product-index-d1';
+import { openOracleBreaker, oracleBreakerOpen } from './oracle-health';
 import {
   CONFIDENCE_WEIGHT,
   feedEntities,
@@ -462,6 +464,23 @@ export async function loadCountryData(env: Pick<Env, 'DB'>, cfg: OracleConfig): 
  * Falls back to the full read when the database has no such route yet.
  */
 export async function loadCountryDataForCode(env: Pick<Env, 'DB'>, cfg: OracleConfig, hs: string): Promise<CountryData[]> {
+  if (!oracleBreakerOpen()) {
+    try {
+      return await loadCountryDataFromOracle(env, cfg, hs);
+    } catch {
+      openOracleBreaker(60);
+    }
+  }
+  // Oracle is unreachable: the copy of the index in D1 answers instead.
+  const entities = await feedEntities(env.DB);
+  return (await d1CountryFeeds(env.DB, entities, hs)).map(({ e, feed, totals }) => ({
+    e,
+    feed,
+    dash: totals ? ({ overview: totals } as unknown as DashboardPayload) : null,
+  }));
+}
+
+async function loadCountryDataFromOracle(env: Pick<Env, 'DB'>, cfg: OracleConfig, hs: string): Promise<CountryData[]> {
   const res = await oracleFetch(cfg, { route: 'code', prefix: hs.slice(0, 2) });
   if (res.status === 404 || res.status === 400) return loadCountryData(env, cfg);
   if (!res.ok) throw new Error(`oracle ${res.status}`);
@@ -483,15 +502,26 @@ export async function loadCountryDataForCode(env: Pick<Env, 'DB'>, cfg: OracleCo
   });
 }
 
-/** Distinct 6-digit products matching a search, aggregated inside Oracle. Null when the database has no such route yet. */
+/**
+ * Distinct 6-digit products matching a search: Oracle first, D1 when Oracle fails. Null only when the database has no such
+ * route yet (the caller then reads every feed).
+ */
 export async function oracleCatalogue(
+  env: Pick<Env, 'DB'>,
   cfg: OracleConfig,
   p: { tokens: string[]; codes: string[]; limit: number },
 ): Promise<Array<{ hs_code: string; product_name: string | null; total_value: number }> | null> {
-  const res = await oracleFetch(cfg, { route: 'catalogue', tokens: p.tokens.join(','), codes: p.codes.join(','), limit: p.limit });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`oracle ${res.status}`);
-  return (await res.json()) as Array<{ hs_code: string; product_name: string | null; total_value: number }>;
+  if (!oracleBreakerOpen()) {
+    try {
+      const res = await oracleFetch(cfg, { route: 'catalogue', tokens: p.tokens.join(','), codes: p.codes.join(','), limit: p.limit });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`oracle ${res.status}`);
+      return (await res.json()) as Array<{ hs_code: string; product_name: string | null; total_value: number }>;
+    } catch {
+      openOracleBreaker(60);
+    }
+  }
+  return d1Catalogue(env.DB, p);
 }
 
 export const oracleProductDetail = (cfg: OracleConfig, iso3: string, flow: 'X' | 'M', code: string) =>

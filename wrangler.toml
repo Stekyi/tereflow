@@ -27,15 +27,19 @@ directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
-# No [triggers] block on purpose.
+# The only scheduled work is a keep-alive: one light ORDS read every 5 minutes so the
+# Autonomous Database is not stopped for idleness and the app knows whether Oracle is
+# answering (read by /api/health). It makes no analysis and fetches no trade data.
 #
-# The ingest and analysis pipeline runs on a machine you control and pushes
+# The ingest and analysis pipeline still runs on a machine you control and pushes
 # finished results to /api/admin/ingest/*. See local/pipeline.ts and the
 # "Running the pipeline" section of the README.
 #
 # Workers cap subrequests per invocation, which limited a cloud run to two
 # countries per fire. Locally the whole registry finishes in one pass, and the
 # heavy work costs nothing on hardware you already own.
+[triggers]
+crons = ["*/5 * * * *"]
 
 # Local dev works with these placeholders. Before the first remote deploy run:
 #   npm run db:create      -> paste the real database_id here

@@ -791,6 +791,9 @@ pub.get('/products', async (c) => {
   const limit = Math.min(Number(c.req.query('limit') ?? PRODUCT_PAGE) || PRODUCT_PAGE, 120);
   const settings = await loadSettings(c.env);
   const budget = Number(c.req.query('budget') ?? 0);
+  // Reads every country's full feed instead of asking Oracle to search. Too heavy for a live request on the free Workers
+  // plan, so it is only used by the snapshot build (scripts/build-snapshots.mjs), which runs the Worker locally.
+  const exact = c.req.query('exact') === '1';
 
   const expanded = q ? expandQuery(q) : { tokens: [], codes: [], note: null };
   const typedQ = q ? typedWords(q) : [];
@@ -844,7 +847,7 @@ pub.get('/products', async (c) => {
     try {
       const entities = await feedEntities(c.env.DB, { continent: continent ?? undefined, slug: slug ?? undefined });
       const byIso = new Map(entities.map((e) => [e.iso3, e]));
-      const found = await oracleSearch(oracleCfg, {
+      const found = exact ? null : await oracleSearch(oracleCfg, {
         tokens: expanded.tokens.slice(0, 8),
         codes: [...expanded.codes, ...(/^\d{6}$/.test(q) ? [q] : [])].slice(0, 20),
         prefix: /^\d{2,6}$/.test(q) ? q : '',

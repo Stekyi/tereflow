@@ -90,7 +90,9 @@ try {
 
   const out = {};
   for (const p of ['/api/countries', '/api/opportunities', '/api/products?limit=40']) {
-    out[`snap:${p}`] = await get(p);
+    // The product list is built from every country's full feed (exact=1), not the database search the live Worker uses,
+    // so its totals and strong-case counts cover everything and not just a sample.
+    out[`snap:${p}`] = await get(p.startsWith('/api/products') ? `${p}&exact=1` : p);
     console.log(`  built ${p} (${out[`snap:${p}`].length} bytes)`);
   }
   const countries = JSON.parse(out['snap:/api/countries']).countries ?? [];

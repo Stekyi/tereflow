@@ -10,8 +10,6 @@ python -u -m tereflow_oracle ingest-monthly --country GHA NGA TGO CIV LBR CHN US
 python -m tereflow_oracle ingest --incremental >> "..\%LOG%" 2>&1
 if errorlevel 1 (echo ingest failed, skipping snapshots >> "..\%LOG%" & exit /b 1)
 python -m tereflow_oracle analytics >> "..\%LOG%" 2>&1
-REM Copy the product index to D1, the fallback the Worker reads if ORDS is unreachable. Only changed countries are rewritten.
-python -m tereflow_oracle sync-index-d1 >> "..\%LOG%" 2>&1
 cd ..
 call npm run snapshots >> "%LOG%" 2>&1
 exit /b %errorlevel%

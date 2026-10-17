@@ -4,12 +4,15 @@ import { api } from '../lib/api';
 import type { ProductCard } from '../../shared/types';
 import type { GuideResult } from '../../shared/guide';
 
+interface Target { hs: string; name: string; via?: string; note?: string }
+interface Mapped { id: string; kind: string; confidence: string; by_name: string; by_code: string | null; parent_name: string; parent_code: string | null; matched_on: string }
+
 type CountrySummary = Awaited<ReturnType<typeof api.countries>>['countries'][number];
 
 type Answer =
   | { locked: true; title: string; teaser: string }
   | { locked: false; available: false; reason: string }
-  | ({ locked: false; available: true; inputs: { country: string; product: string; hs: string; role: string; budget_usd: number | null }; sources: string[] } & GuideResult);
+  | ({ locked: false; available: true; inputs: { country: string; product: string; hs: string; role: string; budget_usd: number | null }; lens: { name: string; kind: string; confidence: string; parent_name: string; shown_through: 'own_code' | 'parent'; note: string } | null; sources: string[] } & GuideResult);
 
 const STEPS = ['Your starting point', 'Trace the chain', 'Where it strains', 'Group by dimension', 'Merge into problems', 'Questions and plays'];
 const usd = (n: number | null) => (n == null ? 'unavailable' : `$${Math.round(n).toLocaleString('en-US')}`);
@@ -21,7 +24,8 @@ export default function Guide() {
   const [role, setRole] = useState<'supply' | 'procurement'>('supply');
   const [q, setQ] = useState('');
   const [cards, setCards] = useState<ProductCard[]>([]);
-  const [pick, setPick] = useState<ProductCard | null>(null);
+  const [pick, setPick] = useState<Target | null>(null);
+  const [maps, setMaps] = useState<Mapped[]>([]);
   const [budget, setBudget] = useState('');
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -29,9 +33,10 @@ export default function Guide() {
 
   useEffect(() => { api.countries().then((r) => setCountries(r.countries.filter((c) => c.is_active))).catch(() => {}); }, []);
   useEffect(() => {
-    if (!slug || q.trim().length < 2) { setCards([]); return; }
+    if (!slug || q.trim().length < 2) { setCards([]); setMaps([]); return; }
     let live = true;
     const t = setTimeout(() => {
+      if (q.trim().length >= 3) fetch(`/api/resolve?q=${encodeURIComponent(q.trim())}`).then((r) => (r.ok ? r.json() : { matches: [] })).then((r: { matches: Mapped[] }) => { if (live) setMaps(r.matches); }).catch(() => {});
       api.products({ q: q.trim(), country: slug, flow: role === 'supply' ? 'export' : 'import', limit: 12 })
         .then((r) => { if (live) setCards(r.products.filter((p) => /^\d{6}$/.test(p.hs_code))); }).catch(() => {});
     }, 300);
@@ -42,9 +47,10 @@ export default function Guide() {
     if (!pick) return;
     setBusy(true); setAns(null);
     const qs = new URLSearchParams({ role });
+    if (pick.via) qs.set('via', pick.via);
     if (Number(budget) > 0) qs.set('budget', String(Number(budget)));
     try {
-      const res = await fetch(`/api/guide/${encodeURIComponent(slug)}/${pick.hs_code}?${qs}`, { headers: { accept: 'application/json' }, credentials: 'same-origin' });
+      const res = await fetch(`/api/guide/${encodeURIComponent(slug)}/${pick.hs}?${qs}`, { headers: { accept: 'application/json' }, credentials: 'same-origin' });
       setAns(res.ok ? ((await res.json()) as Answer) : 'failed');
       setStep(1);
     } catch { setAns('failed'); }
@@ -52,6 +58,12 @@ export default function Guide() {
   };
 
   const ready = !!slug && !!pick;
+  const options: Target[] = maps.filter((m) => m.matched_on === 'byproduct').flatMap((m) => {
+    const out: Target[] = [];
+    if (m.parent_code && /^\d{6}$/.test(m.parent_code)) out.push({ hs: m.parent_code, via: m.id, name: `${m.by_name}, a ${m.kind} of ${m.parent_name}: analyse through ${m.parent_name} (HS ${m.parent_code})` });
+    if (m.by_code && /^\d{6}$/.test(m.by_code)) out.push({ hs: m.by_code, via: m.id, name: `${m.by_name}: its own trade code (HS ${m.by_code}, ${m.confidence} link)` });
+    return out;
+  });
   const a = ans && ans !== 'failed' && !ans.locked && ans.available ? ans : null;
 
   return (
@@ -73,7 +85,7 @@ export default function Guide() {
 
       {step === 0 && (
         <section style={box}>
-          <label>I want to <select value={role} onChange={(e) => { setRole(e.target.value as 'supply' | 'procurement'); setPick(null); setCards([]); }}>
+          <label>I want to <select value={role} onChange={(e) => { setRole(e.target.value as 'supply' | 'procurement'); setPick(null); setCards([]); setMaps([]); }}>
             <option value="supply">supply (sell goods out of a country)</option>
             <option value="procurement">procure (bring goods into a country)</option>
           </select></label>
@@ -85,10 +97,17 @@ export default function Guide() {
           <p><label>Product{' '}
             <input value={pick ? pick.name : q} onChange={(e) => { setPick(null); setQ(e.target.value); }} placeholder="Type a product, for example cocoa" disabled={!slug} />
           </label></p>
-          {!pick && cards.length > 0 && (
-            <ul style={{ listStyle: 'none', padding: 0 }}>
-              {cards.map((c) => <li key={c.hs_code}><button type="button" className="btn" onClick={() => setPick(c)}>{c.name} (HS {c.hs_code})</button></li>)}
-            </ul>
+          {!pick && (cards.length > 0 || options.length > 0) && (
+            <div>
+              {options.length > 0 && <p className="tiny dim" style={{ margin: '6px 0' }}>Made from, or left over from, a main product</p>}
+              <ul style={{ listStyle: 'none', padding: 0 }}>
+                {options.map((o) => <li key={`${o.hs}|${o.via}`}><button type="button" className="btn" onClick={() => setPick(o)}>{o.name}</button></li>)}
+              </ul>
+              {cards.length > 0 && <p className="tiny dim" style={{ margin: '6px 0' }}>Traded products</p>}
+              <ul style={{ listStyle: 'none', padding: 0 }}>
+                {cards.map((c) => <li key={c.hs_code}><button type="button" className="btn" onClick={() => setPick({ hs: c.hs_code, name: `${c.name} (HS ${c.hs_code})` })}>{c.name} (HS {c.hs_code})</button></li>)}
+              </ul>
+            </div>
           )}
           <p><label>Budget in US dollars (optional, used only for the return range){' '}
             <input inputMode="numeric" value={budget} onChange={(e) => setBudget(e.target.value.replace(/[^\d]/g, ''))} placeholder="for example 50000" /></label></p>
@@ -104,6 +123,7 @@ export default function Guide() {
       {a && step === 1 && (
         <section style={box}>
           <h2>1. The chain for {a.inputs.product}</h2>
+          {a.lens && <p style={{ ...box, background: 'rgba(120,120,120,.08)' }}>{a.lens.note}</p>}
           <p className="tiny dim">Stages are a standard product chain. Names appear only where trade data gives them; roles are marked as not held.</p>
           {a.chain.map((c) => (
             <div key={c.stage} style={{ margin: '8px 0' }}>

@@ -21,7 +21,7 @@ export const guide = new Hono<{ Bindings: Env }>();
 /** HS wording is long and often starts with a one-word heading, so keep enough of it to still make sense. */
 const shortName = (full: string) => {
   const seg = full.split(';').map((s) => s.trim());
-  return seg[0].length <= 8 && seg[1] ? `: ${seg[1].split(',')[0].trim()}` : seg[0];
+  return seg[0].length <= 12 && seg[1] ? `${seg[0]}: ${seg[1].split(',')[0].trim()}` : seg[0];
 };
 const nameOf = (iso3: string) => partnerName(iso3, ISO3_NAME);
 const series = (d: ProductDetailPayload | null) => (d?.series ?? []).map((s) => ({ year: s.year, value_usd: s.value_usd, qty_kg: s.qty_kg ?? null }));
@@ -106,11 +106,34 @@ guide.get('/:country/:hs', async (c) => {
   };
   const result = runGuide(facts);
 
+  // When the user typed a by-product, say plainly which trade is being shown: its own code, or its parent's.
+  const via = q.get('via');
+  let lens: { name: string; kind: string; confidence: string; parent_name: string; shown_through: 'own_code' | 'parent'; note: string } | null = null;
+  if (via) {
+    const row = await c.env.DB.prepare('SELECT byproduct_name, byproduct_code, kind, confidence, parent_name, parent_code FROM kb_relationship WHERE id = ?')
+      .bind(via).first<{ byproduct_name: string; byproduct_code: string | null; kind: string; confidence: string; parent_name: string; parent_code: string | null }>();
+    if (row) {
+      const own = row.byproduct_code === hs;
+      lens = {
+        name: row.byproduct_name, kind: row.kind, confidence: row.confidence, parent_name: row.parent_name,
+        shown_through: own ? 'own_code' : 'parent',
+        note: own
+          ? `${row.byproduct_name} is a ${row.kind} of ${row.parent_name}. The trade below is for its own code, which can include goods other than ${row.byproduct_name.toLowerCase()}.`
+          : `${row.byproduct_name} is a ${row.kind} of ${row.parent_name} and has no trade code of its own. The trade below is for ${row.parent_name}, not for ${row.byproduct_name.toLowerCase()} itself. How much of it exists scales with that parent trade, but the amount is not measured here.`,
+      };
+      if (!own) {
+        result.unavailable.unshift(`There is no trade data for ${row.byproduct_name.toLowerCase()} itself. Price, buyers and volume for it need a quote from a buyer or a local source.`);
+        result.estimate = { available: false, low_usd: null, high_usd: null, basis: [], caveats: [`No return range is given: the prices held are for ${row.parent_name}, not for ${row.byproduct_name.toLowerCase()}.`] };
+      }
+    }
+  }
+
   return json(
     {
       locked: false,
       available: true,
       inputs: { country: facts.country, product: facts.product, hs, role, budget_usd: budget },
+      lens,
       ...result,
       sources: ['Trade values, quantities and partners: UN Comtrade, as held by Tereflow.', 'Related goods: Tereflow by-product knowledge base.', 'Exchange rates: World Bank PA.NUS.FCRF.'],
     },

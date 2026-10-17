@@ -34,10 +34,10 @@ HS_SOURCE_URL = "https://comtradeapi.un.org/files/v1/app/reference/HS.json"
 C = []
 
 
-def rel(parents, parent_name, by_code, by_name, kind, process, apps, kw=(), rejected=None, note=None):
+def rel(parents, parent_name, by_code, by_name, kind, process, apps, kw=(), rejected=None, note=None, aliases=()):
     for p in parents:
         C.append(dict(parent_code=p, parent_name=parent_name, byproduct_code=by_code, byproduct_name=by_name, kind=kind,
-                      process=process, applications=apps, kw=list(kw), rejected=rejected, note=note))
+                      process=process, applications=apps, kw=list(kw), rejected=rejected, note=note, aliases=list(aliases)))
 
 
 # ---- cocoa
@@ -111,6 +111,57 @@ rel(["0803", "0804"], "Bananas, mangoes and tropical fruit", "2009", "Fruit juic
 rel(["0803"], "Bananas", "110630", "Flour of fruit (banana flour)", "processed", "Fruit is dried and milled.", "Flour.", [], None, "Heading-level relationship; the wording is generic, so this link cannot be machine-checked.")
 
 
+# ---- shells, husks and peels: residues that have no HS code of their own are kept with no code and shown through the parent
+rel(["080119", "080112"], "Coconuts", None, "Coconut shell (raw)", "residue", "Left when the nut is opened for the kernel, copra or water.",
+    "Fuel, charcoal and activated carbon feedstock, craft and filler uses are reported.", [], None,
+    "Raw coconut shell has no HS code of its own, so its trade cannot be checked. It is shown through its parent, coconuts.",
+    ["coconut shell", "coconut shells", "coco shell"])
+rel(["080119", "080112"], "Coconuts", "440220", "Coconut shell charcoal", "byproduct", "The shell is carbonised in a kiln or retort.",
+    "Cooking and barbecue fuel, and feedstock for activated carbon.", ["nut or shell"], None,
+    "The code is charcoal of nut or shell. Coconut shell charcoal falls here, but so do other nut and shell charcoals, so recorded trade is not coconut alone.",
+    ["coconut charcoal", "coconut shell charcoal", "shell charcoal", "nut charcoal"])
+rel(["080119", "080112"], "Coconuts", "380210", "Activated carbon", "downstream", "Charcoal is activated with steam or chemicals.",
+    "Water and air filtration, gold recovery.", [], None, "The wording does not name coconut, so this link cannot be machine-checked.",
+    ["activated carbon", "activated charcoal"])
+rel(["120710"], "Palm nuts and kernels", None, "Palm kernel shell", "residue", "Left when the kernel is cracked out of the nut.",
+    "Boiler and biomass fuel, and charcoal are reported uses.", [], None,
+    "Palm kernel shell has no HS code of its own, so its trade cannot be checked. It is shown through its parent.",
+    ["palm kernel shell", "pks", "palm shell"])
+rel(["180100"], "Cocoa beans", None, "Cocoa pod husk", "residue", "The empty pod left after the beans are removed at harvest.",
+    "Compost, animal feed after processing, and potash for soap are reported uses.", [], None,
+    "Cocoa pod husk has no HS code of its own, so its trade cannot be checked. It is shown through its parent.",
+    ["cocoa pod", "cocoa pod husk", "cocoa husk", "pod husk"])
+rel(["080131"], "Cashew nuts in shell", None, "Cashew nut shell (residue)", "residue", "Left when the kernel is removed from the shell.",
+    "Fuel, and the source of cashew nut shell liquid.", [], None,
+    "Cashew shell has no HS code of its own, so its trade cannot be checked. It is shown through its parent.",
+    ["cashew shell", "cashew nut shell", "cashew husk"])
+rel(["1202"], "Groundnuts", None, "Groundnut shell", "residue", "Left when the nuts are shelled.",
+    "Fuel, briquettes and filler uses are reported.", [], None,
+    "Groundnut shell has no HS code of its own, so its trade cannot be checked. It is shown through its parent.",
+    ["groundnut shell", "peanut shell", "groundnut husk"])
+rel(["071410"], "Cassava (manioc) roots", None, "Cassava peel", "residue", "Removed when the roots are peeled for processing.",
+    "Animal feed after processing and compost are reported uses; cyanide content needs treatment before feed use.", [], None,
+    "Cassava peel has no HS code of its own, so its trade cannot be checked. It is shown through its parent.",
+    ["cassava peel", "cassava peels", "cassava waste"])
+
+# Search terms for relationships written before aliases existed, keyed by the by-product code.
+ALIASES = {
+    "180200": ["cocoa shell", "cocoa shells", "cocoa waste"],
+    "121300": ["rice husk", "paddy husk", "rice straw", "husk"],
+    "230650": ["copra cake", "coconut cake", "copra meal"],
+    "530500": ["coir", "coconut husk", "coconut fibre", "coconut fiber"],
+    "151311": ["coconut oil", "copra oil"],
+    "230320": ["bagasse", "sugarcane bagasse", "sugar cane waste"],
+    "1703": ["molasses"],
+    "230660": ["palm kernel cake", "pkc"],
+    "230690": ["shea cake"],
+    "151590": ["shea butter"],
+    "230240": ["rice bran"],
+    "100640": ["broken rice"],
+    "110814": ["cassava starch", "tapioca starch"],
+}
+
+
 def names_under(code, names: dict) -> list[str]:
     """Official wording of every code at or under a 4 or 6 digit code."""
     return [n for c, n in names.items() if code and c.startswith(code)]
@@ -170,7 +221,7 @@ def to_sql(rows: list[dict], names: dict, trade: dict, today: str | None = None)
         out.append(
             "INSERT OR REPLACE INTO kb_relationship (id, parent_name, parent_code, byproduct_name, byproduct_code, kind, process_method, applications, "
             "detail_sourced, status, confidence, parent_hs_official, byproduct_hs_official, hs_codes_checked, derivation_checked, "
-            "trade_evidence_usd, trade_evidence_year, trade_evidence_note, evidence_note, source_name, source_url, verified_at) VALUES ("
+            "trade_evidence_usd, trade_evidence_year, trade_evidence_note, evidence_note, source_name, source_url, verified_at, aliases) VALUES ("
             + ", ".join([
                 sql_str(rid), sql_str(r["parent_name"]), sql_str(r["parent_code"]), sql_str(r["byproduct_name"]), sql_str(r["byproduct_code"]),
                 sql_str(r["kind"]), sql_str(None if r["rejected"] else r["process"]), sql_str(None if r["rejected"] else r["applications"]),
@@ -178,6 +229,7 @@ def to_sql(rows: list[dict], names: dict, trade: dict, today: str | None = None)
                 str(a["codes_checked"]), str(a["derivation_checked"]),
                 "NULL" if a["trade_usd"] is None else repr(round(a["trade_usd"], 2)), "NULL" if a["trade_year"] is None else str(a["trade_year"]),
                 sql_str(tnote), sql_str(" ".join(ev) or None), sql_str(HS_SOURCE_NAME), sql_str(HS_SOURCE_URL), sql_str(today),
+                sql_str(",".join(sorted({x.lower() for x in (r.get("aliases") or ALIASES.get(r["byproduct_code"] or "", []))} | {r["byproduct_name"].lower()}))),
             ]) + ");")
     return "\n".join(out) + "\n"
 

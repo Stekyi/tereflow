@@ -26,6 +26,51 @@ ROUTES = [
 ]
 ROLE, PRIVILEGE, CLIENT = "tf_reader", "tf_read", "tereflow_worker"
 
+# The app's own data gateway lives in a separate module with its own role, privilege and OAuth client, so the read-only
+# client the trade pages use can never reach it.
+APP_MODULE, APP_BASE = "tf_app", "/app/"
+APP_ROUTES = [("sql", "sql.plsql", "POST")]
+APP_ROLE, APP_PRIVILEGE, APP_CLIENT = "tf_app_rw", "tf_app", "tereflow_app_worker"
+
+
+def define_app_module(conn) -> None:
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM user_ords_modules WHERE name = :1", [APP_MODULE])
+    if cur.fetchone()[0]:
+        cur.execute("BEGIN ORDS.DELETE_MODULE(p_module_name => :1); END;", [APP_MODULE])
+    cur.execute("""BEGIN ORDS.DEFINE_MODULE(p_module_name => :m, p_base_path => :b, p_items_per_page => 0,
+                   p_status => 'PUBLISHED', p_comments => 'Tereflow application data gateway (APP_ tables only)'); END;""",
+                {"m": APP_MODULE, "b": APP_BASE})
+    for pattern, fname, method in APP_ROUTES:
+        src = (HANDLERS / fname).read_text(encoding="utf-8")
+        cur.execute("BEGIN ORDS.DEFINE_TEMPLATE(p_module_name => :m, p_pattern => :p); END;", {"m": APP_MODULE, "p": pattern})
+        cur.execute("""BEGIN ORDS.DEFINE_HANDLER(p_module_name => :m, p_pattern => :p, p_method => :meth,
+                       p_source_type => ORDS.source_type_plsql, p_items_per_page => 0, p_source => :s); END;""",
+                    {"m": APP_MODULE, "p": pattern, "meth": method, "s": src})
+    conn.commit()
+
+
+def define_app_security(conn) -> tuple[str, str]:
+    """Role, privilege and OAuth client for the application gateway. Returns (client_id, client_secret)."""
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM user_ords_roles WHERE name = :1", [APP_ROLE])
+    if not cur.fetchone()[0]:
+        cur.execute("BEGIN ORDS.CREATE_ROLE(p_role_name => :1); END;", [APP_ROLE])
+    cur.execute("SELECT COUNT(*) FROM user_ords_privileges WHERE name = :1", [APP_PRIVILEGE])
+    if not cur.fetchone()[0]:
+        cur.execute("BEGIN ORDS.CREATE_PRIVILEGE(p_name => :p, p_role_name => :r, p_label => 'Tereflow app data', "
+                    "p_description => 'Read and write access to the Tereflow application tables'); END;", {"p": APP_PRIVILEGE, "r": APP_ROLE})
+        cur.execute("BEGIN ORDS.CREATE_PRIVILEGE_MAPPING(p_privilege_name => :p, p_pattern => '/app/*'); END;", {"p": APP_PRIVILEGE})
+    cur.execute("SELECT COUNT(*) FROM user_ords_clients WHERE name = :1", [APP_CLIENT])
+    if not cur.fetchone()[0]:
+        cur.execute("""BEGIN OAUTH.CREATE_CLIENT(p_name => :n, p_grant_type => 'client_credentials', p_owner => 'Tereflow',
+                       p_description => 'Cloudflare Worker reading and writing Tereflow application data', p_support_email => 'noreply@tiwaak.com',
+                       p_privilege_names => :p); END;""", {"n": APP_CLIENT, "p": APP_PRIVILEGE})
+        cur.execute("BEGIN OAUTH.GRANT_CLIENT_ROLE(p_client_name => :n, p_role_name => :r); END;", {"n": APP_CLIENT, "r": APP_ROLE})
+    conn.commit()
+    cur.execute("SELECT client_id, client_secret FROM user_ords_clients WHERE name = :1", [APP_CLIENT])
+    return cur.fetchone()
+
 
 def define_module(conn) -> None:
     cur = conn.cursor()

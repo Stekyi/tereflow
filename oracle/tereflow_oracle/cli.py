@@ -152,17 +152,20 @@ def cmd_analytics(conn, a):
 
 
 def cmd_define_ords(conn, _a):
-    """Create or refresh the ORDS module and OAuth client; write the Worker settings to .env."""
+    """Create or refresh the ORDS modules and OAuth clients; write the Worker settings to .env."""
     ords.define_module(conn)
     client_id, secret = ords.define_security(conn)
+    ords.define_app_module(conn)
+    app_id, app_secret = ords.define_app_security(conn)
     envf = ROOT / ".env"
     text = envf.read_text()
     host = os.environ.get("ORACLE_ORDS_HOST", "qfrucfvqrp17bzk-tereflow.adb.us-ashburn-1.oraclecloudapps.com")
-    for k, v in (("ORACLE_ORDS_URL", f"https://{host}/ords/admin"), ("ORACLE_CLIENT_ID", client_id), ("ORACLE_CLIENT_SECRET", secret)):
+    for k, v in (("ORACLE_ORDS_URL", f"https://{host}/ords/admin"), ("ORACLE_CLIENT_ID", client_id), ("ORACLE_CLIENT_SECRET", secret),
+                 ("ORACLE_APP_CLIENT_ID", app_id), ("ORACLE_APP_CLIENT_SECRET", app_secret)):
         if f"\n{k}=" not in "\n" + text:
             text = text.rstrip("\n") + f"\n{k}={v}\n"
     envf.write_text(text)
-    print("ORDS module and OAuth client defined; ORACLE_ORDS_URL, ORACLE_CLIENT_ID, ORACLE_CLIENT_SECRET are in .env")
+    print("ORDS modules and OAuth clients defined; ORACLE_ORDS_URL, ORACLE_CLIENT_ID/SECRET and ORACLE_APP_CLIENT_ID/SECRET are in .env")
 
 
 def cmd_status(conn, _a):

@@ -213,12 +213,33 @@ def main(argv=None):
     ix = sub.add_parser("index-products")
     ix.add_argument("--country", nargs="*", default=[])
     sd = sub.add_parser("sync-index-d1")
+    cs = sub.add_parser("create-app-schema")
+    cs.add_argument("--prefix", default="app_")
+    cs.add_argument("--drop", action="store_true")
+    sub.add_parser("export-app-tables")
+    cp = sub.add_parser("copy-app-data")
+    cp.add_argument("--prefix", default="app_")
     sd.add_argument("--force", action="store_true")
     sd.add_argument("--max-writes", type=int, default=20000, help="refuse to write more than about this many D1 rows")
     a = p.parse_args(argv)
     conn = db.connect(app=a.app)
     if a.cmd == "migrate":
         print("applied:", db.migrate(conn) or "nothing new")
+        return
+    elif a.cmd == "create-app-schema":
+        from . import appschema
+        g = appschema.create(conn, prefix=a.prefix, drop=a.drop)
+        print(f"created {len(g['tables'])} tables, {len(g['fks'])} foreign keys, {len(g['indexes'])} indexes with prefix {a.prefix}")
+        return
+    elif a.cmd == "copy-app-data":
+        from . import appschema
+        counts = appschema.copy_data(conn, prefix=a.prefix)
+        print("copied:", {k: v for k, v in counts.items() if v})
+        return
+    elif a.cmd == "export-app-tables":
+        from . import appschema
+        (ROOT / "shared" / "app-tables.ts").write_text(appschema.export_tables_ts(), encoding="utf-8", newline="\n")
+        print("wrote shared/app-tables.ts")
         return
     elif a.cmd == "sync-index-d1":
         from . import d1sync

@@ -22,6 +22,7 @@ ROUTES = [
     ("search", "search.plsql"),
     ("code/:prefix", "code.plsql"),
     ("catalogue", "catalogue.plsql"),
+    ("coverage", "coverage.plsql"),
     ("sandbox", "sandbox.plsql"),
 ]
 ROLE, PRIVILEGE, CLIENT = "tf_reader", "tf_read", "tereflow_worker"

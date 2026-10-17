@@ -48,7 +48,7 @@ DECLARE
     IF NOT REGEXP_LIKE(l_s, '^\s*(select|insert|update|delete|merge|with)\s') THEN
       RAISE_APPLICATION_ERROR(-20002, 'only select, insert, update, delete and merge are allowed');
     END IF;
-    IF REGEXP_LIKE(l_s, '(^|[^a-z0-9_])(dbms_[a-z_]*|utl_[a-z_]*|execute|immediate|drop|alter|create|grant|revoke|truncate|begin|declare|sys|v\$[a-z_]*|dba_[a-z_]*|all_[a-z_]*|user_[a-z_]*|tf_[a-z0-9_]*)([^a-z0-9_]|$)') THEN
+    IF REGEXP_LIKE(l_s, '(^|[^a-z0-9_])(dbms_[a-z_]*|utl_[a-z_]*|execute|immediate|drop|alter|create|grant|revoke|truncate|begin|declare|sys|v\$[a-z_]*|(dba|all|user)_(tables|tab_columns|objects|views|users|constraints|indexes|ind_columns|sequences|source|procedures|triggers|synonyms|catalog|tab_privs|role_privs|sys_privs|db_links|jobs|scheduler_jobs)|tf_[a-z0-9_]*)([^a-z0-9_]|$)') THEN
       RAISE_APPLICATION_ERROR(-20003, 'statement mentions something the gateway does not allow');
     END IF;
     -- Every table named after FROM, JOIN, INTO, UPDATE or USING must be an APP_ table (or DUAL).

@@ -38,6 +38,9 @@ function sharedPrefix(texts: string[]): string {
   return shared;
 }
 
+const isShelf = (cleanHead: string) =>
+  SHELF_HEADS.has(cleanHead.toLowerCase()) || SHELF_HEADS.has(cleanHead.split(',')[0].trim().toLowerCase());
+
 /**
  * The base name for a set of lines under one heading, in the tariff's own wording. Never invents a name: where the
  * lines share nothing that reads as a phrase, the largest line's name stands in with "and variants" after it.
@@ -51,7 +54,7 @@ export function familyBaseName(descriptions: (string | null | undefined)[], hs4?
   const heads = texts.map(headOf);
   const head = heads[0];
   const cleanHead = dropBrackets(head);
-  if (heads.every((h) => h === head) && !SHELF_HEADS.has(cleanHead.toLowerCase()) && cleanHead.length >= 4 && cleanHead.length <= 60) {
+  if (heads.every((h) => h === head) && !isShelf(cleanHead) && cleanHead.length >= 4 && cleanHead.length <= 60) {
     return cleanHead;
   }
 
@@ -59,7 +62,7 @@ export function familyBaseName(descriptions: (string | null | undefined)[], hs4?
   if (shared.split(/\s+/).filter(Boolean).length >= 3 && shared.length >= 14) return shortProductName(shared);
 
   // The lines share only a shelf word ("Vehicles"), so naming the family by one line would misdescribe the rest.
-  if (hs4 && heads.every((h) => h === head) && SHELF_HEADS.has(cleanHead.toLowerCase())) return `${cleanHead} (HS ${hs4})`;
+  if (hs4 && heads.every((h) => h === head) && isShelf(cleanHead)) return `${cleanHead} (HS ${hs4})`;
 
   const lead = shortProductName(texts[0]);
   return lead.endsWith('...') ? lead : `${lead}, and variants`;

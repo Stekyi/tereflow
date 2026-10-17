@@ -22,7 +22,7 @@ import {
   buildMarketProducts, buildProductDetail, buildProductInsightOracle, catalogueFrom, loadCountryData, oracleProductDetail,
 } from '../lib/oracle-insight';
 import {
-  CONFIDENCE_WEIGHT, currentItems, feedEntities, flowName, itemName, oracleDashboard, oracleProducts, partnerLabel, toExplore,
+  CONFIDENCE_WEIGHT, currentItems, feedEntities, flowName, itemName, oracleDashboard, oracleProducts, oracleSearch, partnerLabel, toExplore,
   type FeedItem,
 } from '../lib/oracle-feeds';
 import { assessCoverage, itemRankable } from '../../shared/coverage';
@@ -794,9 +794,12 @@ pub.get('/products', async (c) => {
 
   const expanded = q ? expandQuery(q) : { tokens: [], codes: [], note: null };
   const typedQ = q ? typedWords(q) : [];
-  const searchClauses: string[] = [];
-  const searchBinds: unknown[] = [];
-  if (q) {
+
+  // Only the D1 fallback builds SQL for the search. The HS6 catalogue scan below is expensive, so the Oracle path,
+  // which searches inside the database, never pays for it.
+  const d1Search = () => {
+    const searchClauses: string[] = [];
+    const searchBinds: unknown[] = [];
     for (const token of expanded.tokens.slice(0, 6)) {
       searchClauses.push('f.product_name LIKE ?');
       searchBinds.push(`%${token}%`);
@@ -827,7 +830,8 @@ pub.get('/products', async (c) => {
 
     searchClauses.push('f.hs_code LIKE ?');
     searchBinds.push(`${q}%`);
-  }
+    return { searchClauses, searchBinds };
+  };
 
   // Search mode is intentionally broader than the opportunity feed. A reader
   // asking for "mango" is looking for the product, even when that product has
@@ -835,40 +839,56 @@ pub.get('/products', async (c) => {
   let rows: SignalRow[] = [];
   const oracleCfg = oracleConfig(c.env);
   if (oracleCfg) {
-    // Oracle holds the trade data. Each country's scored products come from one precomputed feed.
+    // Oracle holds the trade data. The search runs inside the database against a flat product index and returns only the
+    // matching lines, so the Worker never has to parse every country's multi-megabyte feed (that is what exceeded its CPU limit).
     try {
       const entities = await feedEntities(c.env.DB, { continent: continent ?? undefined, slug: slug ?? undefined });
-      const feeds = await Promise.all(entities.map(async (e) => ({ e, feed: await oracleProducts(oracleCfg, e.iso3) })));
-      for (const { e, feed } of feeds) {
-        if (!feed) continue;
-        for (const i of feed.products) {
-          if ((flow === 'export' || flow === 'import') && flowName(i.flow) !== flow) continue;
-          rows.push({
-            entity_id: e.id,
-            hs_code: i.code,
-            product_name: itemName(i),
-            flow: flowName(i.flow),
-            year: i.year,
-            value_usd: i.value_usd,
-            cagr_3y: i.cagr_3y,
-            momentum: i.score / 100,
-            confidence: CONFIDENCE_WEIGHT[i.confidence],
-            best_market: partnerLabel(i.top_partner),
-            best_market_iso3: i.top_partner,
-            best_market_product_specific: 1,
-            unit_value_usd_t: i.unit_value_usd_t,
-            price_ratio: null,
-            slug: e.slug,
-            country: e.name,
-            iso3: e.iso3,
-            continent: e.continent ?? '',
-          });
-        }
+      const byIso = new Map(entities.map((e) => [e.iso3, e]));
+      const found = await oracleSearch(oracleCfg, {
+        tokens: expanded.tokens.slice(0, 8),
+        codes: [...expanded.codes, ...(/^\d{6}$/.test(q) ? [q] : [])].slice(0, 20),
+        prefix: /^\d{2,6}$/.test(q) ? q : '',
+        flow: flow === 'export' || flow === 'import' ? flow : '',
+        iso3s: [...byIso.keys()],
+        limit: 500,
+      });
+      const items: Array<FeedItem & { reporter: string }> = found
+        ? found.products.filter((i) => byIso.has(i.reporter))
+        : [];
+      if (!found) {
+        // The search route is not defined on this database yet: fall back to reading every feed.
+        const feeds = await Promise.all(entities.map(async (e) => ({ e, feed: await oracleProducts(oracleCfg, e.iso3) })));
+        for (const { e, feed } of feeds) for (const i of feed?.products ?? []) items.push({ ...i, reporter: e.iso3 });
+      }
+      for (const i of items) {
+        const e = byIso.get(i.reporter)!;
+        if ((flow === 'export' || flow === 'import') && flowName(i.flow) !== flow) continue;
+        rows.push({
+          entity_id: e.id,
+          hs_code: i.code,
+          product_name: itemName(i),
+          flow: flowName(i.flow),
+          year: i.year,
+          value_usd: i.value_usd,
+          cagr_3y: i.cagr_3y,
+          momentum: i.score / 100,
+          confidence: CONFIDENCE_WEIGHT[i.confidence],
+          best_market: partnerLabel(i.top_partner),
+          best_market_iso3: i.top_partner,
+          best_market_product_specific: 1,
+          unit_value_usd_t: i.unit_value_usd_t,
+          price_ratio: null,
+          slug: e.slug,
+          country: e.name,
+          iso3: e.iso3,
+          continent: e.continent ?? '',
+        });
       }
     } catch {
       return bad('Trade data service is unavailable', 502);
     }
   } else if (q) {
+    const { searchClauses, searchBinds } = d1Search();
     const clauses = [
       'f.stream = \'goods\'',
       'length(f.hs_code) = 6',

@@ -253,7 +253,32 @@ def refresh_dashboard(conn, reporter: str) -> int:
                             [reporter, kind, json.dumps(val)])
                 n += 1
         conn.commit()
+        refresh_product_index(conn, reporter, payloads.get("products"))
         return n
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def refresh_product_index(conn, reporter: str, feed: dict | None) -> int:
+    """Mirror one country's product feed into tf_product_index, for the in-database product search."""
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM tf_product_index WHERE reporter_iso3 = :1", [reporter])
+        rows = []
+        for i in (feed or {}).get("products", []):
+            name = i.get("name") or ""
+            rows.append((reporter, i["flow"], i["code"], i.get("level"), name[:500], name.lower()[:500], i["year"], i.get("value_usd"),
+                         i.get("cagr_3y"), i.get("yoy_pct"), i["score"], i.get("confidence"), (i.get("signal") or "")[:30],
+                         i.get("top_partner"), i.get("top_share_pct"), i.get("partner_count"), i.get("unit_value_usd_t"),
+                         i.get("years_available"), (i.get("trend") or "")[:30]))
+        if rows:
+            cur.executemany("""INSERT INTO tf_product_index (reporter_iso3, flow, cmd_code, classification_level, product_name, name_lc,
+                               latest_year, value_usd, cagr_3y, yoy_pct, score, confidence, signal, top_partner, top_share_pct,
+                               partner_count, unit_value_usd_t, years_available, trend)
+                               VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18, :19)""", rows)
+        conn.commit()
+        return len(rows)
     except Exception:
         conn.rollback()
         raise

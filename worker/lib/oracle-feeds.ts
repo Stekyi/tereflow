@@ -1,5 +1,5 @@
 import type { Env } from './db';
-import { oracleJson, type OracleConfig } from './oracle';
+import { oracleFetch, oracleJson, type OracleConfig } from './oracle';
 import { ISO3_NAME } from '../agent/country-names';
 import { partnerName } from '../../shared/markets';
 import { hs6Label } from '../agent/codes';
@@ -83,6 +83,26 @@ export async function feedEntities(
 
 export const oracleProducts = (cfg: OracleConfig, iso3: string) =>
   oracleJson<ProductsFeed>(cfg, { route: 'products', iso3 });
+
+/** Product lines matching a search, found inside Oracle. Null when the database has no search route yet. */
+export async function oracleSearch(
+  cfg: OracleConfig,
+  p: { tokens: string[]; codes: string[]; prefix: string; flow: string; iso3s: string[]; limit: number },
+): Promise<{ total: number; products: Array<FeedItem & { reporter: string }> } | null> {
+  const res = await oracleFetch(cfg, {
+    route: 'search',
+    tokens: p.tokens.join(','),
+    codes: p.codes.join(','),
+    prefix: p.prefix,
+    flow: p.flow === 'export' ? 'X' : p.flow === 'import' ? 'M' : '',
+    iso3s: p.iso3s.join(','),
+    limit: p.limit,
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`oracle ${res.status}`);
+  const body = (await res.json()) as { total: number; products: Array<FeedItem & { reporter: string }> | null };
+  return { total: body.total, products: body.products ?? [] };
+}
 
 export const oracleDashboard = (cfg: OracleConfig, iso3: string) =>
   oracleJson<DashboardPayload>(cfg, { route: 'dashboard', iso3 });

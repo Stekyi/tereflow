@@ -207,10 +207,21 @@ def main(argv=None):
     kbp.add_argument("--out", default="kb-seed.sql")
     an = sub.add_parser("analytics")
     an.add_argument("--country", nargs="*", default=[])
+    ix = sub.add_parser("index-products")
+    ix.add_argument("--country", nargs="*", default=[])
     a = p.parse_args(argv)
     conn = db.connect(app=a.app)
     if a.cmd == "migrate":
         print("applied:", db.migrate(conn) or "nothing new")
+        return
+    elif a.cmd == "index-products":
+        n = 0
+        for c in [x.upper() for x in a.country] or [r[0] for r in conn.cursor().execute("SELECT reporter_iso3 FROM tf_dashboard_cache WHERE kind = 'products' ORDER BY 1")]:
+            feed = dashboard.read_cached(conn, c, "products")
+            k = dashboard.refresh_product_index(conn, c, feed)
+            print(f"index {c}: {k:,} lines")
+            n += k
+        print(f"{n:,} lines indexed")
         return
     {"sync-countries": cmd_sync_countries, "create-app-user": cmd_create_app_user, "ingest": cmd_ingest,
      "analytics": cmd_analytics, "ingest-monthly": cmd_ingest_monthly, "ingest-tariffs": cmd_ingest_tariffs, "build-kb": cmd_build_kb, "status": cmd_status, "check": cmd_check, "define-ords": cmd_define_ords}[a.cmd](conn, a)

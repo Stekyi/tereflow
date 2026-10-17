@@ -19,6 +19,7 @@ ROUTES = [
     ("monthly/:iso3/:flow/:code", "monthly.plsql"),
     ("tariff/:iso3/:code", "tariff.plsql"),
     ("stats", "stats.plsql"),
+    ("search", "search.plsql"),
     ("sandbox", "sandbox.plsql"),
 ]
 ROLE, PRIVILEGE, CLIENT = "tf_reader", "tf_read", "tereflow_worker"

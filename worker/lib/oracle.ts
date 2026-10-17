@@ -40,6 +40,7 @@ export type OracleRoute =
   | { route: 'monthly'; iso3: string; flow: 'X' | 'M'; code: string }
   | { route: 'tariff'; iso3: string; code: string }
   | { route: 'stats' }
+  | { route: 'search'; tokens: string; codes: string; prefix: string; flow: string; iso3s: string; limit: number }
   | { route: 'sandbox'; primary: string; partners: string[]; exclude?: string[] };
 
 const TOKEN_KEY = 'oracle:ords-token';
@@ -85,6 +86,10 @@ function target(cfg: OracleConfig, r: OracleRoute): { url: string; init: Request
       case 'monthly': return { url: `${cfg.base}/tf/monthly/${enc(r.iso3)}/${r.flow}/${enc(r.code)}`, init: {} };
       case 'tariff': return { url: `${cfg.base}/tf/tariff/${enc(r.iso3)}/${enc(r.code)}`, init: {} };
       case 'stats': return { url: `${cfg.base}/tf/stats`, init: {} };
+      case 'search': {
+        const qs = new URLSearchParams({ tokens: r.tokens, codes: r.codes, prefix: r.prefix, flow: r.flow, iso3s: r.iso3s, lim: String(r.limit) });
+        return { url: `${cfg.base}/tf/search?${qs}`, init: {} };
+      }
       case 'sandbox': {
         const ex = r.exclude?.length ? `&exclude=${enc(r.exclude.join(','))}` : '';
         return { url: `${cfg.base}/tf/sandbox?primary=${enc(r.primary)}&partners=${enc(r.partners.join(','))}${ex}`, init: {} };
@@ -100,6 +105,7 @@ function target(cfg: OracleConfig, r: OracleRoute): { url: string; init: Request
     case 'monthly': return { url: `${cfg.base}/api/monthly/${enc(r.iso3)}/${r.flow}/${enc(r.code)}`, init: {} };
     case 'tariff': return { url: `${cfg.base}/api/tariff/${enc(r.iso3)}/${enc(r.code)}`, init: {} };
     case 'stats': return { url: `${cfg.base}/api/stats`, init: {} };
+    case 'search': return { url: `${cfg.base}/api/search`, init: {} };
     case 'sandbox':
       return {
         url: `${cfg.base}/api/trade/sandbox`,

@@ -14,6 +14,7 @@ import ProductModal from '../components/ProductModal';
 import { CountUp } from '../components/TradeStory';
 import { shortProductName } from '../../shared/product-name';
 import { fmtPct, fmtUsd, type ExploreOpportunity } from '../../shared/types';
+import type { CountryCoverage } from '../../shared/coverage';
 
 type FlowFilter = 'all' | 'export' | 'import';
 
@@ -25,6 +26,8 @@ function codeOf(o: ExploreOpportunity): string {
 export default function Opportunities() {
   usePageTitle('Opportunities');
   const [items, setItems] = useState<ExploreOpportunity[]>([]);
+  const [coverage, setCoverage] = useState<CountryCoverage[]>([]);
+  const [disclosure, setDisclosure] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [flow, setFlow] = useState<FlowFilter>('all');
@@ -34,7 +37,11 @@ export default function Opportunities() {
   useEffect(() => {
     api
       .opportunities()
-      .then((r) => setItems(r.opportunities))
+      .then((r) => {
+        setItems(r.opportunities);
+        setCoverage(r.coverage ?? []);
+        setDisclosure(r.coverage_disclosure ?? null);
+      })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -101,6 +108,31 @@ export default function Opportunities() {
       {countries.length > 1 && <Chips options={countryOptions} value={country} onChange={setCountry} />}
       <div style={{ height: 14 }} />
 
+      {!loading && !error && coverage.length > 0 && (
+        <details className="card tiny dim" style={{ marginBottom: 14 }} open>
+          <summary><strong>Data coverage behind these rankings</strong></summary>
+          {disclosure && <p style={{ margin: '6px 0 0' }}>{disclosure}</p>}
+          <table className="data-table" style={{ marginTop: 6 }}>
+            <thead>
+              <tr><th>Country</th><th>Period</th><th className="align-right">Ranked</th><th className="align-right">Complete</th><th>Level</th></tr>
+            </thead>
+            <tbody>
+              {coverage.map((c) => (
+                <tr key={c.iso3} title={c.note}>
+                  <td>{c.name}</td>
+                  <td>{c.period ?? 'none'}</td>
+                  <td className="align-right">{c.items_ranked} of {c.items_considered}</td>
+                  <td className="align-right">{c.completeness_pct}%</td>
+                  <td>{c.level}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p style={{ margin: '6px 0 0' }}>
+            A product is ranked only with at least 3 years of data. Missing figures are never counted as zero, and countries are not compared against newer data than they have.
+          </p>
+        </details>
+      )}
       {loading ? (
         <Skeletons n={5} />
       ) : error ? (
@@ -116,6 +148,7 @@ export default function Opportunities() {
                 <h3>{shortProductName(o.name)}</h3>
                 <p className="tiny dim">
                   <Link to={`/country/${o.slug}`}>{o.country}</Link> · {o.year}
+                  {o.years_available != null && ` · ${o.years_available} years of data`}
                 </p>
               </div>
               <div className="mm-opp-fig">

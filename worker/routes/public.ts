@@ -22,7 +22,9 @@ import {
 } from '../lib/oracle-insight';
 import {
   CONFIDENCE_WEIGHT, currentItems, feedEntities, flowName, itemName, oracleDashboard, oracleProducts, partnerLabel, toExplore,
+  type FeedItem,
 } from '../lib/oracle-feeds';
+import { assessCoverage, itemRankable } from '../../shared/coverage';
 import { loadSettings, type Settings } from '../lib/settings';
 import {
   classify,
@@ -1460,21 +1462,42 @@ pub.get('/opportunities', async (c) => {
       const entities = await feedEntities(c.env.DB);
       const feeds = await Promise.all(entities.map(async (e) => ({ e, feed: await oracleProducts(oppCfg, e.iso3), dash: await oracleDashboard(oppCfg, e.iso3) })));
       const classByEntity = await loadClassificationsBulk(c.env.DB, entities.map((e) => e.id));
-      const picked: Array<ReturnType<typeof toExplore> & { score: number }> = [];
+      // First gather what each country offers, so coverage can be assessed across the whole ranking before anything is dropped.
+      const offered: Array<{ e: (typeof entities)[number]; latest: number; rows: Array<{ i: FeedItem; category: 'traditional' | 'non_traditional' }> }> = [];
       for (const { e, feed, dash } of feeds) {
         if (!feed) continue;
         const cls = resolveForEntity(classByEntity, e.id);
         const dom = dominantCodes(dash?.overview.export_chapter_shares, 0.25);
+        const rows: (typeof offered)[number]['rows'] = [];
         for (const i of currentItems(feed)) {
           if (i.value_usd < 1_000_000) continue;
           const category = classify(i.code, cls, dom);
           if (!includeTraditional && category === 'traditional') continue;
-          picked.push({ ...toExplore(e, i, category), score: i.score });
+          rows.push({ i, category });
+        }
+        offered.push({ e, latest: feed.latest_year, rows });
+      }
+      // Coverage follows Osofo's rules: a product is ranked only with enough comparable years, missing data is never read
+      // as zero, and any difference in coverage between the countries is stated with the result.
+      const coverage = assessCoverage(offered.map((o) => ({ iso3: o.e.iso3, name: o.e.name, latest_year: o.latest, items: o.rows.map((r) => ({ years_available: r.i.years_available })) })));
+      const newest = coverage.newest_year ?? 0;
+      const picked: Array<ReturnType<typeof toExplore> & { score: number }> = [];
+      for (const o of offered) {
+        for (const { i, category } of o.rows) {
+          if (!itemRankable(i.years_available, o.latest, newest).ok) continue;
+          picked.push({ ...toExplore(o.e, i, category), years_available: i.years_available, data_confidence: i.confidence, score: i.score });
         }
       }
       picked.sort((a, b) => b.score - a.score || b.value_usd - a.value_usd);
       const products = picked.slice(0, 100).map(({ score: _s, ...rest }) => rest);
-      return json({ opportunities: products, count: products.length });
+      return json({
+        opportunities: products,
+        count: products.length,
+        coverage: coverage.countries,
+        coverage_comparable: coverage.comparable,
+        coverage_disclosure: coverage.disclosure,
+        newest_year: coverage.newest_year,
+      });
     } catch {
       return bad('Trade data service is unavailable', 502);
     }

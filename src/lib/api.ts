@@ -36,6 +36,7 @@ import type {
 import type { Severity, ValidationReport } from '../../shared/csv/validate';
 import type { DatasetCode } from '../../shared/csv/schema';
 import type { TradeSandboxResponse } from '../../shared/trade-sandbox';
+import type { CountryCoverage } from '../../shared/coverage';
 
 const ADMIN_TOKEN_KEY = 'tf_admin_token';
 
@@ -643,7 +644,14 @@ export const api = {
     }>(`/api/rankings?metric=${metric}`),
 
   opportunities: () =>
-    req<{ opportunities: ExploreOpportunity[]; count: number }>('/api/opportunities'),
+    req<{
+      opportunities: ExploreOpportunity[];
+      count: number;
+      coverage?: CountryCoverage[];
+      coverage_comparable?: boolean;
+      coverage_disclosure?: string | null;
+      newest_year?: number | null;
+    }>('/api/opportunities'),
 
   /** Specific product lines across every activated country. The app's front door. */
   products: (

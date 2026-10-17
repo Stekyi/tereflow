@@ -50,6 +50,7 @@
     "test:prospect": "node scripts/test-prospect.mjs",
     "test:tariff": "node scripts/test-tariff.mjs",
     "test:markets": "node scripts/test-markets.mjs",
+    "test:coverage": "node scripts/test-coverage.mjs",
     "test:reexport": "node scripts/test-reexport.mjs",
     "test:seasonality": "node scripts/test-seasonality.mjs",
     "test:regulatory": "node scripts/test-regulatory.mjs",

@@ -380,6 +380,9 @@ export interface ExploreOpportunity {
   partners: ExplorePartner[];
   /** Absent for services (no HS code to classify). */
   category?: ExportCategory;
+  /** Years of data behind this product; a product is only ranked with enough comparable years. */
+  years_available?: number | null;
+  data_confidence?: 'high' | 'medium' | 'low';
 }
 
 export interface ExplorePartner {

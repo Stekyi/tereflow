@@ -18,6 +18,11 @@ import { worldBankRates } from './prospect';
  */
 export const guide = new Hono<{ Bindings: Env }>();
 
+/** HS wording is long and often starts with a one-word heading, so keep enough of it to still make sense. */
+const shortName = (full: string) => {
+  const seg = full.split(';').map((s) => s.trim());
+  return seg[0].length <= 8 && seg[1] ? `: ${seg[1].split(',')[0].trim()}` : seg[0];
+};
 const nameOf = (iso3: string) => partnerName(iso3, ISO3_NAME);
 const series = (d: ProductDetailPayload | null) => (d?.series ?? []).map((s) => ({ year: s.year, value_usd: s.value_usd, qty_kg: s.qty_kg ?? null }));
 const partners = (d: ProductDetailPayload | null) =>
@@ -91,7 +96,7 @@ guide.get('/:country/:hs', async (c) => {
   const fx = homeRates ? fxRisk(homeRates) : null;
   const facts: GuideFacts = {
     country: entity?.name ?? home,
-    product: (exp?.name ?? imp?.name ?? `HS ${hs}`).split(';')[0].trim(),
+    product: shortName(exp?.name ?? imp?.name ?? `HS ${hs}`),
     hs, role, budget_usd: budget,
     exports: series(exp), imports: series(imp),
     buyers: buyers.map(({ name, value_usd, qty_kg }) => ({ name, value_usd, qty_kg })),

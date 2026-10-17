@@ -211,6 +211,7 @@ def main(argv=None):
     ix.add_argument("--country", nargs="*", default=[])
     sd = sub.add_parser("sync-index-d1")
     sd.add_argument("--force", action="store_true")
+    sd.add_argument("--max-writes", type=int, default=20000, help="refuse to write more than about this many D1 rows")
     a = p.parse_args(argv)
     conn = db.connect(app=a.app)
     if a.cmd == "migrate":
@@ -218,7 +219,7 @@ def main(argv=None):
         return
     elif a.cmd == "sync-index-d1":
         from . import d1sync
-        changed = d1sync.sync(conn, force=a.force)
+        changed = d1sync.sync(conn, force=a.force, max_writes=a.max_writes)
         print("synced to D1:", changed or "nothing changed")
         return
     elif a.cmd == "index-products":

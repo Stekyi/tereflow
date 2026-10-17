@@ -1009,6 +1009,13 @@ export function ProductionBlock({ slug, hs }: { slug: string; hs: string }) {
 }
 type ByproductResponse = ReturnType<typeof byproductAnalysis> & { country: string; year: number | null; has_data: boolean };
 
+const KB_CONFIDENCE_LABEL: Record<string, string> = {
+  verified: 'Verified',
+  plausible: 'Plausible, not machine-checked',
+  unverified: 'Unverified',
+  rejected: 'Rejected',
+};
+
 const VERDICT_LABEL: Record<string, string> = {
   'import-gap': 'Country imports this',
   'under-processed': 'Little made locally',
@@ -1045,12 +1052,18 @@ export function ByproductBlock({ slug, hs }: { slug: string; hs: string }) {
       {r.rows.length > 0 && (
         <table className="data-table" style={{ marginTop: 4 }}>
           <thead>
-            <tr><th>By-product</th><th className="align-right">Exports {r.year}</th><th className="align-right">Imports {r.year}</th><th>Read</th></tr>
+            <tr><th>By-product</th><th>Evidence</th><th className="align-right">Exports {r.year}</th><th className="align-right">Imports {r.year}</th><th>Read</th></tr>
           </thead>
           <tbody>
             {r.rows.map((x) => (
-              <tr key={x.hs4}>
-                <td title={x.note}>{x.name} (HS {x.hs4})</td>
+              <tr key={x.id}>
+                <td title={[x.process_method, x.applications, x.detail_sourced ? '' : 'Process and uses are general knowledge, not yet tied to a cited source.'].filter(Boolean).join(' ')}>
+                  {x.byproduct_name}{x.byproduct_code ? ` (HS ${x.byproduct_code})` : ''}
+                </td>
+                <td title={[x.evidence_note, x.trade_evidence_note, x.byproduct_hs_official ? `Official wording: ${x.byproduct_hs_official}` : ''].filter(Boolean).join(' ')}>
+                  {KB_CONFIDENCE_LABEL[x.confidence]}, {x.status === 'established' ? 'established' : 'technically possible'}
+                  {x.source_url && <>{' '}<a href={x.source_url} target="_blank" rel="noopener noreferrer">source</a></>}
+                </td>
                 <td className="align-right">{money(x.exports_usd)}</td>
                 <td className="align-right">{money(x.imports_usd)}</td>
                 <td title={x.reason}>{VERDICT_LABEL[x.verdict]}</td>
@@ -1058,6 +1071,12 @@ export function ByproductBlock({ slug, hs }: { slug: string; hs: string }) {
             ))}
           </tbody>
         </table>
+      )}
+      {r.unsupported.length > 0 && (
+        <p style={{ margin: '4px 0 0' }}>
+          <strong>Checked and ruled out:</strong>{' '}
+          {r.unsupported.map((u) => `${u.byproduct_name}${u.byproduct_code ? ` (HS ${u.byproduct_code})` : ''}: ${u.evidence_note ?? 'not supported'}`).join(' ')}
+        </p>
       )}
       {r.services.length > 0 && (
         <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>

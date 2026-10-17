@@ -4,9 +4,12 @@ import { bad, json } from '../lib/db';
 import { oracleConfig } from '../lib/oracle';
 import { oracleProductDetail, type ProductDetailPayload } from '../lib/oracle-insight';
 import { clientKey, rateLimit, tooMany } from '../lib/ratelimit';
-import { byproductAnalysis, byproductCandidates, mainCodeFor, type ByproductInput } from '../../shared/byproducts';
+import { byproductAnalysis, relationshipsFor, type ByproductInput, type KbRow } from '../../shared/byproducts';
 
-/** By-product and logistics leads for one country's main export, checked against that country's own trade. Reads only. */
+/**
+ * By-product and logistics leads for one country's main export, from the product knowledge base and checked against
+ * that country's own trade. The relationships live in D1 (kb_relationship), not in code. Reads only.
+ */
 export const byproducts = new Hono<{ Bindings: Env }>();
 
 const latest = (d: ProductDetailPayload | null) => {
@@ -14,6 +17,10 @@ const latest = (d: ProductDetailPayload | null) => {
   const last = s[s.length - 1];
   return last ? { year: last.year, value: last.value_usd } : null;
 };
+
+const KB_COLUMNS = `id, parent_name, parent_code, byproduct_name, byproduct_code, kind, process_method, applications, detail_sourced,
+  status, confidence, byproduct_hs_official, hs_codes_checked, derivation_checked, trade_evidence_usd, trade_evidence_year,
+  trade_evidence_note, evidence_note, source_name, source_url, verified_at`;
 
 byproducts.get('/:country/:hs', async (c) => {
   const limited = await rateLimit(c.env, 'lookup', clientKey(c.req.raw));
@@ -33,28 +40,33 @@ byproducts.get('/:country/:hs', async (c) => {
     import_gap_usd: q.has('import_gap_usd') ? Number(q.get('import_gap_usd')) : undefined,
   };
 
+  // A parent code matches when the product's code starts with it; relationshipsFor keeps the most specific level.
+  const { results } = await c.env.DB.prepare(`SELECT ${KB_COLUMNS} FROM kb_relationship WHERE ? LIKE parent_code || '%'`)
+    .bind(hs).all<KbRow>();
+  const rel = relationshipsFor(results ?? [], hs);
+  const mainCode = rel.parent_code ?? hs.slice(0, 4);
+
   const cfg = oracleConfig(c.env);
-  const hs4 = mainCodeFor(hs).slice(0, 4);
-  const cands = byproductCandidates(hs);
   let mainValue: number | null = null;
   let year: number | null = null;
   const data: ByproductInput[] = [];
 
   if (cfg) {
-    const main = await oracleProductDetail(cfg, iso3, 'X', mainCodeFor(hs)).catch(() => null);
+    const main = await oracleProductDetail(cfg, iso3, 'X', mainCode).catch(() => null);
     const m = latest(main);
     mainValue = m?.value ?? null;
     year = m?.year ?? null;
-    const pairs = await Promise.all(cands.map(async (cd) => {
+    const codes = [...new Set(rel.active.map((r) => r.byproduct_code).filter((x): x is string => !!x))];
+    const pairs = await Promise.all(codes.map(async (code) => {
       const [x, i] = await Promise.all([
-        oracleProductDetail(cfg, iso3, 'X', cd.hs4).catch(() => null),
-        oracleProductDetail(cfg, iso3, 'M', cd.hs4).catch(() => null),
+        oracleProductDetail(cfg, iso3, 'X', code).catch(() => null),
+        oracleProductDetail(cfg, iso3, 'M', code).catch(() => null),
       ]);
       const xv = latest(x);
       const iv = latest(i);
       // Only use a year that matches the main commodity's year, so the ratio compares like with like.
       return {
-        hs4: cd.hs4,
+        code,
         exports_usd: xv && xv.year === year ? xv.value : null,
         imports_usd: iv && iv.year === year ? iv.value : null,
       };
@@ -62,9 +74,9 @@ byproducts.get('/:country/:hs', async (c) => {
     data.push(...pairs);
   }
 
-  const analysis = byproductAnalysis(hs, mainValue, data, thresholds);
+  const analysis = byproductAnalysis(mainCode, mainValue, data, rel, thresholds);
   return json(
-    { country: entity?.name ?? iso3, hs4, year, ...analysis, has_data: cfg != null && mainValue != null },
+    { country: entity?.name ?? iso3, hs4: mainCode, year, ...analysis, has_data: cfg != null && mainValue != null },
     200,
     { 'cache-control': 'public, max-age=3600' },
   );

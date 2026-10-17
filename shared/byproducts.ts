@@ -1,111 +1,63 @@
-export type ByproductKind = 'processing' | 'residue' | 'service';
+export type ByproductKind = 'processed' | 'residue' | 'byproduct' | 'downstream';
+export type KbConfidence = 'verified' | 'plausible' | 'unverified' | 'rejected';
+export type KbStatus = 'established' | 'possible' | 'rejected';
 
-export interface ByproductCandidate {
-  hs4: string;
-  name: string;
+/** One relationship row from the knowledge base (D1 table kb_relationship). Nothing about it is hardcoded here. */
+export interface KbRow {
+  id: string;
+  parent_name: string;
+  parent_code: string | null;
+  byproduct_name: string;
+  byproduct_code: string | null;
   kind: ByproductKind;
-  note: string;
+  process_method: string | null;
+  applications: string | null;
+  /** 0 until the process and applications text is tied to a cited source. */
+  detail_sourced: number;
+  status: KbStatus;
+  confidence: KbConfidence;
+  byproduct_hs_official: string | null;
+  hs_codes_checked: number;
+  derivation_checked: number;
+  trade_evidence_usd: number | null;
+  trade_evidence_year: number | null;
+  trade_evidence_note: string | null;
+  evidence_note: string | null;
+  source_name: string | null;
+  source_url: string | null;
+  verified_at: string;
+}
+
+export interface Relationships {
+  /** The parent code that matched, 6 digits when a line-level relationship exists, else the heading. */
+  parent_code: string | null;
+  active: KbRow[];
+  /** Relationships that were checked and found wrong. They are listed so they are not quietly re-added. */
+  rejected: KbRow[];
 }
 
 /**
- * Curated by Tereflow, not derived from data: which goods are made from, or out of the waste of, a main
- * commodity. Keyed by the 4-digit HS heading of the main commodity. A missing key means no suggestion is
- * made; nothing is guessed.
+ * The relationships that apply to a product. A parent code matches when the product's code starts with it, and the
+ * most specific match wins, so a line-level relationship (cashew in shell) is not mixed with a heading-level one.
  */
-const COCONUT: ByproductCandidate[] = [
-  { hs4: '1513', name: 'Coconut oil', kind: 'processing', note: 'Pressed from copra.' },
-  { hs4: '5305', name: 'Coconut fibre (coir)', kind: 'residue', note: 'Husk fibre used in ropes, mats and growing media.' },
-];
-
-const CASHEW: ByproductCandidate[] = [
-  { hs4: '0802', name: 'Other nuts, shelled or in shell', kind: 'processing', note: 'Shelled kernels are the higher-value form of cashew in shell.' },
-  { hs4: '1515', name: 'Other fixed vegetable fats and oils', kind: 'residue', note: 'Cashew nut shell liquid is extracted from the shells; it sits in a broader oil heading, so treat the numbers as indicative.' },
-  { hs4: '2008', name: 'Prepared and preserved fruit and nuts', kind: 'processing', note: 'Roasted and flavoured cashews.' },
-];
-
-export const BYPRODUCTS_BY_HS4: Record<string, ByproductCandidate[]> = {
-  '1801': [
-    { hs4: '1802', name: 'Cocoa shells and husks', kind: 'residue', note: 'Waste of bean processing; used as mulch, fuel and fibre.' },
-    { hs4: '1803', name: 'Cocoa paste', kind: 'processing', note: 'First processing step after the bean.' },
-    { hs4: '1804', name: 'Cocoa butter, fat and oil', kind: 'processing', note: 'Pressed from paste; high value per tonne.' },
-    { hs4: '1805', name: 'Cocoa powder', kind: 'processing', note: 'What remains after the butter is pressed out.' },
-  ],
-  '0901': [
-    { hs4: '2101', name: 'Coffee extracts and instant coffee', kind: 'processing', note: 'Soluble coffee made from roasted beans.' },
-  ],
-  '0804': [
-    { hs4: '2009', name: 'Fruit juices', kind: 'processing', note: 'Juice and concentrate from fruit that misses fresh-market grade.' },
-    { hs4: '2008', name: 'Prepared and preserved fruit', kind: 'processing', note: 'Pulp, canned and dried products.' },
-    { hs4: '2007', name: 'Jams, purees and fruit pastes', kind: 'processing', note: 'Cooked fruit products.' },
-  ],
-  '0803': [
-    { hs4: '2008', name: 'Prepared and preserved fruit', kind: 'processing', note: 'Includes dried banana and banana products.' },
-    { hs4: '1106', name: 'Flour of fruit and roots', kind: 'processing', note: 'Includes banana and plantain flour.' },
-  ],
-  '0805': [
-    { hs4: '2009', name: 'Fruit juices', kind: 'processing', note: 'Citrus juice and concentrate.' },
-    { hs4: '3301', name: 'Essential oils', kind: 'residue', note: 'Citrus peel oil is a by-product of juicing.' },
-  ],
-  '1207': [
-    { hs4: '1515', name: 'Other vegetable fats and oils', kind: 'processing', note: 'Includes shea butter.' },
-    { hs4: '2306', name: 'Oilcake and other oil-extraction residue', kind: 'residue', note: 'Animal feed from what is left after pressing.' },
-  ],
-  '1202': [
-    { hs4: '1508', name: 'Groundnut oil', kind: 'processing', note: 'Pressed from the nut.' },
-    { hs4: '2305', name: 'Groundnut oilcake', kind: 'residue', note: 'Animal feed from the pressed residue.' },
-  ],
-  '1201': [
-    { hs4: '1507', name: 'Soya-bean oil', kind: 'processing', note: 'Pressed from the bean.' },
-    { hs4: '2304', name: 'Soya-bean oilcake', kind: 'residue', note: 'High-protein animal feed from the residue.' },
-  ],
-  '1511': [
-    { hs4: '1513', name: 'Coconut and palm kernel oil', kind: 'processing', note: 'Pressed from the kernel, a separate oil from palm oil.' },
-    { hs4: '2306', name: 'Oilcake and other oil-extraction residue', kind: 'residue', note: 'Palm kernel cake is used as feed.' },
-  ],
-  // Heading 0801 mixes coconuts, Brazil nuts and cashews, so coconut by-products are keyed to the coconut lines only.
-  '080111': COCONUT,
-  '080112': COCONUT,
-  '080119': COCONUT,
-  '080131': CASHEW,
-  '080132': CASHEW,
-  '5201': [
-    { hs4: '1512', name: 'Cottonseed oil', kind: 'processing', note: 'Pressed from the seed left after ginning.' },
-    { hs4: '5202', name: 'Cotton waste', kind: 'residue', note: 'Waste from spinning and ginning.' },
-    { hs4: '2306', name: 'Oilcake and other oil-extraction residue', kind: 'residue', note: 'Cottonseed cake as animal feed.' },
-  ],
-  '1006': [
-    { hs4: '2302', name: 'Bran and milling residues', kind: 'residue', note: 'Rice bran from milling; used as feed.' },
-    { hs4: '1102', name: 'Cereal flours other than wheat', kind: 'processing', note: 'Includes rice flour.' },
-  ],
-  '1005': [
-    { hs4: '1108', name: 'Starches', kind: 'processing', note: 'Maize starch.' },
-    { hs4: '2303', name: 'Starch-making residues', kind: 'residue', note: 'Maize gluten and germ cake, used as feed.' },
-  ],
-  '0714': [
-    { hs4: '1108', name: 'Starches', kind: 'processing', note: 'Cassava starch.' },
-    { hs4: '1106', name: 'Flour of roots and tubers', kind: 'processing', note: 'Cassava and yam flour.' },
-  ],
-  '1701': [
-    { hs4: '1703', name: 'Molasses', kind: 'residue', note: 'Left after sugar is crystallised.' },
-    { hs4: '2303', name: 'Sugar-making residues', kind: 'residue', note: 'Bagasse and beet pulp.' },
-    { hs4: '2207', name: 'Ethyl alcohol', kind: 'processing', note: 'Ethanol is fermented from molasses.' },
-  ],
-  '0303': [
-    { hs4: '2301', name: 'Fish meal and flours', kind: 'residue', note: 'Made from fish waste and low-grade catch.' },
-    { hs4: '1504', name: 'Fish oils and fats', kind: 'residue', note: 'Pressed from fish and offcuts.' },
-  ],
-  '4403': [
-    { hs4: '4407', name: 'Wood sawn or chipped lengthwise', kind: 'processing', note: 'Sawn timber from round logs.' },
-    { hs4: '4410', name: 'Particle board', kind: 'residue', note: 'Made from chips and sawmill waste.' },
-    { hs4: '4402', name: 'Wood charcoal', kind: 'residue', note: 'Made from offcuts and waste wood.' },
-  ],
-  '4101': [
-    { hs4: '4104', name: 'Tanned or crust hides and skins', kind: 'processing', note: 'First step after raw hides.' },
-  ],
-  '0702': [
-    { hs4: '2002', name: 'Prepared or preserved tomatoes', kind: 'processing', note: 'Paste and canned tomatoes.' },
-  ],
-};
+export function relationshipsFor(rows: KbRow[], hs: string): Relationships {
+  const matched = rows.filter((r) => r.parent_code && hs.startsWith(r.parent_code));
+  if (!matched.length) return { parent_code: null, active: [], rejected: [] };
+  const longest = Math.max(...matched.map((r) => (r.parent_code as string).length));
+  const level = matched.filter((r) => (r.parent_code as string).length === longest);
+  const seen = new Set<string>();
+  const uniq = level.filter((r) => {
+    const k = `${r.status === 'rejected' ? 'x' : 'a'}|${r.byproduct_code ?? r.byproduct_name}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  return {
+    parent_code: level[0].parent_code,
+    active: uniq.filter((r) => r.status !== 'rejected'),
+    rejected: uniq.filter((r) => r.status === 'rejected'),
+  };
+}
 
 /** Service ideas by HS chapter of the main commodity. These come from the type of goods, not from trade data. */
 const SERVICE_IDEAS: { chapters: string[]; title: string; note: string }[] = [
@@ -132,12 +84,12 @@ export const DEFAULT_THRESHOLDS: ByproductThresholds = {
 export type ByproductVerdict = 'import-gap' | 'under-processed' | 'covered' | 'no-data';
 
 export interface ByproductInput {
-  hs4: string;
+  code: string;
   exports_usd: number | null;
   imports_usd: number | null;
 }
 
-export interface ByproductRow extends ByproductCandidate {
+export interface ByproductRow extends KbRow {
   exports_usd: number | null;
   imports_usd: number | null;
   /** By-product exports over main exports. */
@@ -147,11 +99,13 @@ export interface ByproductRow extends ByproductCandidate {
 }
 
 export interface ByproductAnalysis {
-  main_hs4: string;
+  main_code: string;
   main_exports_usd: number | null;
   thresholds: ByproductThresholds;
   eligible: boolean;
   rows: ByproductRow[];
+  /** Relationships from an earlier list that the checks showed to be wrong. */
+  unsupported: KbRow[];
   services: { title: string; note: string }[];
   limitations: string[];
 }
@@ -172,24 +126,26 @@ export function clampThresholds(t: Partial<ByproductThresholds>): ByproductThres
 }
 
 /**
- * Looks at a country's main commodity and checks each curated by-product against the country's own trade:
- * does it import the by-product while exporting the raw good (a domestic demand gap), or export very little
- * of it compared with the raw good (under-processed). Where the data holds neither flow the row says so.
+ * Checks each knowledge-base by-product of a country's main commodity against the country's own trade: does it
+ * import the by-product while exporting the raw good (a domestic demand gap), or export very little of it compared
+ * with the raw good (under-processed). Where the data holds neither flow, or the by-product has no code, the row says so.
  */
 export function byproductAnalysis(
-  mainHs: string,
+  mainCode: string,
   mainExportsUsd: number | null,
   data: ByproductInput[],
+  rel: Relationships,
   thresholds: Partial<ByproductThresholds> = {},
 ): ByproductAnalysis {
   const t = clampThresholds(thresholds);
-  const hs4 = mainHs.slice(0, 4);
-  const candidates = byproductCandidates(mainHs);
-  const byHs = new Map(data.map((d) => [d.hs4, d]));
+  const byCode = new Map(data.map((d) => [d.code, d]));
   const eligible = mainExportsUsd != null && mainExportsUsd >= t.min_main_usd;
 
-  const rows: ByproductRow[] = candidates.map((c) => {
-    const d = byHs.get(c.hs4);
+  const rows: ByproductRow[] = rel.active.map((c) => {
+    if (!c.byproduct_code) {
+      return { ...c, exports_usd: null, imports_usd: null, ratio: null, verdict: 'no-data' as const, reason: 'This by-product has no confirmed HS code, so its trade cannot be checked.' };
+    }
+    const d = byCode.get(c.byproduct_code);
     const ex = d?.exports_usd ?? null;
     const im = d?.imports_usd ?? null;
     const ratio = eligible && ex != null && mainExportsUsd ? ex / mainExportsUsd : null;
@@ -217,25 +173,16 @@ export function byproductAnalysis(
     return { ...c, exports_usd: ex, imports_usd: im, ratio, verdict, reason };
   });
 
-  const chapter = hs4.slice(0, 2);
+  const chapter = mainCode.slice(0, 2);
   const services = eligible ? SERVICE_IDEAS.filter((s) => s.chapters.includes(chapter)).map(({ title, note }) => ({ title, note })) : [];
 
   const limitations = [
-    'The list of by-products for each commodity is curated by Tereflow from how the goods are made. It is not drawn from the trade data, and it is not complete.',
+    "The relationships come from Tereflow's product knowledge base. Each is checked against the official HS wording and recorded trade. 'Verified' means the by-product's official wording states the derivation; 'plausible' means both codes exist but the wording does not.",
+    'The process and applications text is general knowledge and is not yet tied to a cited source. Not every residue can be processed or sold at a profit.',
     'A gap in the numbers is a lead to check, not proof of a business. Imports can be re-exported, quality can differ, and a small export may reflect cost or policy.',
     'Service ideas come from the type of goods and are not measured. No logistics cost or capacity data is held.',
   ];
-  if (!candidates.length) limitations.unshift('No by-products are listed yet for this heading, so no suggestion is made.');
+  if (!rel.active.length) limitations.unshift('No by-products are in the knowledge base yet for this product, so no suggestion is made.');
 
-  return { main_hs4: hs4, main_exports_usd: mainExportsUsd, thresholds: t, eligible, rows, services, limitations };
-}
-
-export function mainCodeFor(hs: string): string {
-  const h6 = hs.slice(0, 6);
-  return h6.length === 6 && BYPRODUCTS_BY_HS4[h6] ? h6 : hs.slice(0, 4);
-}
-
-/** A 6-digit key wins over the 4-digit heading, so a mixed heading can be split line by line. */
-export function byproductCandidates(hs: string): ByproductCandidate[] {
-  return BYPRODUCTS_BY_HS4[mainCodeFor(hs)] ?? [];
+  return { main_code: mainCode, main_exports_usd: mainExportsUsd, thresholds: t, eligible, rows, unsupported: rel.rejected, services, limitations };
 }

@@ -129,6 +129,20 @@ def cmd_ingest_tariffs(conn, a):
             break
 
 
+def cmd_build_kb(conn, a):
+    from . import kb
+    names = kb.load_names(conn)
+    trade = kb.load_trade(conn, kb.C)
+    sql = kb.to_sql(kb.C, names, trade)
+    from pathlib import Path
+    Path(a.out).write_text(sql, encoding="utf-8", newline="\n")
+    counts: dict[str, int] = {}
+    for r in kb.C:
+        k = kb.assess(r, names, trade)["confidence"]
+        counts[k] = counts.get(k, 0) + 1
+    print(f"wrote {len(kb.C)} relationships to {a.out}: {counts}")
+
+
 def cmd_analytics(conn, a):
     for c in [x.upper() for x in a.country] or active_countries(conn):
         print(f"metrics {c}: {analytics.refresh_metrics(conn, c):,} products")
@@ -189,6 +203,8 @@ def main(argv=None):
     tf.add_argument("--products", nargs="*")
     tf.add_argument("--years", nargs="*", type=int)
     tf.add_argument("--max-calls", type=int, default=60)
+    kbp = sub.add_parser("build-kb")
+    kbp.add_argument("--out", default="kb-seed.sql")
     an = sub.add_parser("analytics")
     an.add_argument("--country", nargs="*", default=[])
     a = p.parse_args(argv)
@@ -197,7 +213,7 @@ def main(argv=None):
         print("applied:", db.migrate(conn) or "nothing new")
         return
     {"sync-countries": cmd_sync_countries, "create-app-user": cmd_create_app_user, "ingest": cmd_ingest,
-     "analytics": cmd_analytics, "ingest-monthly": cmd_ingest_monthly, "ingest-tariffs": cmd_ingest_tariffs, "status": cmd_status, "check": cmd_check, "define-ords": cmd_define_ords}[a.cmd](conn, a)
+     "analytics": cmd_analytics, "ingest-monthly": cmd_ingest_monthly, "ingest-tariffs": cmd_ingest_tariffs, "build-kb": cmd_build_kb, "status": cmd_status, "check": cmd_check, "define-ords": cmd_define_ords}[a.cmd](conn, a)
 
 
 if __name__ == "__main__":

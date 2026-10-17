@@ -1131,9 +1131,12 @@ export default function ProductModal({
   hsCode,
   countrySlug = null,
   flow = null,
+  openScore = false,
   onClose,
 }: {
   hsCode: string;
+  /** Open with the opportunity-score breakdown already expanded. */
+  openScore?: boolean;
   /** Country to open on, when the reader tapped a row belonging to one. */
   countrySlug?: string | null;
   /** Direction the reader arrived on, so the headline matches the row tapped. */
@@ -1155,7 +1158,7 @@ export default function ProductModal({
   const [insight, setInsight] = useState<ProductInsight | null>(null);
   // The score is the one figure here that asks to be trusted, so it opens to
   // show the four terms behind it rather than staying a bare number.
-  const [scoreOpen, setScoreOpen] = useState(false);
+  const [scoreOpen, setScoreOpen] =   useState(openScore);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);

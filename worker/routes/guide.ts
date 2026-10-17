@@ -134,6 +134,11 @@ guide.get('/:country/:hs', async (c) => {
       available: true,
       inputs: { country: facts.country, product: facts.product, hs, role, budget_usd: budget },
       lens,
+      refs: {
+        partners: [...buyers, ...suppliers, ...buyer_markets.map((m) => ({ name: m.name }))]
+          .map((p) => ({ name: p.name, iso3: 'iso3' in p ? (p as { iso3: string }).iso3 : null })),
+        products: related.map((r) => ({ name: r.name, hs: r.code && /^\d{6}$/.test(r.code) ? r.code : null })),
+      },
       ...result,
       sources: ['Trade values, quantities and partners: UN Comtrade, as held by Tereflow.', 'Related goods: Tereflow by-product knowledge base.', 'Exchange rates: World Bank PA.NUS.FCRF.'],
     },

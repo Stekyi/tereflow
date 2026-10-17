@@ -111,7 +111,7 @@ export default function Country() {
   // One product modal, scoped to this country and the flow the row or bar was
   // listed under, so the reader sees this country's figures for that product.
   // A worldwide tap (an early signal) leaves slug and flow unset.
-  const [modal, setModal] = useState<{ hs: string; slug?: string; flow?: 'export' | 'import' } | null>(
+  const [modal, setModal] = useState<{ hs: string; slug?: string;   flow?: 'export' | 'import'; score?: boolean } | null>(
     null,
   );
   usePageTitle(data?.entity.name);
@@ -203,6 +203,7 @@ export default function Country() {
       hs,
       slug,
       flow: flow === 'import' || flow === 'export' ? flow : undefined,
+      score: searchParams.get('score') === '1',
     });
   }, [data, searchParams, slug]);
 
@@ -324,6 +325,7 @@ export default function Country() {
           hsCode={modal.hs}
           countrySlug={modal.slug ?? null}
           flow={modal.flow ?? null}
+          openScore={modal.score === true}
           onClose={() => setModal(null)}
         />
       )}

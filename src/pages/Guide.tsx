@@ -12,7 +12,7 @@ type CountrySummary = Awaited<ReturnType<typeof api.countries>>['countries'][num
 type Answer =
   | { locked: true; title: string; teaser: string }
   | { locked: false; available: false; reason: string }
-  | ({ locked: false; available: true; inputs: { country: string; product: string; hs: string; role: string; budget_usd: number | null }; lens: { name: string; kind: string; confidence: string; parent_name: string; shown_through: 'own_code' | 'parent'; note: string } | null; sources: string[] } & GuideResult);
+  | ({ locked: false; available: true; inputs: { country: string; product: string; hs: string; role: string; budget_usd: number | null }; lens: { name: string; kind: string; confidence: string; parent_name: string; shown_through: 'own_code' | 'parent'; note: string } | null; refs?: { partners: { name: string; iso3: string | null }[]; products: { name: string; hs: string | null }[] }; sources: string[] } & GuideResult);
 
 const STEPS = ['Your starting point', 'Trace the chain', 'Where it strains', 'Group by dimension', 'Merge into problems', 'Questions and plays'];
 const usd = (n: number | null) => (n == null ? 'unavailable' : `$${Math.round(n).toLocaleString('en-US')}`);
@@ -65,6 +65,31 @@ export default function Guide() {
     return out;
   });
   const a = ans && ans !== 'failed' && !ans.locked && ans.available ? ans : null;
+  const flow = role === 'supply' ? 'export' : 'import';
+  const enc = encodeURIComponent;
+
+  const LinkBar = () => a && (
+    <p className="tiny" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', margin: '6px 0' }}>
+      <Link to={`/country/${slug}?product=${a.inputs.hs}&flow=${flow}`}>Product details</Link>
+      <Link to={`/country/${slug}?product=${a.inputs.hs}&flow=${flow}&score=1`}>Why this opportunity score</Link>
+      <Link to={`/country/${slug}`}>{a.inputs.country} home</Link>
+      <Link to={`/sandbox?primary=${enc(slug)}&hs=${a.inputs.hs}&flow=${flow}`}>Open in sandbox</Link>
+      <Link to={`/feasibility/${slug}/${a.inputs.hs}?flow=${flow}`}>Feasibility report</Link>
+    </p>
+  );
+
+  /** Names we know become links: a country goes to its page (or the sandbox when it has none), a product to its details. */
+  const Actor = ({ name }: { name: string }) => {
+    const p = a?.refs?.partners.find((x) => x.name === name);
+    if (p?.iso3) {
+      const c = countries.find((x) => x.iso3 === p.iso3);
+      return c
+        ? <Link to={`/country/${c.slug}`}>{name}</Link>
+        : <Link to={`/sandbox?primary=${enc(slug)}&hs=${a!.inputs.hs}&flow=${flow}&partner=${p.iso3}`}>{name}</Link>;
+    }
+    const r = a?.refs?.products.find((x) => x.hs && name.includes(x.name));
+    return r ? <Link to={`/country/${slug}?product=${r.hs}&flow=${flow}`}>{name}</Link> : <>{name}</>;
+  };
 
   return (
     <main style={{ maxWidth: 780, margin: '0 auto', padding: '24px 16px' }}>
@@ -105,7 +130,8 @@ export default function Guide() {
               </ul>
               {cards.length > 0 && <p className="tiny dim" style={{ margin: '6px 0' }}>Traded products</p>}
               <ul style={{ listStyle: 'none', padding: 0 }}>
-                {cards.map((c) => <li key={c.hs_code}><button type="button" className="btn" onClick={() => setPick({ hs: c.hs_code, name: `${c.name} (HS ${c.hs_code})` })}>{c.name} (HS {c.hs_code})</button></li>)}
+                {cards.map((c) => <li key={c.hs_code}><button type="button" className="btn" onClick={() => setPick({ hs: c.hs_code, name: `${c.name} (HS ${c.hs_code})` })}>{c.name} (HS {c.hs_code})</button>{' '}
+                  <Link className="tiny" to={`/country/${slug}?product=${c.hs_code}&flow=${role === 'supply' ? 'export' : 'import'}`}>details</Link></li>)}
               </ul>
             </div>
           )}
@@ -123,12 +149,13 @@ export default function Guide() {
       {a && step === 1 && (
         <section style={box}>
           <h2>1. The chain for {a.inputs.product}</h2>
+          <LinkBar />
           {a.lens && <p style={{ ...box, background: 'rgba(120,120,120,.08)' }}>{a.lens.note}</p>}
           <p className="tiny dim">Stages are a standard product chain. Names appear only where trade data gives them; roles are marked as not held.</p>
           {a.chain.map((c) => (
             <div key={c.stage} style={{ margin: '8px 0' }}>
               <strong>{c.stage}</strong> <span className="tiny dim">{c.from_data ? 'from trade data' : 'role only, not held'}</span>
-              <div>{c.actors.join(', ')}</div>
+              <div>{c.actors.map((x, i) => <span key={x}>{i > 0 && ', '}<Actor name={x} /></span>)}</div>
             </div>
           ))}
         </section>
@@ -137,6 +164,7 @@ export default function Guide() {
       {a && step === 2 && (
         <section style={box}>
           <h2>2. Where the trade strains</h2>
+          <LinkBar />
           {a.findings.length === 0 && <p>No rule fired on the data held. That is not the same as no problem.</p>}
           {a.findings.map((f) => (
             <div key={f.id} style={{ margin: '10px 0' }}>
@@ -150,6 +178,7 @@ export default function Guide() {
       {a && step === 3 && (
         <section style={box}>
           <h2>3. Grouped by PESTEL dimension</h2>
+          <LinkBar />
           <p className="tiny dim">Which dimension a finding sits in is a fixed Tereflow rule. Dimensions with nothing found are left out; Legal needs tariff and rules data we do not hold yet.</p>
           {a.by_dimension.map((d) => (
             <div key={d.dimension} style={{ margin: '8px 0' }}><strong>{d.dimension}</strong><ul>{d.findings.map((f) => <li key={f.id}>{f.text}</li>)}</ul></div>
@@ -160,6 +189,7 @@ export default function Guide() {
       {a && step === 4 && (
         <section style={box}>
           <h2>4. Merged into problems</h2>
+          <LinkBar />
           <p className="tiny dim">Findings that point at the same underlying problem are merged. Each problem lists the dimensions it spans.</p>
           {a.problems.map((p) => (
             <div key={p.key} style={{ margin: '10px 0' }}><strong>{p.title}</strong> <span className="tiny dim">({p.dimensions.join(', ')})</span>
@@ -185,6 +215,7 @@ export default function Guide() {
           ))}
           <div style={box}>
             <h3 style={{ marginTop: 0 }}>Risk and return</h3>
+            <LinkBar />
             <p><strong>Risk: {a.risk.level}.</strong> {a.risk.reasons.join(' ')}</p>
             {a.estimate.available
               ? <p><strong>Indicative return on {usd(a.inputs.budget_usd)}: {usd(a.estimate.low_usd)} to {usd(a.estimate.high_usd)}.</strong></p>

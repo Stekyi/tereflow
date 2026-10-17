@@ -251,18 +251,67 @@ function firstSection(md: string): string {
 
 // --- billing ----------------------------------------------------------------
 
-const PLANS = {
+export const PLANS = {
   monthly: { label: 'Premium monthly', amount_minor: 1200, currency: 'USD', days: 30 },
   annual: { label: 'Premium annual', amount_minor: 11000, currency: 'USD', days: 365 },
 } as const;
 type PlanId = keyof typeof PLANS;
 
-premium.get('/billing/plans', (c) =>
+premium.get('/billing/plans', async (c) =>
   json({
     plans: Object.entries(PLANS).map(([id, p]) => ({ id, ...p })),
-    provider: c.env.STRIPE_SECRET_KEY ? 'stripe' : 'stub',
+    provider: c.env.STRIPE_SECRET_KEY ? 'stripe' : (await wiseDetails(c.env)) ? 'wise' : 'stub',
   }),
 );
+
+export interface WiseDetails { holder: string; bank: string; account: string; routing: string; note: string }
+
+/** The receiving account, set by the owner in the portal. Null until a holder and an account number are both filled in. */
+export async function wiseDetails(env: Env): Promise<WiseDetails | null> {
+  try {
+    const { results } = await env.DB.prepare("SELECT code, value FROM code_setup WHERE code LIKE 'WISE\\_%' ESCAPE '\\'").all<{ code: string; value: string }>();
+    const m = Object.fromEntries((results ?? []).map((r) => [r.code, (r.value ?? '').trim()]));
+    if (!m.WISE_HOLDER || !m.WISE_ACCOUNT) return null;
+    return { holder: m.WISE_HOLDER, bank: m.WISE_BANK ?? '', account: m.WISE_ACCOUNT, routing: m.WISE_ROUTING ?? '', note: m.WISE_NOTE ?? '' };
+  } catch {
+    return null;
+  }
+}
+
+const REF_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function newReference(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  return `TF-${[...bytes].map((b) => REF_ALPHABET[b % REF_ALPHABET.length]).join('')}`;
+}
+
+interface PaymentRow { id: string; plan: string; amount_minor: number; currency: string; reference: string; status: string; payer_note: string | null; created_at: string; period_end: string | null }
+const wisePayload = (p: PaymentRow, d: WiseDetails | null) => ({
+  provider: 'wise',
+  payment: p,
+  // Account details are only sent while a transfer is still expected.
+  details: d && (p.status === 'pending' || p.status === 'claimed') ? d : null,
+});
+
+/** The signed-in user's latest bank transfer, so the page can pick up where they left off. */
+premium.get('/billing/wise', async (c) => {
+  const user = await currentUser(c.req.raw, c.env);
+  if (!user) return bad('Sign in first', 401);
+  const p = await c.env.DB.prepare('SELECT id, plan, amount_minor, currency, reference, status, payer_note, created_at, period_end FROM manual_payments WHERE user_id = ? ORDER BY created_at DESC LIMIT 1')
+    .bind(user.id).first<PaymentRow>();
+  return json(p ? wisePayload(p, await wiseDetails(c.env)) : { provider: 'wise', payment: null, details: null }, 200, { 'cache-control': 'private, no-store' });
+});
+
+/** The payer says they have sent it. This only flags it for the owner; it grants nothing. */
+premium.post('/billing/wise/claim', async (c) => {
+  const user = await currentUser(c.req.raw, c.env);
+  if (!user) return bad('Sign in first', 401);
+  const b = (await c.req.json().catch(() => null)) as { reference?: string; note?: string } | null;
+  const note = (b?.note ?? '').toString().trim().slice(0, 300);
+  const r = await c.env.DB.prepare("UPDATE manual_payments SET status = 'claimed', payer_note = ? WHERE reference = ? AND user_id = ? AND status IN ('pending', 'claimed')")
+    .bind(note || null, b?.reference ?? '', user.id).run();
+  if (!r.meta.changes) return bad('No open payment with that reference', 404);
+  return json({ claimed: true });
+});
 
 /**
  * Provider-agnostic checkout.
@@ -326,6 +375,24 @@ premium.post('/billing/checkout', async (c) => {
     });
 
     return json({ provider: 'stripe', checkout_url: session.url });
+  }
+
+  // Wise bank transfer. Nothing is granted here: the payer gets a reference and the owner's account details, and an
+  // admin confirms in the portal once the money is seen in Wise.
+  const wise = c.env.STRIPE_SECRET_KEY ? null : await wiseDetails(c.env);
+  if (wise) {
+    let p = await c.env.DB.prepare("SELECT id, plan, amount_minor, currency, reference, status, payer_note, created_at, period_end FROM manual_payments WHERE user_id = ? AND plan = ? AND status IN ('pending', 'claimed') ORDER BY created_at DESC LIMIT 1")
+      .bind(user.id, planId).first<PaymentRow>();
+    if (!p) {
+      const open = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM manual_payments WHERE user_id = ? AND status IN ('pending', 'claimed')").bind(user.id).first<{ n: number }>();
+      if ((open?.n ?? 0) >= 3) return bad('You already have open bank transfers waiting. Finish or wait for those first.', 409);
+      const id = uid('mp_');
+      const reference = newReference();
+      await c.env.DB.prepare('INSERT INTO manual_payments (id, user_id, plan, amount_minor, currency, reference) VALUES (?, ?, ?, ?, ?, ?)')
+        .bind(id, user.id, planId, plan.amount_minor, plan.currency, reference).run();
+      p = await c.env.DB.prepare('SELECT id, plan, amount_minor, currency, reference, status, payer_note, created_at, period_end FROM manual_payments WHERE id = ?').bind(id).first<PaymentRow>();
+    }
+    return json(wisePayload(p!, wise));
   }
 
   // Stub provider.

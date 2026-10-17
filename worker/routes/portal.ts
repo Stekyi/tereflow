@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import type { Env } from '../lib/db';
-import { json } from '../lib/db';
+import { json, uid } from '../lib/db';
 import { requireAdmin } from '../lib/auth';
+import { PLANS } from './premium';
 import { linkHealth, type SourceFmt } from '../../shared/types';
 
 /**
@@ -250,6 +251,74 @@ portal.get('/network', async (c) => {
   );
 
   return json({ cards, activity: activity ?? {}, recent_ratings: recentRatings });
+});
+
+/**
+ * Give a user premium for a period with no payment, a trial or a comp. Extends from the current expiry when they are
+ * already premium, unless replace is set, in which case the period starts now. Revoking ends it immediately.
+ */
+portal.post('/users/:id/premium', async (c) => {
+  const id = c.req.param('id');
+  const b = await c.req.json<{ days?: unknown; note?: unknown; replace?: unknown }>().catch(() => ({}) as Record<string, unknown>);
+  const days = Number(b.days);
+  if (!Number.isInteger(days) || days < 1 || days > 3650) return json({ error: 'days must be a whole number from 1 to 3650' }, 400);
+  const user = await row<{ id: string; tier: string; tier_expires_at: string | null }>(c.env.DB, 'SELECT id, tier, tier_expires_at FROM users WHERE id = ?', id);
+  if (!user) return json({ error: 'no such user' }, 404);
+  const now = Date.now();
+  const current = user.tier === 'premium' && user.tier_expires_at ? new Date(user.tier_expires_at).getTime() : 0;
+  const base = b.replace === true || current < now ? now : current;
+  const expires = new Date(base + days * 86_400_000).toISOString();
+  await c.env.DB.prepare("UPDATE users SET tier = 'premium', tier_expires_at = ? WHERE id = ?").bind(expires, id).run();
+  await c.env.DB.prepare("INSERT INTO premium_grants (id, user_id, kind, days, expires_at, note) VALUES (?, ?, 'grant', ?, ?, ?)")
+    .bind(uid('pg_'), id, days, expires, typeof b.note === 'string' ? b.note.slice(0, 200) : null).run();
+  return json({ tier: 'premium', tier_expires_at: expires });
+});
+
+portal.post('/users/:id/premium/revoke', async (c) => {
+  const id = c.req.param('id');
+  const user = await row<{ id: string }>(c.env.DB, 'SELECT id FROM users WHERE id = ?', id);
+  if (!user) return json({ error: 'no such user' }, 404);
+  await c.env.DB.prepare("UPDATE users SET tier = 'free', tier_expires_at = NULL WHERE id = ?").bind(id).run();
+  await c.env.DB.prepare("INSERT INTO premium_grants (id, user_id, kind) VALUES (?, ?, 'revoke')").bind(uid('pg_'), id).run();
+  return json({ tier: 'free', tier_expires_at: null });
+});
+
+/** Bank transfers: open ones first, then the recent decided ones. */
+portal.get('/payments', async (c) => {
+  const payments = await all(
+    c.env.DB,
+    `SELECT p.id, p.plan, p.amount_minor, p.currency, p.reference, p.status, p.payer_note, p.created_at, p.decided_at, p.period_end,
+            u.email AS user_email, u.full_name AS user_name
+       FROM manual_payments p LEFT JOIN users u ON u.id = p.user_id
+      ORDER BY CASE p.status WHEN 'claimed' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END, p.created_at DESC
+      LIMIT 60`,
+  );
+  return json({ payments });
+});
+
+/** The owner has seen the money in Wise. Grants the plan's period, extending from the current expiry if already premium. */
+portal.post('/payments/:id/confirm', async (c) => {
+  const p = await row<{ id: string; user_id: string; plan: string; status: string }>(c.env.DB, 'SELECT id, user_id, plan, status FROM manual_payments WHERE id = ?', c.req.param('id'));
+  if (!p) return json({ error: 'no such payment' }, 404);
+  if (p.status !== 'pending' && p.status !== 'claimed') return json({ error: `this payment is already ${p.status}` }, 409);
+  const days = PLANS[p.plan as keyof typeof PLANS]?.days ?? 30;
+  const user = await row<{ tier: string; tier_expires_at: string | null }>(c.env.DB, 'SELECT tier, tier_expires_at FROM users WHERE id = ?', p.user_id);
+  const now = Date.now();
+  const current = user?.tier === 'premium' && user.tier_expires_at ? new Date(user.tier_expires_at).getTime() : 0;
+  const end = new Date(Math.max(now, current) + days * 86_400_000).toISOString();
+  // Status flips first and only from an open state, so a double click cannot grant the period twice.
+  const flipped = await c.env.DB.prepare("UPDATE manual_payments SET status = 'confirmed', decided_at = datetime('now'), period_end = ? WHERE id = ? AND status IN ('pending', 'claimed')")
+    .bind(end, p.id).run();
+  if (!flipped.meta.changes) return json({ error: 'this payment was already decided' }, 409);
+  await c.env.DB.prepare("UPDATE users SET tier = 'premium', tier_expires_at = ? WHERE id = ?").bind(end, p.user_id).run();
+  return json({ status: 'confirmed', period_end: end });
+});
+
+portal.post('/payments/:id/reject', async (c) => {
+  const r = await c.env.DB.prepare("UPDATE manual_payments SET status = 'rejected', decided_at = datetime('now') WHERE id = ? AND status IN ('pending', 'claimed')")
+    .bind(c.req.param('id')).run();
+  if (!r.meta.changes) return json({ error: 'no open payment with that id' }, 404);
+  return json({ status: 'rejected' });
 });
 
 /** Premium: who follows what, and what billing has recorded. */

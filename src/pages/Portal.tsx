@@ -25,6 +25,7 @@ import {
   type PortalCard,
   type PortalRating,
   type PortalBillingEvent,
+  type PortalPayment,
   type PortalSource,
   type PortalPlaybook,
   type PortalSetup,
@@ -991,6 +992,8 @@ function Users({ onError }: { onError: OnError }) {
   const [byTier, setByTier] = useState<{ tier: string; n: number }[]>([]);
   const [signups, setSignups] = useState<{ day: string; n: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
+  const [pick, setPick] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -1007,7 +1010,15 @@ function Users({ onError }: { onError: OnError }) {
     }, 250);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+  }, [q, tick]);
+
+  async function grant(id: string, days: number) {
+    try { await api.portal.grantPremium(id, days); setTick((x) => x + 1); } catch (e) { onError(e as Error); }
+  }
+  async function revoke(id: string, email: string) {
+    if (!window.confirm(`End premium for ${email} now?`)) return;
+    try { await api.portal.revokePremium(id); setTick((x) => x + 1); } catch (e) { onError(e as Error); }
+  }
 
   const chart = useMemo(
     () => signups.map((s) => ({ day: s.day.slice(5), n: s.n })),
@@ -1065,6 +1076,8 @@ function Users({ onError }: { onError: OnError }) {
                 <th>Email</th>
                 <th>Name</th>
                 <th>Tier</th>
+                <th>Premium until</th>
+                <th>Give or end premium</th>
                 <th>Country</th>
                 <th className="align-right">Cards</th>
                 <th className="align-right">Follows</th>
@@ -1078,6 +1091,26 @@ function Users({ onError }: { onError: OnError }) {
                   <td>{u.full_name ?? '—'}</td>
                   <td>
                     <span className={`badge ${u.tier === 'premium' ? 'premium' : 'off'}`}>{u.tier}</span>
+                  </td>
+                  <td>{u.tier === 'premium' ? (u.tier_expires_at ? fmtDate(u.tier_expires_at) : 'no end date') : '—'}</td>
+                  <td>
+                    <div className="row" style={{ gap: 6 }}>
+                      <select
+                        aria-label={`Premium period for ${u.email}`}
+                        value={pick[u.id] ?? 30}
+                        onChange={(e) => setPick((p) => ({ ...p, [u.id]: Number(e.target.value) }))}
+                      >
+                        {[[7, '7 days'], [14, '14 days'], [30, '30 days'], [90, '90 days'], [180, '6 months'], [365, '1 year']].map(([d, l]) => (
+                          <option key={d} value={d}>{l}</option>
+                        ))}
+                      </select>
+                      <button type="button" className="btn small" onClick={() => grant(u.id, pick[u.id] ?? 30)}>
+                        {u.tier === 'premium' ? 'Add' : 'Give'}
+                      </button>
+                      {u.tier === 'premium' && (
+                        <button type="button" className="btn small ghost" onClick={() => revoke(u.id, u.email)}>End</button>
+                      )}
+                    </div>
                   </td>
                   <td>{u.country_iso3 ?? '—'}</td>
                   <td className="align-right">{num(u.cards)}</td>
@@ -1204,7 +1237,22 @@ function Premium({ onError }: { onError: OnError }) {
   const [topFollowed, setTopFollowed] = useState<{ kind: string; value: string; label: string | null; followers: number }[]>([]);
   const [feed, setFeed] = useState<{ items: number; unread: number; premium_items: number } | null>(null);
   const [billing, setBilling] = useState<PortalBillingEvent[]>([]);
+  const [payments, setPayments] = useState<PortalPayment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    api.portal.payments().then((r) => setPayments(r.payments)).catch(onError);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
+
+  async function decide(p: PortalPayment, action: 'confirm' | 'reject') {
+    const text = action === 'confirm'
+      ? `Confirm that ${(p.amount_minor / 100).toFixed(2)} ${p.currency} with reference ${p.reference} has arrived in Wise? This switches premium on for ${p.user_email}.`
+      : `Reject the payment ${p.reference}?`;
+    if (!window.confirm(text)) return;
+    try { await api.portal.decidePayment(p.id, action); setTick((x) => x + 1); } catch (e) { onError(e as Error); }
+  }
 
   useEffect(() => {
     api.portal
@@ -1224,6 +1272,44 @@ function Premium({ onError }: { onError: OnError }) {
 
   return (
     <>
+      <Panel title="Bank transfers (Wise)">
+        {payments.length === 0 ? (
+          <p className="small dim" style={{ margin: 0 }}>
+            No transfers yet. Set the Wise account details under Setup, in the Payments group, to turn bank transfer on.
+          </p>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr><th>When</th><th>User</th><th>Plan</th><th className="align-right">Amount</th><th>Reference</th><th>Status</th><th>Payer note</th><th /></tr>
+              </thead>
+              <tbody>
+                {payments.map((p) => (
+                  <tr key={p.id}>
+                    <td>{fmtDate(p.created_at)}</td>
+                    <td className="tiny">{p.user_email ?? '—'}</td>
+                    <td>{p.plan}</td>
+                    <td className="align-right">{(p.amount_minor / 100).toFixed(2)} {p.currency}</td>
+                    <td><code>{p.reference}</code></td>
+                    <td><span className={`badge ${p.status === 'confirmed' ? 'premium' : p.status === 'claimed' ? 'watch' : 'off'}`}>{p.status === 'claimed' ? 'says sent' : p.status}</span></td>
+                    <td className="tiny dim">{p.payer_note ?? '—'}</td>
+                    <td>
+                      {(p.status === 'pending' || p.status === 'claimed') && (
+                        <div className="row" style={{ gap: 6 }}>
+                          <button type="button" className="btn small" onClick={() => decide(p, 'confirm')}>Confirm received</button>
+                          <button type="button" className="btn small ghost" onClick={() => decide(p, 'reject')}>Reject</button>
+                        </div>
+                      )}
+                      {p.status === 'confirmed' && <span className="tiny dim">until {fmtDate(p.period_end)}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+
       {feed && (
         <div className="portal-tiles">
           <Stat label="Feed items" value={num(feed.items)} />
@@ -1688,4 +1774,5 @@ const CATEGORY_LABEL: Record<string, string> = {
   limits: 'How much is shown',
   pipeline: 'What the fetch covers',
   pricing: 'Prices and premiums',
+  payments: 'Payments: Wise account that receives premium payments',
 };

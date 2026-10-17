@@ -421,6 +421,27 @@ export interface PortalCountryRow {
   facts: number;
 }
 
+export interface PortalPayment {
+  id: string;
+  plan: string;
+  amount_minor: number;
+  currency: string;
+  reference: string;
+  status: 'pending' | 'claimed' | 'confirmed' | 'rejected';
+  payer_note: string | null;
+  created_at: string;
+  decided_at: string | null;
+  period_end: string | null;
+  user_email: string | null;
+  user_name: string | null;
+}
+
+export interface WisePayment {
+  provider: 'wise';
+  payment: { id: string; plan: string; amount_minor: number; currency: string; reference: string; status: string; payer_note: string | null; created_at: string; period_end: string | null } | null;
+  details: { holder: string; bank: string; account: string; routing: string; note: string } | null;
+}
+
 export interface PortalUser {
   id: string;
   email: string;
@@ -992,6 +1013,16 @@ export const api = {
         `/api/admin/portal/config/${encodeURIComponent(code)}/reset`,
         { method: 'POST' },
       ),
+    grantPremium: (id: string, days: number, replace = false) =>
+      req<{ tier: string; tier_expires_at: string }>(`/api/admin/portal/users/${encodeURIComponent(id)}/premium`, {
+        method: 'POST',
+        body: JSON.stringify({ days, replace }),
+      }),
+    revokePremium: (id: string) =>
+      req<{ tier: string }>(`/api/admin/portal/users/${encodeURIComponent(id)}/premium/revoke`, { method: 'POST' }),
+    payments: () => req<{ payments: PortalPayment[] }>('/api/admin/portal/payments'),
+    decidePayment: (id: string, action: 'confirm' | 'reject') =>
+      req<{ status: string; period_end?: string }>(`/api/admin/portal/payments/${encodeURIComponent(id)}/${action}`, { method: 'POST' }),
   },
 
   auth: {
@@ -1113,7 +1144,12 @@ export const api = {
         activated?: boolean;
         period_end?: string;
         note?: string;
+        payment?: WisePayment['payment'];
+        details?: WisePayment['details'];
       }>('/api/premium/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
+    wise: () => req<WisePayment>('/api/premium/billing/wise'),
+    wiseClaim: (reference: string, note: string) =>
+      req<{ claimed: boolean }>('/api/premium/billing/wise/claim', { method: 'POST', body: JSON.stringify({ reference, note }) }),
     cancel: () => req<{ tier: string }>('/api/premium/billing/cancel', { method: 'POST' }),
     history: () =>
       req<{

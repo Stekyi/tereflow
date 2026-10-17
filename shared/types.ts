@@ -411,7 +411,7 @@ export interface MarketProducts {
   category: ExportCategory;
   exporters: MarketCountryRank[];
   importers: MarketCountryRank[];
-  /** Each country's general trading partners â€” not specific to this product. */
+  /** Each country's general trading partners ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â not specific to this product. */
   partners_by_slug: Record<string, { export: RankedItem[]; import: RankedItem[] }>;
 }
 
@@ -501,6 +501,8 @@ export interface ProductCard {
    */
   family?: {
     hs4: string;
+    /** Sum of every line in the family. The card's own value_usd is its best-scoring line, so the card still matches its hs_code. */
+    total_usd: number;
     line_count: number;
     members: { hs_code: string; name: string; value_usd: number; growth_pct: number | null; score: number }[];
   };
@@ -1119,7 +1121,7 @@ export function fmtMoney(minor: number, currency: string): string {
 }
 
 export function fmtUsd(v: number | null | undefined): string {
-  if (v == null || !isFinite(v)) return 'â€”';
+  if (v == null || !isFinite(v)) return 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
   const abs = Math.abs(v);
   // The sign goes outside the currency symbol. "$-3.33B" reads as a dollar
   // amount that happens to start with a minus; "-$3.33B" reads as a deficit,
@@ -1133,7 +1135,7 @@ export function fmtUsd(v: number | null | undefined): string {
 }
 
 export function fmtPct(v: number | null | undefined, digits = 1): string {
-  if (v == null || !isFinite(v)) return 'â€”';
+  if (v == null || !isFinite(v)) return 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
   const sign = v > 0 ? '+' : '';
   return `${sign}${v.toFixed(digits)}%`;
 }

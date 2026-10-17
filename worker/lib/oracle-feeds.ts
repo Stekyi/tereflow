@@ -88,7 +88,7 @@ export const oracleProducts = (cfg: OracleConfig, iso3: string) =>
 export async function oracleSearch(
   cfg: OracleConfig,
   p: { tokens: string[]; codes: string[]; prefix: string; flow: string; iso3s: string[]; limit: number },
-): Promise<{ total: number; products: Array<FeedItem & { reporter: string }> } | null> {
+): Promise<{ total: number; exports: number; imports: number; markets: number; products: Array<FeedItem & { reporter: string }> } | null> {
   const res = await oracleFetch(cfg, {
     route: 'search',
     tokens: p.tokens.join(','),
@@ -100,8 +100,8 @@ export async function oracleSearch(
   });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`oracle ${res.status}`);
-  const body = (await res.json()) as { total: number; products: Array<FeedItem & { reporter: string }> | null };
-  return { total: body.total, products: body.products ?? [] };
+  const body = (await res.json()) as { total: number; exports: number; imports: number; markets: number; products: Array<FeedItem & { reporter: string }> | null };
+  return { total: body.total, exports: body.exports, imports: body.imports, markets: body.markets, products: body.products ?? [] };
 }
 
 export const oracleDashboard = (cfg: OracleConfig, iso3: string) =>

@@ -47,7 +47,8 @@ const COLS = `reporter_iso3, flow, cmd_code, level, product_name, year, value_us
   top_partner, top_share_pct, partner_count, unit_value_usd_t, years_available, trend`;
 
 /** Same matching as the ORDS route: any token inside the name, a mapped code, or a code prefix. Wider is fine, the caller re-ranks. */
-export async function d1Search(db: D1Database, p: SearchParams): Promise<{ total: number; products: IndexItem[] }> {
+export interface SearchResult { total: number; exports: number; imports: number; markets: number; products: IndexItem[] }
+export async function d1Search(db: D1Database, p: SearchParams): Promise<SearchResult> {
   const where: string[] = [];
   const binds: unknown[] = [];
   const any: string[] = [];
@@ -65,9 +66,9 @@ export async function d1Search(db: D1Database, p: SearchParams): Promise<{ total
   const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const [rows, count] = await Promise.all([
     db.prepare(`SELECT ${COLS} FROM product_index ${w} ORDER BY score DESC, value_usd DESC LIMIT ?`).bind(...binds, p.limit).all<Row>(),
-    db.prepare(`SELECT COUNT(*) AS n FROM product_index ${w}`).bind(...binds).first<{ n: number }>(),
+    db.prepare(`SELECT COUNT(*) AS n, SUM(CASE WHEN flow = 'X' THEN 1 ELSE 0 END) AS x, SUM(CASE WHEN flow = 'M' THEN 1 ELSE 0 END) AS m, COUNT(DISTINCT reporter_iso3) AS c FROM product_index ${w}`).bind(...binds).first<{ n: number; x: number | null; m: number | null; c: number }>(),
   ]);
-  return { total: count?.n ?? 0, products: (rows.results ?? []).map(toItem) };
+  return { total: count?.n ?? 0, exports: count?.x ?? 0, imports: count?.m ?? 0, markets: count?.c ?? 0, products: (rows.results ?? []).map(toItem) };
 }
 
 /** Product search: Oracle, then D1. Null only when the ORDS route is not defined yet (the caller has a legacy path). */
@@ -75,7 +76,7 @@ export async function searchProducts(
   env: Env,
   cfg: OracleConfig,
   p: SearchParams,
-): Promise<{ total: number; products: IndexItem[]; source: Source } | null> {
+): Promise<(SearchResult & { source: Source }) | null> {
   if (!oracleBreakerOpen()) {
     try {
       const r = await oracleSearch(cfg, { ...p });

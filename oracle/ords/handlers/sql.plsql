@@ -38,7 +38,8 @@ DECLARE
 
   -- Raises when the statement is not one the gateway will run.
   PROCEDURE check_sql(p_sql VARCHAR2) IS
-    l_s VARCHAR2(32767) := LOWER(p_sql);
+    -- String literals are blanked first: the checks are about what the statement does, not about text it carries as data.
+    l_s VARCHAR2(32767) := REGEXP_REPLACE(LOWER(p_sql), '''([^'']|'''')*''', '''''');
     l_i PLS_INTEGER := 1;
     l_t VARCHAR2(400);
   BEGIN
@@ -56,7 +57,7 @@ DECLARE
       l_t := REGEXP_SUBSTR(l_s, '(^|[^a-z0-9_])(from|join|into|update|using)[[:space:]]+("?[a-z0-9_$.]+"?)', 1, l_i, 'i', 3);
       EXIT WHEN l_t IS NULL;
       l_t := REPLACE(l_t, '"', '');
-      IF NOT (l_t = 'dual' OR l_t LIKE 'app\_%' ESCAPE '\') THEN
+      IF NOT (l_t IN ('dual', 'set') OR l_t LIKE 'app\_%' ESCAPE '\') THEN
         RAISE_APPLICATION_ERROR(-20004, 'table not allowed: ' || l_t);
       END IF;
       l_i := l_i + 1;

@@ -354,7 +354,7 @@ pub.get('/dashboard/:slug', async (c) => {
   );
 });
 
-/** Where the numbers came from ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â shown under every dashboard. */
+/** Where the numbers came from ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â shown under every dashboard. */
 pub.get('/dashboard/:slug/sources', async (c) => {
   const entity = await getEntityBySlug(c.env.DB, c.req.param('slug'));
   if (!entity) return bad('Not found', 404);
@@ -842,6 +842,8 @@ pub.get('/products', async (c) => {
   // not earned an opportunity signal yet.
   let rows: SignalRow[] = [];
   let dataSource: 'oracle' | 'd1' = 'oracle';
+  // Set when more lines matched than were fetched: the counts then come from the database, not from the fetched sample.
+  let sampled: { total: number; exports: number; imports: number; markets: number } | null = null;
   const oracleCfg = oracleConfig(c.env);
   if (oracleCfg) {
     // Oracle holds the trade data. The search runs inside the database against a flat product index and returns only the
@@ -859,6 +861,7 @@ pub.get('/products', async (c) => {
         limit: 500,
       });
       if (found) dataSource = found.source;
+      if (found && found.total > found.products.length) sampled = { total: found.total, exports: found.exports, imports: found.imports, markets: found.markets };
       const items: Array<FeedItem & { reporter: string }> = found
         ? found.products.filter((i) => byIso.has(i.reporter))
         : [];
@@ -1005,22 +1008,25 @@ pub.get('/products', async (c) => {
 
   // Fold tariff lines of one product (same HS4, country and flow) into a single family card. An exact code search is
   // left as typed, so somebody asking for one line gets that line.
-  const folded = /^\d{6}$/.test(q) ? { list: matched.slice(0, limit), total: matched.length } : foldFamilies(matched, limit);
+  const folded = /^\d{6}$/.test(q) ? { list: matched.slice(0, limit), total: matched.length, reps: matched, sums: new Map<ProductCard, number>() } : foldFamilies(matched, limit);
+  const reps = folded.reps;
 
   const summary = {
-    total: folded.total,
-    exports: matched.filter((p) => p.flow === 'export').length,
-    imports: matched.filter((p) => p.flow === 'import').length,
-    strong: matched.filter((p) => p.has_signal && p.score >= settings.scoreBandStrong).length,
-    markets: new Set(matched.map((p) => p.slug)).size,
-    largest_usd: matched.length ? Math.max(...matched.map((p) => p.value_usd)) : 0,
+    total: sampled?.total ?? folded.total,
+    // Counted over what the list shows (a family is one opening), so the figures reconcile with the list. When the search
+    // matched more lines than it fetched, the database's own counts are used instead (lines, not families).
+    exports: sampled?.exports ?? reps.filter((p) => p.flow === 'export').length,
+    imports: sampled?.imports ?? reps.filter((p) => p.flow === 'import').length,
+    strong: reps.filter((p) => p.has_signal && p.score >= settings.scoreBandStrong).length,
+    markets: sampled?.markets ?? new Set(reps.map((p) => p.slug)).size,
+    largest_usd: reps.length ? Math.max(...reps.map((p) => folded.sums.get(p) ?? p.value_usd)) : 0,
     within_budget:
-      budget > 0 ? matched.filter((p) => budgetFit(budget, p.unit_value_usd_t).fits).length : null,
-    priced: matched.filter((p) => p.unit_value_usd_t != null).length,
+      budget > 0 ? reps.filter((p) => budgetFit(budget, p.unit_value_usd_t).fits).length : null,
+    priced: reps.filter((p) => p.unit_value_usd_t != null).length,
   };
 
   return json(
-    { products: folded.list, count: folded.total, summary, note: expanded.note },
+    { products: folded.list, count: summary.total, summary, note: expanded.note },
     200,
     dataSource === 'd1' ? { 'x-data-source': 'd1-fallback' } : {},
   );
@@ -1030,7 +1036,7 @@ pub.get('/products', async (c) => {
  * Keeps the order of `cards`; a family sits where its best-ranked line was. Only the entries that will be shown are
  * built and named: naming every family in a large result is wasted work on a request that only returns one page.
  */
-function foldFamilies(cards: ProductCard[], limit: number): { list: ProductCard[]; total: number } {
+function foldFamilies(cards: ProductCard[], limit: number): { list: ProductCard[]; total: number; reps: ProductCard[]; sums: Map<ProductCard, number> } {
   const groups = new Map<string, ProductCard[]>();
   const entries: { key: string; first: ProductCard }[] = [];
   for (const p of cards) {
@@ -1056,9 +1062,9 @@ function foldFamilies(cards: ProductCard[], limit: number): { list: ProductCard[
       ...top,
       name: fam.name,
       name_full: fam.name,
-      value_usd: g.reduce((s, m) => s + m.value_usd, 0),
       family: {
         hs4: first.hs_code.slice(0, 4),
+        total_usd: g.reduce((s, m) => s + m.value_usd, 0),
         line_count: g.length,
         members: fam.lines.map((l) => {
           const m = byCode.get(l.code)!;
@@ -1067,7 +1073,12 @@ function foldFamilies(cards: ProductCard[], limit: number): { list: ProductCard[
       },
     };
   });
-  return { list, total: entries.length };
+  return {
+    list,
+    total: entries.length,
+    reps: entries.map((e) => e.first),
+    sums: new Map(entries.filter((e) => groups.get(e.key)!.length > 1).map((e) => [e.first, groups.get(e.key)!.reduce((s, m) => s + m.value_usd, 0)] as [ProductCard, number])),
+  };
 }
 
 interface SignalRow {
@@ -1670,7 +1681,7 @@ pub.get('/opportunities', async (c) => {
   // dominant legacy commodity (Ghanaian cocoa is always top-5, never a
   // "signal"). What that exclusion does NOT catch is a smaller, growing
   // mining/oil-type category that isn't top-5 yet but is still never
-  // realistically SME-accessible ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the universal defaults + admin overrides
+  // realistically SME-accessible ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â the universal defaults + admin overrides
   // below catch that.
   const classificationsByEntity = await loadClassificationsBulk(
     c.env.DB,
@@ -1819,7 +1830,7 @@ pub.get('/market/hs-codes', async (c) => {
 /**
  * Product view: for one HS2 product/service chapter, rank every country by
  * trade volume. Partner detail attached per country is that country's own
- * general trading partners (already computed) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â never product-specific,
+ * general trading partners (already computed) ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â never product-specific,
  * because Comtrade's keyless tier never fetches partner x HS-code together.
  */
 pub.get('/market/products', async (c) => {

@@ -92,7 +92,7 @@ export function ProductCardRow({
           </span>
           {product.country}
           {family && <> {'\u00b7'} {family.line_count} variants {open ? '\u25b4' : '\u25be'}</>}
-          {product.value_usd > 0 && <> {'\u00b7'} {fmtUsd(product.value_usd)}</>}
+          {(family?.total_usd ?? product.value_usd) > 0 && <> {'\u00b7'} {fmtUsd(family?.total_usd ?? product.value_usd)}</>}
           {product.growth_pct != null &&
             (isNewTrade(product.growth_pct) ? (
               <> {'\u00b7'} <span className="up">Newly established</span></>
@@ -799,7 +799,7 @@ export function CompanyLinksBlock({ name }: { name: string | null }) {
       <p style={{ margin: '4px 0 0' }}>
         UN Comtrade has no company names, so Tereflow cannot list them. These free searches open outside Tereflow, and we do not store or verify what they show:{' '}
         <a href={`https://www.importyeti.com/search?q=${enc}`} target="_blank" rel="noopener noreferrer">US import shipments (ImportYeti)</a>
-        {' · '}
+        {' Â· '}
         <a href={`https://opencorporates.com/companies?q=${enc}`} target="_blank" rel="noopener noreferrer">company registers (OpenCorporates)</a>.
         {' '}ImportYeti covers only goods shipped into the United States. Search results match on the product wording, so expect noise.
       </p>

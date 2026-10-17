@@ -21,6 +21,13 @@ export interface Env {
   ANANSE_NEWS_URL?: string;
   ORACLE_CLIENT_ID?: string;
   ORACLE_CLIENT_SECRET?: string;
+  /** The ORDS client that may read and write the application tables (the /app/sql gateway). */
+  ORACLE_APP_CLIENT_ID?: string;
+  ORACLE_APP_CLIENT_SECRET?: string;
+  /** oracle keeps the application's data in Oracle. Anything else leaves it in D1. */
+  APP_DB?: string;
+  /** Table name prefix in Oracle. pp_ in production; tests use pp_t_. */
+  APP_TABLE_PREFIX?: string;
   CENSUS_API_KEY?: string;
   SESSION_SECRET?: string;
   STRIPE_SECRET_KEY?: string;

@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+﻿import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { bad, json, uid } from '../lib/db';
 import { currentUser } from '../lib/session';
@@ -163,26 +163,8 @@ network.put('/cards/me', async (c) => {
 });
 
 /** Keep the FTS table in step. Manual because fts5 here is not external-content. */
-async function reindexCard(env: Env, cardId: string) {
-  const row = await env.DB.prepare('SELECT * FROM business_cards WHERE id = ?')
-    .bind(cardId)
-    .first<CardRow>();
-  await env.DB.prepare('DELETE FROM business_cards_fts WHERE card_id = ?').bind(cardId).run();
-  if (!row || row.is_published !== 1) return;
-  await env.DB.prepare(
-    `INSERT INTO business_cards_fts (card_id, display_name, company, headline, bio, sectors, hs_codes)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  )
-    .bind(
-      cardId,
-      row.display_name,
-      row.company ?? '',
-      row.headline ?? '',
-      row.bio ?? '',
-      parseList(row.sectors).join(' '),
-      parseList(row.hs_codes).join(' '),
-    )
-    .run();
+async function reindexCard(_env: Env, _cardId: string) {
+  // Search is a plain LIKE over business_cards; no separate index to maintain.
 }
 
 // --- discovery --------------------------------------------------------------
@@ -223,22 +205,9 @@ network.get('/cards', async (c) => {
 
   const ftsTerm = q.replace(/["*()^:-]/g, ' ').trim();
   if (ftsTerm) {
-    try {
-      const r = await c.env.DB.prepare(
-        `SELECT bc.* FROM business_cards bc
-          WHERE ${filters.join(' AND ')}
-            AND bc.id IN (SELECT card_id FROM business_cards_fts WHERE business_cards_fts MATCH ?)
-          ${order}`,
-      )
-        .bind(...filterBinds, `${ftsTerm}*`, limit)
-        .all<CardRow>();
-      results = r.results ?? [];
-    } catch {
-      results = [];
-    }
-    // Nothing matched the index, or fts5 rejected the term — fall back to LIKE
-    // so a search never returns a hard failure or a misleading empty list.
-    if (results.length === 0) {
+    // Nothing matched the index, or fts5 rejected the term â€” fall back to LIKE
+
+    {
       const like = `%${q}%`;
       const r = await c.env.DB.prepare(
         `SELECT bc.* FROM business_cards bc

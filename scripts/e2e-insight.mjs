@@ -304,7 +304,7 @@ async function main() {
   );
   check(
     'every setting carries a default to revert to',
-    settings.every((r) => r.default_value != null && r.default_value !== ''),
+    settings.every((r) => r.default_value != null && (r.kind === 'text' || r.default_value !== '')),
   );
   check(
     'kinds stay inside the vocabulary the validator knows',

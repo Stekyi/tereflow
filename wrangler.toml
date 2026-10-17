@@ -1,4 +1,4 @@
-name = "tereflow"
+﻿name = "tereflow"
 main = "worker/index.ts"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
@@ -56,6 +56,7 @@ id = "c695850919d14808be6049cf75a0ccf1"
 
 [vars]
 APP_NAME = "Tereflow"
+APP_DB = "oracle"
 # Comma-separated emails allowed into /admin. Set per environment with
 # `wrangler secret put` or a per-environment [vars] block. Deliberately empty
 # here: a real address in version control is somebody's personal data sitting

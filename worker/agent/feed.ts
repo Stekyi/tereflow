@@ -1,6 +1,10 @@
 import type { Env } from '../lib/db';
 import { uid } from '../lib/db';
 import { hs2Sector, hs2Label } from './codes';
+import { oracleConfig, type OracleConfig } from '../lib/oracle';
+import { feedRationale, itemName, oracleDashboard } from '../lib/oracle-feeds';
+import { searchProducts } from '../lib/product-index-d1';
+import { loadCountryDataForCode, oracleCatalogue } from '../lib/oracle-insight';
 
 /**
  * Weekly feed fan-out.
@@ -57,21 +61,14 @@ export async function fanOutFeed(env: Env, runId: string): Promise<FanoutResult>
     return { subscribers: 0, subscriptions: 0, items_written: 0 };
   }
 
-  const { results: signalRows } = await env.DB.prepare(
-    `SELECT s.id, s.entity_id, e.slug AS entity_slug, e.name AS entity_name,
-            s.hs_code, s.product_name, s.flow, s.cagr_3y, s.momentum,
-            s.current_rank, s.projected_rank, s.horizon_years, s.rationale
-       FROM opportunity_signals s
-       JOIN entities e ON e.id = s.entity_id
-      WHERE e.is_active = 1
-      ORDER BY s.momentum DESC`,
-  ).all<SignalRow>();
-  const signals = signalRows ?? [];
-
+  // Signals now come from Oracle's product index (the scored lines of every active country), not from the old D1 copy.
+  const cfg = oracleConfig(env);
+  const entities = cfg ? await activeEntities(env) : [];
+  const cache = new Map<string, SignalRow[]>();
   const pending: FeedDraft[] = [];
 
   for (const sub of subscriptions) {
-    const matched = signals.filter((s) => matches(sub, s)).slice(0, 4);
+    const matched = (await signalsFor(env, cfg, sub, entities, cache)).filter((s) => matches(sub, s)).slice(0, 4);
 
     for (const s of matched) {
       // Export and import signals for the same product would otherwise produce
@@ -81,10 +78,7 @@ export async function fanOutFeed(env: Env, runId: string): Promise<FanoutResult>
         user_id: sub.user_id,
         kind: 'signal',
         title: `${s.entity_name} ${side} more ${s.product_name.toLowerCase()} every year`,
-        body:
-          `${s.rationale ?? ''} ` +
-          `Projected to reach rank ${s.projected_rank ?? '?'} within ${s.horizon_years} years, ` +
-          `from rank ${s.current_rank ?? '?'} today.`,
+        body: `${s.rationale ?? ''} Momentum score ${Math.round(s.momentum * 100)} out of 100.`.trim(),
         payload: {
           signal_id: s.id,
           hs_code: s.hs_code,
@@ -105,7 +99,7 @@ export async function fanOutFeed(env: Env, runId: string): Promise<FanoutResult>
     // Push and pull: who sells this and who buys it. Free, because it is the
     // thing that makes someone want the premium read.
     if (sub.kind === 'hs_code' || sub.kind === 'product') {
-      const balance = await pushPull(env, sub);
+      const balance = await pushPull(env, cfg, sub);
       if (balance) {
         pending.push({
           user_id: sub.user_id,
@@ -121,7 +115,7 @@ export async function fanOutFeed(env: Env, runId: string): Promise<FanoutResult>
     }
 
     if (sub.kind === 'country') {
-      const country = await countryMove(env, sub.value);
+      const country = await countryMove(env, cfg, sub.value);
       if (country) {
         pending.push({
           user_id: sub.user_id,
@@ -181,32 +175,28 @@ function matches(sub: Subscription, s: SignalRow): boolean {
  * query here would both scan an order of magnitude more rows and double-count
  * the same trade at two levels of detail.
  */
-async function pushPull(env: Env, sub: Subscription) {
+async function pushPull(env: Env, cfg: OracleConfig | null, sub: Subscription) {
+  if (!cfg) return null;
   const hs =
     sub.kind === 'hs_code'
       ? sub.value.padStart(2, '0').slice(0, 2)
-      : await hsForProduct(env, sub.value);
+      : await hsForProduct(env, cfg, sub.value);
   if (!hs) return null;
 
-  const { results } = await env.DB.prepare(
-    `WITH scoped AS (
-       SELECT entity_id, flow, value_usd, year
-         FROM trade_facts
-        WHERE hs_code = ? AND stream = 'goods' AND partner_iso3 IS NULL
-     ),
-     latest AS (
-       SELECT entity_id, flow, MAX(year) AS year FROM scoped GROUP BY entity_id, flow
-     )
-     SELECT e.name, e.slug, s.flow, s.value_usd, s.year
-       FROM scoped s
-       JOIN latest l ON l.entity_id = s.entity_id AND l.flow = s.flow AND l.year = s.year
-       JOIN entities e ON e.id = s.entity_id AND e.is_active = 1
-      ORDER BY s.value_usd DESC`,
-  )
-    .bind(hs)
-    .all<{ name: string; slug: string; flow: 'export' | 'import'; value_usd: number; year: number }>();
-
-  const rows = results ?? [];
+  // Each active country's trade in this chapter, summed from its scored lines in the latest year (from Oracle).
+  const data = await loadCountryDataForCode(env, cfg, hs).catch(() => []);
+  const totals = new Map<string, { name: string; slug: string; flow: 'export' | 'import'; value_usd: number }>();
+  for (const { e, feed } of data) {
+    for (const i of feed.products) {
+      if (i.year !== feed.latest_year || !i.code.startsWith(hs)) continue;
+      const flow = i.flow === 'X' ? 'export' : 'import';
+      const key = `${e.slug}|${flow}`;
+      const cur = totals.get(key) ?? { name: e.name, slug: e.slug, flow, value_usd: 0 };
+      cur.value_usd += i.value_usd;
+      totals.set(key, cur);
+    }
+  }
+  const rows = [...totals.values()].sort((a, b) => b.value_usd - a.value_usd);
   if (rows.length === 0) return null;
 
   const exporters = rows.filter((r) => r.flow === 'export').slice(0, 3);
@@ -235,55 +225,27 @@ async function pushPull(env: Env, sub: Subscription) {
   };
 }
 
-/**
- * Best-effort map from a free-text product to an HS chapter we hold data for.
- *
- * `LIKE '%text%'` cannot use an index, so this is a scan and its cost is set
- * by how many rows it has to look at. Restricting to chapter-level world-total
- * rows takes that from every fact in the table to roughly one row per chapter
- * per country per year, which is what keeps the weekly fan-out from stalling
- * now that specific HS6 lines and per-partner rows share the table.
- */
-async function hsForProduct(env: Env, text: string): Promise<string | null> {
-  const row = await env.DB.prepare(
-    `SELECT hs_code FROM trade_facts
-      WHERE length(hs_code) = 2 AND partner_iso3 IS NULL AND stream = 'goods'
-        AND lower(product_name) LIKE ?
-      GROUP BY hs_code ORDER BY SUM(value_usd) DESC LIMIT 1`,
-  )
-    .bind(`%${text.trim().toLowerCase()}%`)
-    .first<{ hs_code: string }>();
-  return row?.hs_code ?? null;
+/** Best-effort map from a free-text product to the HS chapter holding the most trade in it, asked of Oracle. */
+async function hsForProduct(env: Env, cfg: OracleConfig, text: string): Promise<string | null> {
+  const words = text.trim().toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 1);
+  if (words.length === 0) return null;
+  const found = await oracleCatalogue(env, cfg, { tokens: words, codes: [], limit: 1 }).catch(() => null);
+  return found?.[0]?.hs_code.slice(0, 2) ?? null;
 }
 
-async function countryMove(env: Env, slugOrIso: string) {
+async function countryMove(env: Env, cfg: OracleConfig | null, slugOrIso: string) {
+  if (!cfg) return null;
   const entity = await env.DB.prepare(
-    `SELECT id, slug, name FROM entities
+    `SELECT id, slug, name, iso3 FROM entities
       WHERE (slug = ? OR lower(iso3) = lower(?)) AND is_active = 1`,
   )
     .bind(slugOrIso.toLowerCase(), slugOrIso)
-    .first<{ id: string; slug: string; name: string }>();
-  if (!entity) return null;
+    .first<{ id: string; slug: string; name: string; iso3: string | null }>();
+  if (!entity?.iso3) return null;
 
-  const row = await env.DB.prepare(
-    "SELECT payload FROM analysis_results WHERE entity_id = ? AND kind = 'overview'",
-  )
-    .bind(entity.id)
-    .first<{ payload: string }>();
-  if (!row) return null;
-
-  let o: {
-    year: number;
-    export_usd: number;
-    import_usd: number;
-    balance_usd: number;
-    export_yoy_pct: number | null;
-  };
-  try {
-    o = JSON.parse(row.payload);
-  } catch {
-    return null;
-  }
+  const dash = await oracleDashboard(cfg, entity.iso3).catch(() => null);
+  const o = dash?.overview;
+  if (!o) return null;
 
   const bn = (v: number) => `$${(v / 1e9).toFixed(1)}bn`;
   const dir = o.balance_usd >= 0 ? 'surplus' : 'deficit';
@@ -300,6 +262,58 @@ async function countryMove(env: Env, slugOrIso: string) {
   };
 }
 
+interface ActiveEntity { id: string; slug: string; name: string; iso3: string | null }
+async function activeEntities(env: Env): Promise<ActiveEntity[]> {
+  const { results } = await env.DB.prepare(`SELECT id, slug, name, iso3 FROM entities WHERE kind = 'country' AND is_active = 1`).all<ActiveEntity>();
+  return results ?? [];
+}
+
+/** The scored lines that could matter to one subscription, found inside Oracle and shaped as signals. */
+async function signalsFor(
+  env: Env,
+  cfg: OracleConfig | null,
+  sub: Subscription,
+  entities: ActiveEntity[],
+  cache: Map<string, SignalRow[]>,
+): Promise<SignalRow[]> {
+  if (!cfg) return [];
+  const value = sub.value.trim().toLowerCase();
+  const p = { tokens: [] as string[], codes: [] as string[], prefix: '', flow: '', iso3s: [] as string[], limit: 200 };
+  if (sub.kind === 'hs_code') p.prefix = value.replace(/\D/g, '').slice(0, 6);
+  else if (sub.kind === 'product') p.tokens = value.split(/[^a-z0-9]+/).filter((w) => w.length > 1).slice(0, 8);
+  else if (sub.kind === 'country') {
+    const e = entities.find((x) => x.slug === value || x.name.toLowerCase() === value || x.iso3?.toLowerCase() === value);
+    if (!e?.iso3) return [];
+    p.iso3s = [e.iso3];
+  } else p.limit = 800; // a sector spans chapters, so take the best-scoring lines and filter by sector below
+  const key = JSON.stringify(p);
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const found = await searchProducts(env, cfg, { ...p, iso3s: p.iso3s.length ? p.iso3s : entities.map((e) => e.iso3).filter((x): x is string => !!x) });
+  const byIso = new Map(entities.map((e) => [e.iso3, e]));
+  const rows: SignalRow[] = (found?.products ?? [])
+    .filter((i) => byIso.has(i.reporter) && i.cagr_3y != null && i.cagr_3y > 0)
+    .map((i) => {
+      const e = byIso.get(i.reporter)!;
+      return {
+        id: `${i.reporter}-${i.flow}-${i.code}`,
+        entity_id: e.id,
+        entity_slug: e.slug,
+        entity_name: e.name,
+        hs_code: i.code,
+        product_name: itemName(i),
+        flow: i.flow === 'X' ? 'export' : 'import',
+        cagr_3y: i.cagr_3y,
+        momentum: i.score / 100,
+        current_rank: null,
+        projected_rank: null,
+        horizon_years: 0,
+        rationale: feedRationale(i),
+      } satisfies SignalRow;
+    });
+  cache.set(key, rows);
+  return rows;
+}
 interface FeedDraft {
   user_id: string;
   kind: string;

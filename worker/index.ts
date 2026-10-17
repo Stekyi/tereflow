@@ -20,6 +20,7 @@ import { portal } from './routes/portal';
 import { ghana } from './routes/ghana';
 import { serveSnapshot } from './lib/snapshot';
 import { oracleConfig } from './lib/oracle';
+import { withAppDb } from './lib/oracle-db';
 import {
   closeOracleBreaker, pingOracle, readHealth, recordHealth,
 } from './lib/oracle-health';
@@ -126,6 +127,8 @@ app.onError((err, c) => {
     return c.json({ error: 'Expected a JSON body.' }, 400);
   }
   console.error('Unhandled error', c.req.method, c.req.path, message);
+  // Development only: say what failed, so a broken query is found in one step.
+  if (c.env.ALLOW_DEV_TIER_SWITCH === 'true') return c.json({ error: 'Internal Server Error', detail: message.slice(0, 400) }, 500);
   return c.json({ error: 'Internal Server Error' }, 500);
 });
 
@@ -150,7 +153,7 @@ app.get('/assets/*', async (c) => {
 app.get('*', (c) => c.env.ASSETS.fetch(c.req.raw));
 
 export default {
-  fetch: app.fetch,
+  fetch: (req, env, ctx) => app.fetch(req, withAppDb(env), ctx),
   /**
    * Keep-alive only. Every few minutes it makes one light ORDS read, so Autonomous Database does not stop from idleness and
    * the first real request is not the one that wakes it, and records whether Oracle answered (read by /api/health).

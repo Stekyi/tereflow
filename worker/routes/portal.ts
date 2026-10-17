@@ -3,6 +3,8 @@ import type { Env } from '../lib/db';
 import { json, uid } from '../lib/db';
 import { requireAdmin } from '../lib/auth';
 import { PLANS } from './premium';
+import { oracleConfig, oracleJson } from '../lib/oracle';
+import { oracleSearch } from '../lib/oracle-feeds';
 import { linkHealth, type SourceFmt } from '../../shared/types';
 
 /**
@@ -47,14 +49,13 @@ async function all<T>(db: D1Database, sql: string, ...binds: unknown[]): Promise
 portal.get('/overview', async (c) => {
   const db = c.env.DB;
 
+  // Application counts come from the application tables in one statement.
   const counts = await row<{
     countries: number;
     countries_active: number;
     orgs: number;
     regional: number;
     sources: number;
-    facts: number;
-    signals: number;
     users: number;
     premium_users: number;
     cards: number;
@@ -68,16 +69,9 @@ portal.get('/overview', async (c) => {
     `SELECT
        (SELECT COUNT(*) FROM entities WHERE kind='country')                    AS countries,
        (SELECT COUNT(*) FROM entities WHERE kind='country' AND is_active=1)    AS countries_active,
-       -- Countries actually holding trade rows. Activation is intent, not
-       -- coverage, and the admin portal should be the last place that confuses
-       -- the two.
-       (SELECT COUNT(DISTINCT f.entity_id) FROM trade_facts f
-          JOIN entities e ON e.id = f.entity_id AND e.kind='country')          AS countries_with_data,
        (SELECT COUNT(*) FROM entities WHERE kind='intl_org')                   AS orgs,
        (SELECT COUNT(*) FROM entities WHERE kind='regional_body')              AS regional,
        (SELECT COUNT(*) FROM entity_sources)                                   AS sources,
-       (SELECT COUNT(*) FROM trade_facts)                                      AS facts,
-       (SELECT COUNT(*) FROM opportunity_signals)                              AS signals,
        (SELECT COUNT(*) FROM users)                                            AS users,
        (SELECT COUNT(*) FROM users WHERE tier <> 'free')                       AS premium_users,
        (SELECT COUNT(*) FROM business_cards)                                   AS cards,
@@ -88,17 +82,22 @@ portal.get('/overview', async (c) => {
        (SELECT COUNT(*) FROM feedback WHERE status='new')                      AS feedback_new`,
   );
 
-  const lastRun = await row<{
-    id: string;
-    trigger: string;
-    status: string;
-    started_at: string;
-    finished_at: string | null;
-    entities_ok: number;
-    entities_failed: number;
-    entities_skipped: number;
-    facts_written: number;
-  }>(db, `SELECT * FROM analysis_runs ORDER BY started_at DESC LIMIT 1`);
+  // Trade figures come from Oracle's own tables through ORDS, not from the old D1 copies.
+  const oracle = oracleConfig(c.env);
+  let facts = 0;
+  let countriesWithData = 0;
+  let signals = 0;
+  let lastRun: Record<string, unknown> | null = null;
+  if (oracle) {
+    const stats = await oracleJson<{ countries_with_data: number; facts: number; last_run: string | null }>(oracle, { route: 'stats' }).catch(() => null);
+    facts = stats?.facts ?? 0;
+    countriesWithData = stats?.countries_with_data ?? 0;
+    const lines = await oracleSearch(oracle, { tokens: [], codes: [], prefix: '', flow: '', iso3s: [], limit: 1 }).catch(() => null);
+    signals = lines?.total ?? 0;
+    lastRun = stats?.last_run
+      ? { id: 'oracle', trigger: 'ingest', status: 'ok', started_at: stats.last_run, finished_at: stats.last_run, entities_ok: countriesWithData, entities_failed: 0, entities_skipped: 0, facts_written: facts }
+      : null;
+  }
 
   // Countries that are switched on but have never produced figures. This is
   // the single most common reason the app looks empty, so it is surfaced
@@ -137,7 +136,7 @@ portal.get('/overview', async (c) => {
   for (const s of sourceRows) linkHealthCounts[linkHealth(s.last_status, s.fmt)]++;
 
   return json({
-    counts: counts ?? {},
+    counts: { ...(counts ?? {}), countries_with_data: countriesWithData, facts, signals },
     last_run: lastRun,
     attention: {
       active_never_run: activeNeverRun?.n ?? 0,
@@ -150,29 +149,33 @@ portal.get('/overview', async (c) => {
   });
 });
 
-/** Pipeline: run history and per-country ingest state. */
+/** Pipeline: ingest history and per-country state, from Oracle. */
 portal.get('/pipeline', async (c) => {
   const db = c.env.DB;
+  const oracle = oracleConfig(c.env);
 
-  const runs = await all(
-    db,
-    `SELECT id, trigger, status, started_at, finished_at,
-            entities_total, entities_ok, entities_failed, entities_skipped, facts_written
-       FROM analysis_runs ORDER BY started_at DESC LIMIT 25`,
-  );
+  const stats = oracle
+    ? await oracleJson<{ countries_with_data: number; facts: number; last_run: string | null }>(oracle, { route: 'stats' }).catch(() => null)
+    : null;
+  const runs = stats?.last_run
+    ? [{ id: 'oracle', trigger: 'ingest', status: 'ok', started_at: stats.last_run, finished_at: stats.last_run, entities_total: stats.countries_with_data, entities_ok: stats.countries_with_data, entities_failed: 0, entities_skipped: 0, facts_written: stats.facts }]
+    : [];
 
-  const countries = await all(
+  const countries = await all<Record<string, unknown> & { iso3: string | null }>(
     db,
     `SELECT e.slug, e.name, e.iso3, e.continent, e.is_active, e.coverage_score,
-            e.last_ingest_at, e.last_checked_at, e.last_error,
-            (SELECT COUNT(*) FROM opportunity_signals s WHERE s.entity_id = e.id) AS signals,
-            (SELECT COUNT(*) FROM trade_facts f WHERE f.entity_id = e.id)         AS facts
+            e.last_ingest_at, e.last_checked_at, e.last_error
        FROM entities e
       WHERE e.kind = 'country'
       ORDER BY e.is_active DESC, e.last_ingest_at IS NULL DESC, e.name`,
   );
+  const coverage = oracle
+    ? await oracleJson<Array<{ iso3: string; lines: number; facts: number }>>(oracle, { route: 'coverage' }).catch(() => null)
+    : null;
+  const byIso = new Map((coverage ?? []).map((x) => [x.iso3, x]));
+  const merged = countries.map((r) => ({ ...r, signals: byIso.get(r.iso3 ?? '')?.lines ?? 0, facts: byIso.get(r.iso3 ?? '')?.facts ?? 0 }));
 
-  return json({ runs, countries });
+  return json({ runs, countries: merged });
 });
 
 /** Accounts. No password material is selected, ever. */

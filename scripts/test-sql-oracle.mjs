@@ -1,4 +1,4 @@
-﻿/** The SQLite -> Oracle translator the application data gateway uses.   npm run test:sql-oracle */
+/** The SQLite -> Oracle translator the application data gateway uses.   npm run test:sql-oracle */
 import { build } from 'esbuild';
 import { rmSync } from 'node:fs';
 import assert from 'node:assert/strict';
@@ -21,7 +21,7 @@ r = toOracle("UPDATE listings SET current_bid = ?1, current_bidder_id = ?2, upda
 assert.match(r.sql, /UPDATE app_listings SET current_bid = :b1, current_bidder_id = :b2, updated_at = TO_CHAR\(SYSTIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'\) WHERE id = :b3 AND mode_ = 'auction'/); passed += 1;
 assert.deepEqual(r.binds, [5, 'u', 'l']); passed += 1;
 r = toOracle('UPDATE x SET a = ?6, b = ?1, c = ?6 WHERE id = ?2', [1, 2, 3, 4, 5, 6], new Set(['x']));
-eq('numbered, repeated', r.sql, 'UPDATE app_x SET a = :b6, b = :b1, c = :b6 WHERE id = :b2'); assert.equal(r.binds.length, 6); passed += 1;
+eq('numbered, repeated', r.sql, 'UPDATE app_x SET a = :b3, b = :b1, c = :b3 WHERE id = :b2'); assert.deepEqual(r.binds, [1, 2, 6]); passed += 1;
 // a question mark inside a string is not a bind
 r = toOracle("SELECT id FROM users WHERE full_name = 'who?' AND id = ?", ['u1'], T);
 eq('? in string', r.sql, "SELECT id FROM app_users WHERE full_name = 'who?' AND id = :b1");
@@ -74,5 +74,26 @@ assert.match(r.sql, /^INSERT INTO app_analysis_runs \(id, trigger_, status, star
 r = toOracle('UPDATE notifications SET read_at = NULL WHERE user_id = ? AND id IN (?,?,?)', ['u', 1, 2, 3], T);
 eq('in list', r.sql, 'UPDATE app_notifications SET read_at = NULL WHERE user_id = :b1 AND id IN (:b2,:b3,:b4)');
 assert.equal(RENAMED_BACK.mode_, 'mode'); passed += 1;
+
+// empty-string sentinel, derived tables, test prefix
+r = toOracle("SELECT id FROM saved_opportunities WHERE partner_iso3 = '' AND hs_code <> ''", [], T);
+eq('empty literal', r.sql, 'SELECT id FROM app_saved_opportunities WHERE partner_iso3 = CHR(1) AND hs_code <> CHR(1)');
+r = toOracle("SELECT x.n FROM (SELECT COUNT(*) AS n FROM messages) AS x JOIN users AS u ON u.id = ?", ['a'], T);
+eq('derived alias', r.sql, 'SELECT x.n FROM (SELECT COUNT(*) AS n FROM app_messages) x JOIN app_users u ON u.id = :b1');
+r = toOracle('SELECT CAST(id AS TEXT) AS s, CAST((a + b) AS REAL) AS t FROM users', [], T);
+eq('cast keeps AS', r.sql, 'SELECT CAST(id AS VARCHAR2(4000)) s, CAST((a + b) AS NUMBER) AS t FROM app_users');
+r = toOracle('SELECT id FROM users WHERE id = ?', ['a'], T, 'app_t_');
+eq('test prefix', r.sql, 'SELECT id FROM app_t_users WHERE id = :b1');
+r = toOracle('INSERT INTO subscriptions (id, user_id) VALUES (?, ?) ON CONFLICT (id) DO NOTHING', ['a', 'b'], T, 'app_t_');
+assert.match(r.sql, /^MERGE INTO app_t_subscriptions t USING/); passed += 1;
+r = toOracle('SELECT body, comment FROM ratings', [], T);
+eq('comment renamed', r.sql, 'SELECT body, comment_ FROM app_ratings');
+
+r = toOracle('SELECT c.id, (SELECT body FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message FROM conversations c LIMIT 60', [], T);
+eq('limit in subquery', r.sql, 'SELECT c.id, (SELECT body FROM app_messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC FETCH FIRST 1 ROWS ONLY) AS last_message FROM app_conversations c FETCH FIRST 60 ROWS ONLY');
+
+r = toOracle('SELECT id FROM users WHERE a = ? AND b LIKE ? AND (?4 IS NOT NULL AND c LIKE ?4)', ['x', 'y', 'unused', 'z'], T);
+eq('unused bind renumbered', r.sql, 'SELECT id FROM app_users WHERE a = :b1 AND b LIKE :b2 AND (:b3 IS NOT NULL AND c LIKE :b3)');
+assert.deepEqual(r.binds, ['x', 'y', 'z']); passed += 1;
 
 console.log(`sql-oracle: ${passed} checks passed`);

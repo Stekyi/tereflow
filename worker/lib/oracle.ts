@@ -42,6 +42,7 @@ export type OracleRoute =
   | { route: 'stats' }
   | { route: 'search'; tokens: string; codes: string; prefix: string; flow: string; iso3s: string; limit: number }
   | { route: 'code'; prefix: string }
+  | { route: 'coverage' }
   | { route: 'catalogue'; tokens: string; codes: string; limit: number }
   | { route: 'sandbox'; primary: string; partners: string[]; exclude?: string[] };
 
@@ -93,6 +94,7 @@ function target(cfg: OracleConfig, r: OracleRoute): { url: string; init: Request
         return { url: `${cfg.base}/tf/search?${qs}`, init: {} };
       }
       case 'code': return { url: `${cfg.base}/tf/code/${enc(r.prefix)}`, init: {} };
+      case 'coverage': return { url: `${cfg.base}/tf/coverage`, init: {} };
       case 'catalogue': {
         const qs = new URLSearchParams({ tokens: r.tokens, codes: r.codes, lim: String(r.limit) });
         return { url: `${cfg.base}/tf/catalogue?${qs}`, init: {} };
@@ -114,6 +116,7 @@ function target(cfg: OracleConfig, r: OracleRoute): { url: string; init: Request
     case 'stats': return { url: `${cfg.base}/api/stats`, init: {} };
     case 'search': return { url: `${cfg.base}/api/search`, init: {} };
     case 'code': return { url: `${cfg.base}/api/code/${enc(r.prefix)}`, init: {} };
+    case 'coverage': return { url: `${cfg.base}/api/coverage`, init: {} };
     case 'catalogue': return { url: `${cfg.base}/api/catalogue`, init: {} };
     case 'sandbox':
       return {

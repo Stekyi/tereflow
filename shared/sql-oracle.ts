@@ -28,6 +28,7 @@ export const RENAMED_COLUMNS: Readonly<Record<string, string>> = {
   raw: 'raw_',
   mode: 'mode_',
   share: 'share_',
+  comment: 'comment_',
 };
 export const RENAMED_BACK: Readonly<Record<string, string>> = Object.fromEntries(
   Object.entries(RENAMED_COLUMNS).map(([k, v]) => [v, k]),
@@ -48,7 +49,8 @@ function outsideStrings(sql: string, fn: (code: string) => string): string {
         else if (sql[j] === "'") break;
         else j += 1;
       }
-      out += sql.slice(i, j + 1);
+      const lit = sql.slice(i, j + 1);
+      out += lit === "''" ? 'CHR(1)' : lit;
       i = j + 1;
     } else {
       let j = i;
@@ -121,7 +123,7 @@ function upsertToMerge(sql: string, tables: ReadonlySet<string>): string {
   return `MERGE INTO ${table} t USING (SELECT ${src} FROM dual) s ON (${on})${update} WHEN NOT MATCHED THEN ${insert}`;
 }
 
-export function toOracle(sqlIn: string, bindsIn: readonly unknown[], tables: ReadonlySet<string>): Translated {
+export function toOracle(sqlIn: string, bindsIn: readonly unknown[], tables: ReadonlySet<string>, prefix = 'app_'): Translated {
   let sql = sqlIn.trim().replace(/;\s*$/, '');
   let ignoreDup = false;
   if (/^INSERT\s+OR\s+IGNORE\s+INTO\b/i.test(sql)) {
@@ -132,6 +134,8 @@ export function toOracle(sqlIn: string, bindsIn: readonly unknown[], tables: Rea
 
   sql = dateFunctions(sql);
   sql = sql.replace(/\bIFNULL\s*\(/gi, 'NVL(').replace(/\bjson_extract\s*\(/gi, 'JSON_VALUE(');
+  // SQLite type names inside CAST.
+  sql = sql.replace(/\bAS\s+TEXT\s*\)/gi, 'AS VARCHAR2(4000))').replace(/\bAS\s+(INTEGER|INT)\s*\)/gi, 'AS NUMBER(19))').replace(/\bAS\s+REAL\s*\)/gi, 'AS NUMBER)');
 
   // Binds: `?` takes the next value, `?N` takes the N-th. All become :bN against the original value list.
   let next = 0;
@@ -143,7 +147,6 @@ export function toOracle(sqlIn: string, bindsIn: readonly unknown[], tables: Rea
     bindsUsed.push(idx);
     return `:b${idx}`;
   }));
-  const binds = bindsIn.slice(0, Math.max(maxN, 0)).map((v) => (v === undefined ? null : v));
   if (bindsIn.length < maxN) throw new Error(`statement needs ${maxN} binds, got ${bindsIn.length}`);
 
   sql = upsertToMerge(sql, tables);
@@ -152,15 +155,20 @@ export function toOracle(sqlIn: string, bindsIn: readonly unknown[], tables: Rea
   const tableRef = new RegExp(`\\b(FROM|JOIN|INTO|UPDATE)(\\s+)(${names})\\b`, 'gi');
   const renamed = new RegExp(`\\b(${Object.keys(RENAMED_COLUMNS).join('|')})\\b`, 'gi');
   sql = outsideStrings(sql, (code) => {
-    let c = code.replace(tableRef, (_m, kw: string, sp: string, t: string) => `${kw}${sp}app_${t.toLowerCase()}`);
-    c = c.replace(/\b(FROM|JOIN)(\s+app_\w+)\s+AS\s+(\w+)/gi, '$1$2 $3');
+    let c = code.replace(tableRef, (_m, kw: string, sp: string, t: string) => `${kw}${sp}${prefix}${t.toLowerCase()}`);
+    c = c.replace(new RegExp(`\\b(FROM|JOIN)(\\s+${prefix}\\w+)\\s+AS\\s+(\\w+)`, 'gi'), '$1$2 $3');
+    // Oracle does not allow AS before a derived-table alias either: `) AS x JOIN ...`. A CAST type is left alone.
+    c = c.replace(/\)\s+AS\s+(?!(?:INTEGER|INT|TEXT|REAL|NUMERIC|NUMBER|CHAR|VARCHAR2?|DATE|FLOAT)\b)(\w+)(?=\s*(?:\)|,|$|\bJOIN\b|\bLEFT\b|\bINNER\b|\bON\b|\bWHERE\b|\bGROUP\b|\bORDER\b|\bFETCH\b|\bUNION\b))/gi, ') $1');
     c = c.replace(renamed, (w: string) => RENAMED_COLUMNS[w.toLowerCase()]);
-    c = c.replace(/\bLIMIT\s+(:b\d+|\d+)(?:\s+OFFSET\s+(:b\d+|\d+))?\s*$/i, (_m, n: string, off?: string) =>
+    c = c.replace(/\bLIMIT\s+(:b\d+|\d+)(?:\s+OFFSET\s+(:b\d+|\d+))?(?=\s*(?:\)|$))/gi, (_m, n: string, off?: string) =>
       `${off ? ` OFFSET ${off} ROWS` : ''} FETCH FIRST ${n} ROWS ONLY`);
     return c;
   });
-  // MERGE targets were written before the prefix pass; prefix them now.
-  sql = sql.replace(new RegExp(`\\bMERGE INTO (${names})\\b`, 'i'), (_m, t: string) => `MERGE INTO app_${t.toLowerCase()}`);
-  void bindsUsed;
+  // Only the binds the statement really uses are sent, renumbered from 1 (SQLite allows ? and ?4 in one statement,
+  // which leaves value 3 unused; Oracle refuses a bind that is not in the statement).
+  const used = [...new Set(bindsUsed)].sort((a, b) => a - b);
+  const renumber = new Map(used.map((old, i) => [old, i + 1]));
+  sql = outsideStrings(sql, (code) => code.replace(/:b(\d+)/g, (_m, n: string) => `:b${renumber.get(Number(n))}`));
+  const binds = used.map((old) => (bindsIn[old - 1] === undefined ? null : bindsIn[old - 1]));
   return { sql, binds, ignoreDup };
 }

@@ -67,6 +67,7 @@ const NAV: { to: string; label: string; d: string; stroke?: boolean; badge?: 'fe
   { to: '/countries', label: 'Countries', d: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 0v20M2 12h20M12 2c3 3 3 17 0 20M12 2C9 5 9 19 12 22', stroke: true },
   { to: '/news', label: 'Trade news', d: 'M5 4h12a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2zM9 8h6M9 12h6M9 16h3', stroke: true },
   { to: '/sandbox', label: 'Sandbox', d: 'M4 4h16v16H4zM8 8h8M8 12h8M8 16h5', stroke: true },
+  { to: '/guide', label: 'Guide', d: 'M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3zM9.5 20h5M10 17v3', stroke: true },
   { to: '/opportunities', label: 'Opportunities', d: 'M4 19 10 13l4 3 6-8', stroke: true },
   { to: '/network', label: 'Network', d: 'M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 13a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm0 1.5c-3 0-6 1.5-6 3.5v2h12v-2c0-2-3-3.5-6-3.5zm8-1c-.9 0-1.8.14-2.6.4 1.6.9 2.6 2.2 2.6 3.6v2h6v-2c0-2-3-4-6-4z' },
   { to: '/market', label: 'Market', d: 'M3 9l2-5h14l2 5M4 9v11h16V9M9 20v-6h6v6', stroke: true },

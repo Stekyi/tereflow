@@ -173,6 +173,9 @@ export default function Home() {
             <Link className="mm-cta ghost" to="/sandbox">
               Open Trade Sandbox
             </Link>
+            <Link className="mm-cta ghost" to="/guide">
+              Problem to supply guide
+            </Link>
           </div>
           <p className="mm-sources">Built on UN Comtrade, HMRC and national statistics offices</p>
         </div>

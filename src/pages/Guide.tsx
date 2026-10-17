@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
-import type { CountrySummary, ProductCard } from '../lib/api';
+import type { ProductCard } from '../../shared/types';
 import type { GuideResult } from '../../shared/guide';
+
+type CountrySummary = Awaited<ReturnType<typeof api.countries>>['countries'][number];
 
 type Answer =
   | { locked: true; title: string; teaser: string }

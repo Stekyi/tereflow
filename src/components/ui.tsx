@@ -31,7 +31,7 @@ export function Skeletons({ n = 4 }: { n?: number }) {
   );
 }
 
-export function Empty({ title, hint }: { title: string; hint?: string }) {
+export function Empty({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
   return (
     <div className="empty">
       <div style={{ fontSize: 34, marginBottom: 10, opacity: 0.4 }}>◍</div>
@@ -41,6 +41,7 @@ export function Empty({ title, hint }: { title: string; hint?: string }) {
           {hint}
         </div>
       )}
+      {action && <div style={{ marginTop: 12 }}>{action}</div>}
     </div>
   );
 }

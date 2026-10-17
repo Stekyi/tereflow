@@ -978,10 +978,10 @@ pub.get('/products', async (c) => {
 
   // Fold tariff lines of one product (same HS4, country and flow) into a single family card. An exact code search is
   // left as typed, so somebody asking for one line gets that line.
-  const listed = /^\d{6}$/.test(q) ? matched : foldFamilies(matched);
+  const folded = /^\d{6}$/.test(q) ? { list: matched.slice(0, limit), total: matched.length } : foldFamilies(matched, limit);
 
   const summary = {
-    total: listed.length,
+    total: folded.total,
     exports: matched.filter((p) => p.flow === 'export').length,
     imports: matched.filter((p) => p.flow === 'import').length,
     strong: matched.filter((p) => p.has_signal && p.score >= settings.scoreBandStrong).length,
@@ -992,47 +992,51 @@ pub.get('/products', async (c) => {
     priced: matched.filter((p) => p.unit_value_usd_t != null).length,
   };
 
-  return json({ products: listed.slice(0, limit), count: listed.length, summary, note: expanded.note });
+  return json({ products: folded.list, count: folded.total, summary, note: expanded.note });
 });
 
-/** Keeps the order of `cards`; a family sits where its best-ranked line was. */
-function foldFamilies(cards: ProductCard[]): ProductCard[] {
+/**
+ * Keeps the order of `cards`; a family sits where its best-ranked line was. Only the entries that will be shown are
+ * built and named: naming every family in a large result is wasted work on a request that only returns one page.
+ */
+function foldFamilies(cards: ProductCard[], limit: number): { list: ProductCard[]; total: number } {
   const groups = new Map<string, ProductCard[]>();
+  const entries: { key: string; first: ProductCard }[] = [];
   for (const p of cards) {
-    if (!/^\d{6}$/.test(p.hs_code)) continue;
-    const key = `${p.slug}|${p.flow}|${p.hs_code.slice(0, 4)}`;
-    groups.set(key, [...(groups.get(key) ?? []), p]);
-  }
-  const named = nameFamilies(new Map(
-    [...groups].filter(([, g]) => g.length > 1).map(([k, g]) => [k, g.map((p) => ({ code: p.hs_code, description: p.name_full || p.name, value: p.value_usd }))]),
-  ));
-  const done = new Set<string>();
-  const out: ProductCard[] = [];
-  for (const p of cards) {
-    const key = `${p.slug}|${p.flow}|${p.hs_code.slice(0, 4)}`;
+    const key = /^\d{6}$/.test(p.hs_code) ? `${p.slug}|${p.flow}|${p.hs_code.slice(0, 4)}` : `${p.slug}|${p.flow}|${p.hs_code}`;
     const g = groups.get(key);
-    if (!g || g.length < 2) { out.push(p); continue; }
-    if (done.has(key)) continue;
-    done.add(key);
+    if (g) g.push(p);
+    else {
+      groups.set(key, [p]);
+      entries.push({ key, first: p });
+    }
+  }
+  const page = entries.slice(0, limit);
+  const named = nameFamilies(new Map(
+    page.filter((e) => groups.get(e.key)!.length > 1).map((e) => [e.key, groups.get(e.key)!.map((p) => ({ code: p.hs_code, description: p.name_full || p.name, value: p.value_usd }))]),
+  ));
+  const list = page.map(({ key, first }): ProductCard => {
+    const g = groups.get(key)!;
+    if (g.length < 2) return first;
     const fam = named.get(key)!;
     const byCode = new Map(g.map((m) => [m.hs_code, m]));
     const top = g.reduce((a, b) => (b.score > a.score ? b : a), g[0]);
-    out.push({
+    return {
       ...top,
       name: fam.name,
       name_full: fam.name,
       value_usd: g.reduce((s, m) => s + m.value_usd, 0),
       family: {
-        hs4: p.hs_code.slice(0, 4),
+        hs4: first.hs_code.slice(0, 4),
         line_count: g.length,
         members: fam.lines.map((l) => {
           const m = byCode.get(l.code)!;
           return { hs_code: l.code, name: l.name, value_usd: m.value_usd, growth_pct: m.growth_pct, score: m.score };
         }),
       },
-    });
-  }
-  return out;
+    };
+  });
+  return { list, total: entries.length };
 }
 
 interface SignalRow {

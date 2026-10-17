@@ -90,8 +90,12 @@ export default function Home() {
   };
 
   // Debounced so a search doesn't fire a request on every keystroke.
+  const [failed, setFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
     setLoading(true);
+    // A slower, older request must never overwrite the answer to the latest search.
+    let live = true;
     const handle = setTimeout(() => {
       api
         .products({
@@ -102,19 +106,23 @@ export default function Home() {
           limit: 40,
         })
         .then((r) => {
+          if (!live) return;
+          setFailed(false);
           setProducts(r.products);
           setSummary(r.summary);
           setSearchNote(r.note ?? null);
         })
         .catch(() => {
+          if (!live) return;
+          setFailed(true);
           setProducts([]);
           setSummary(null);
           setSearchNote(null);
         })
-        .finally(() => setLoading(false));
+        .finally(() => { if (live) setLoading(false); });
     }, 200);
-    return () => clearTimeout(handle);
-  }, [q, flow, continent, budget]);
+    return () => { live = false; clearTimeout(handle); };
+  }, [q, flow, continent, budget, retry]);
 
   const flowOptions = useMemo(
     () => [
@@ -222,6 +230,12 @@ export default function Home() {
 
       {loading ? (
         <Skeletons n={5} />
+      ) : failed ? (
+        <Empty
+          title="The search could not run"
+          hint="That is a fault on our side, not a sign nothing matches. Tap to try again."
+          action={<button type="button" className="mm-cta small" onClick={() => setRetry((n) => n + 1)}>Try again</button>}
+        />
       ) : products.length === 0 ? (
         <Empty
           title="Nothing matches yet"

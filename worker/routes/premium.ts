@@ -251,15 +251,34 @@ function firstSection(md: string): string {
 
 // --- billing ----------------------------------------------------------------
 
+/** Periods and labels are fixed; the prices are owner settings (PRICE_MONTHLY_USD, PRICE_ANNUAL_USD) and these are only the fallback. */
 export const PLANS = {
   monthly: { label: 'Premium monthly', amount_minor: 1200, currency: 'USD', days: 30 },
   annual: { label: 'Premium annual', amount_minor: 11000, currency: 'USD', days: 365 },
 } as const;
 type PlanId = keyof typeof PLANS;
+type PlanView = { label: string; amount_minor: number; currency: string; days: number };
+const PRICE_CODE: Record<PlanId, string> = { monthly: 'PRICE_MONTHLY_USD', annual: 'PRICE_ANNUAL_USD' };
+
+/** Plans with prices read from the owner's settings. A missing, zero or unreadable price falls back to the shipped one. */
+export async function loadPlans(env: Env): Promise<Record<PlanId, PlanView>> {
+  const out: Record<PlanId, PlanView> = { monthly: { ...PLANS.monthly }, annual: { ...PLANS.annual } };
+  try {
+    const { results } = await env.DB.prepare("SELECT code, value FROM code_setup WHERE code IN ('PRICE_MONTHLY_USD', 'PRICE_ANNUAL_USD')").all<{ code: string; value: string }>();
+    for (const r of results ?? []) {
+      const id = (Object.keys(PRICE_CODE) as PlanId[]).find((k) => PRICE_CODE[k] === r.code);
+      const dollars = Number(r.value);
+      if (id && Number.isFinite(dollars) && dollars > 0 && dollars <= 100000) out[id].amount_minor = Math.round(dollars * 100);
+    }
+  } catch {
+    // No table or no rows: the shipped prices stand.
+  }
+  return out;
+}
 
 premium.get('/billing/plans', async (c) =>
   json({
-    plans: Object.entries(PLANS).map(([id, p]) => ({ id, ...p })),
+    plans: Object.entries(await loadPlans(c.env)).map(([id, p]) => ({ id, ...p })),
     provider: c.env.STRIPE_SECRET_KEY ? 'stripe' : (await wiseDetails(c.env)) ? 'wise' : 'stub',
   }),
 );
@@ -330,7 +349,7 @@ premium.post('/billing/checkout', async (c) => {
 
   const body = (await c.req.json().catch(() => null)) as { plan?: PlanId } | null;
   const planId = (body?.plan ?? 'monthly') as PlanId;
-  const plan = PLANS[planId];
+  const plan = (await loadPlans(c.env))[planId];
   if (!plan) return bad('Unknown plan');
 
   const origin = new URL(c.req.url).origin;
@@ -383,6 +402,11 @@ premium.post('/billing/checkout', async (c) => {
   if (wise) {
     let p = await c.env.DB.prepare("SELECT id, plan, amount_minor, currency, reference, status, payer_note, created_at, period_end FROM manual_payments WHERE user_id = ? AND plan = ? AND status IN ('pending', 'claimed') ORDER BY created_at DESC LIMIT 1")
       .bind(user.id, planId).first<PaymentRow>();
+    if (p && p.status === 'pending' && p.amount_minor !== plan.amount_minor) {
+      // Not yet marked as sent, so it can follow a price change; a sent one keeps the price it was made at.
+      await c.env.DB.prepare('UPDATE manual_payments SET amount_minor = ? WHERE id = ?').bind(plan.amount_minor, p.id).run();
+      p = { ...p, amount_minor: plan.amount_minor };
+    }
     if (!p) {
       const open = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM manual_payments WHERE user_id = ? AND status IN ('pending', 'claimed')").bind(user.id).first<{ n: number }>();
       if ((open?.n ?? 0) >= 3) return bad('You already have open bank transfers waiting. Finish or wait for those first.', 409);

@@ -27,7 +27,7 @@ export default function Upgrade() {
 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [provider, setProvider] = useState('stub');
-  const [selected, setSelected] = useState('monthly');
+  const [amount, setAmount] = useState('20');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [wise, setWise] = useState<WisePayment | null>(null);
@@ -50,7 +50,7 @@ export default function Upgrade() {
     if (!user) return navigate('/join?next=/upgrade');
     setBusy(true);
     try {
-      const r = await api.premium.checkout(selected);
+      const r = await api.premium.checkout('donation', Number(amount));
       if (r.provider === 'wise') {
         setWise({ provider: 'wise', payment: r.payment ?? null, details: r.details ?? null });
         return;
@@ -103,12 +103,12 @@ export default function Upgrade() {
       {t.node}
 
       <div className="hero">
-        <span className="overline">{entitled ? 'Your membership' : 'Premium'}</span>
+        <span className="overline">{entitled ? 'Your membership' : 'Support Tereflow'}</span>
         <h2>{entitled ? 'You are on premium' : 'See the move before it is obvious'}</h2>
         <p>
           {entitled
             ? 'Early signals, the full playbook library and your weekly watchlist feed are unlocked.'
-            : 'The trade data is free and always will be. Premium is the forward-looking read on top of it.'}
+            : 'The trade data is free and always will be. Donate any amount to help the app grow and get six months of the forward-looking read on top of it.'}
         </p>
       </div>
 
@@ -130,11 +130,11 @@ export default function Upgrade() {
         <>
           {user?.tier_expires_at && (
             <p className="small dim" style={{ textAlign: 'center' }}>
-              Renews {new Date(user.tier_expires_at).toLocaleDateString()}
+              Premium runs until {new Date(user.tier_expires_at).toLocaleDateString()}. Donate again then to keep it going.
             </p>
           )}
           <button className="btn danger block" onClick={cancel} disabled={busy}>
-            {busy ? 'Working…' : 'Cancel premium'}
+            {busy ? 'Working…' : 'End premium now'}
           </button>
           <Link className="btn ghost block" to="/playbooks" style={{ marginTop: 8 }}>
             Open the playbook library
@@ -143,34 +143,27 @@ export default function Upgrade() {
       ) : (
         <>
           <div className="section-head">
-            <h2>Choose a plan</h2>
+            <h2>Make a donation</h2>
+          </div>
+          <p className="small dim" style={{ marginTop: 0 }}>
+            Give any amount you like to help Tereflow grow. In return you get six months of premium. When the six months end, a new donation
+            renews it.{plans[0] ? ` Most people start around ${fmtMoney(plans[0].amount_minor, plans[0].currency)}.` : ''}
+          </p>
+
+          <div className="chip-row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+            {[5, 10, 20, 50].map((n) => (
+              <button key={n} type="button" className={`btn ${Number(amount) === n ? 'primary' : 'ghost'}`} onClick={() => setAmount(String(n))}>
+                ${n}
+              </button>
+            ))}
+          </div>
+          <div className="field">
+            <label htmlFor="amount">Your amount in US dollars</label>
+            <input id="amount" type="number" inputMode="decimal" min={1} step="1" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Any amount, $1 or more" />
           </div>
 
-          {plans.map((p) => (
-            <button
-              key={p.id}
-              className={`admin-row ${selected === p.id ? 'selected-plan' : ''}`}
-              onClick={() => setSelected(p.id)}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                cursor: 'pointer',
-                borderColor: selected === p.id ? 'var(--brand)' : undefined,
-              }}
-            >
-              <span className={`dot ${selected === p.id ? 'ok' : 'unknown'}`} />
-              <span>
-                <span className="name">{p.label}</span>
-                <span className="tiny dim">
-                  {p.id === 'annual' ? 'Two months free versus monthly' : 'Cancel any time'}
-                </span>
-              </span>
-              <strong style={{ fontSize: 15 }}>{fmtMoney(p.amount_minor, p.currency)}</strong>
-            </button>
-          ))}
-
-          <button className="btn primary block" onClick={start} disabled={busy} style={{ marginTop: 12 }}>
-            {busy ? 'Working…' : user ? (provider === 'wise' ? 'Pay by bank transfer' : 'Continue') : 'Join free, then upgrade'}
+          <button className="btn primary block" onClick={start} disabled={busy || (!!user && (provider === 'stub' || !(Number(amount) >= 1)))} style={{ marginTop: 12 }}>
+            {busy ? 'Working…' : user ? (provider === 'wise' ? 'Donate by bank transfer' : 'Donate') : 'Join free, then donate'}
           </button>
 
           {provider === 'wise' && !wise?.payment && (
@@ -211,8 +204,7 @@ export default function Upgrade() {
 
           {provider === 'stub' && (
             <p className="tiny dim" style={{ marginTop: 10, textAlign: 'center' }}>
-              No payment provider is configured on this deployment, so continuing grants premium
-              directly. Set <code>STRIPE_SECRET_KEY</code> to take real payments.
+              Donations are not switched on yet. Please check back soon.
             </p>
           )}
         </>

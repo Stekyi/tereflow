@@ -1747,6 +1747,9 @@ pub.get('/market/hs-codes', async (c) => {
   // is how a query ends up depending on what somebody typed.
   const rows = new Map<string, { hs_code: string; product_name: string | null; total_value: number }>();
   const hsCfg = oracleConfig(c.env);
+  // Started now so it runs alongside the catalogue read instead of after it.
+  const globalClassP = loadClassifications(c.env.DB, '*');
+  globalClassP.catch(() => undefined);
   if (hsCfg) {
     try {
       // Matching codes are found inside Oracle, so the Worker never loads every country's feed for a typeahead keystroke.
@@ -1810,7 +1813,7 @@ pub.get('/market/hs-codes', async (c) => {
     .sort((a, b) => b.quality - a.quality || b.row.total_value - a.row.total_value)
     .map((x) => x.row);
 
-  const globalClassifications = await loadClassifications(c.env.DB, '*');
+  const globalClassifications = await globalClassP;
   const codes = matched
     .map((r) => ({
       code: r.hs_code,

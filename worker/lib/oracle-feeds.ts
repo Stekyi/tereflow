@@ -1,8 +1,9 @@
 import type { Env } from './db';
-import { oracleFetch, oracleJson, type OracleConfig } from './oracle';
+import { oracleJson, type OracleConfig } from './oracle';
 import { ISO3_NAME } from '../agent/country-names';
 import { partnerName } from '../../shared/markets';
 import { hs6Label } from '../agent/codes';
+import { cached } from './ttl-cache';
 import type { ExploreOpportunity, Overview, RankedItem } from '../../shared/types';
 
 /**
@@ -74,11 +75,14 @@ export async function feedEntities(
     clauses.push('slug = ?');
     binds.push(filter.slug);
   }
-  const { results } = await db
-    .prepare(`SELECT id, slug, name, iso3, continent FROM entities WHERE ${clauses.join(' AND ')} ORDER BY name`)
-    .bind(...binds)
-    .all<FeedEntity>();
-  return results ?? [];
+  const key = `entities:${filter.continent ?? ''}:${filter.slug ?? ''}`;
+  return [...(await cached(key, async () => {
+    const { results } = await db
+      .prepare(`SELECT id, slug, name, iso3, continent FROM entities WHERE ${clauses.join(' AND ')} ORDER BY name`)
+      .bind(...binds)
+      .all<FeedEntity>();
+    return results ?? [];
+  }))];
 }
 
 export const oracleProducts = (cfg: OracleConfig, iso3: string) =>
@@ -89,7 +93,7 @@ export async function oracleSearch(
   cfg: OracleConfig,
   p: { tokens: string[]; codes: string[]; prefix: string; flow: string; iso3s: string[]; limit: number },
 ): Promise<{ total: number; exports: number; imports: number; markets: number; products: Array<FeedItem & { reporter: string }> } | null> {
-  const res = await oracleFetch(cfg, {
+  const body = await oracleJson<{ total: number; exports: number; imports: number; markets: number; products: Array<FeedItem & { reporter: string }> | null }>(cfg, {
     route: 'search',
     tokens: p.tokens.join(','),
     codes: p.codes.join(','),
@@ -98,9 +102,7 @@ export async function oracleSearch(
     iso3s: p.iso3s.join(','),
     limit: p.limit,
   });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`oracle ${res.status}`);
-  const body = (await res.json()) as { total: number; exports: number; imports: number; markets: number; products: Array<FeedItem & { reporter: string }> | null };
+  if (!body) return null;
   return { total: body.total, exports: body.exports, imports: body.imports, markets: body.markets, products: body.products ?? [] };
 }
 

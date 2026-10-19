@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { ProductCard } from '../../shared/types';
 import type { GuideResult } from '../../shared/guide';
+import InfoTip from '../components/InfoTip';
 
 interface Target { hs: string; name: string; via?: string; note?: string }
 interface Mapped { id: string; kind: string; confidence: string; by_name: string; by_code: string | null; parent_name: string; parent_code: string | null; matched_on: string }
@@ -177,7 +178,7 @@ export default function Guide() {
 
       {a && step === 1 && (
         <section style={box}>
-          <h2>1. The chain for {a.inputs.product}</h2>
+          <h2>1. The chain for {a.inputs.product}<InfoTip k="guide-chain" /></h2>
           <LinkBar />
           {a.lens && <p style={{ ...box, background: 'rgba(120,120,120,.08)' }}>{a.lens.note}</p>}
           <p className="tiny dim">Stages are a standard product chain. Names appear only where trade data gives them; roles are marked as not held.</p>
@@ -192,7 +193,7 @@ export default function Guide() {
 
       {a && step === 2 && (
         <section style={box}>
-          <h2>2. Where the trade strains</h2>
+          <h2>2. Where the trade strains<InfoTip k="guide-strain" /></h2>
           <LinkBar />
           {a.findings.length === 0 && <p>No rule fired on the data held. That is not the same as no problem.</p>}
           {a.findings.map((f) => (

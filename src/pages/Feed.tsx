@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
 import { Empty, Skeletons, useToast } from '../components/ui';
 import type { FeedItem, Subscription } from '../../shared/types';
+import InfoTip from '../components/InfoTip';
 
 export default function Feed() {
   const { user, entitled, loading: sessionLoading, refresh } = useSession();
@@ -55,7 +56,7 @@ export default function Feed() {
       {t.node}
 
       <div className="section-head" style={{ marginTop: 0 }}>
-        <h2>Following</h2>
+        <h2>Following<InfoTip k="following" /></h2>
         <Link className="hint" to="/">
           Add more ›
         </Link>

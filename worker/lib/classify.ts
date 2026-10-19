@@ -1,5 +1,6 @@
 import type { ExportCategory, ExportClassification, ResolvedClassification } from '../../shared/types';
 import { HS2_LABEL } from '../agent/codes';
+import { cached } from './ttl-cache';
 
 /**
  * How much of a country's own exports its HS2 chapter must carry to count as
@@ -30,6 +31,13 @@ export async function loadClassifications(
   db: D1Database,
   entityId: string,
 ): Promise<Map<string, ExportClassification>> {
+  return new Map(await cached(`classif:${entityId}`, async () => [...(await readClassifications(db, entityId)).entries()]));
+}
+
+async function readClassifications(
+  db: D1Database,
+  entityId: string,
+): Promise<Map<string, ExportClassification>> {
   const { results } = await db
     .prepare(`SELECT * FROM export_classifications WHERE entity_id IN ('*', ?) ORDER BY entity_id`)
     .bind(entityId)
@@ -49,19 +57,16 @@ export async function loadClassifications(
  */
 export async function loadClassificationsBulk(
   db: D1Database,
-  entityIds: string[],
+  _entityIds: string[],
 ): Promise<Map<string, Map<string, ExportClassification>>> {
-  const ids = [...new Set(entityIds)];
-  const { results } = await db
-    .prepare(
-      `SELECT * FROM export_classifications
-        WHERE entity_id = '*'${ids.length ? ` OR entity_id IN (${ids.map(() => '?').join(',')})` : ''}`,
-    )
-    .bind(...ids)
-    .all<ExportClassification>();
+  // The table is small, so every row is loaded once and memoised rather than one query per set of countries.
+  const rows = await cached('classif:all', async () => {
+    const { results } = await db.prepare('SELECT * FROM export_classifications').all<ExportClassification>();
+    return results ?? [];
+  });
 
   const byEntity = new Map<string, Map<string, ExportClassification>>();
-  for (const row of results ?? []) {
+  for (const row of rows) {
     if (!byEntity.has(row.entity_id)) byEntity.set(row.entity_id, new Map());
     byEntity.get(row.entity_id)!.set(row.hs_code, row);
   }

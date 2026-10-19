@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import InfoTip from './InfoTip';
 
 export interface Section {
   id: string;
   label: string;
+  info?: string;
 }
 
 /**
@@ -70,16 +72,18 @@ export default function SectionNav({ sections }: { sections: Section[] }) {
     <nav className="section-nav" aria-label="Sections">
       <div className="scroll-x" ref={scrollerRef}>
         {sections.map((s) => (
-          <a
-            key={s.id}
-            href={`#${s.id}`}
-            data-id={s.id}
-            className={`chip${active === s.id ? ' active' : ''}`}
-            aria-current={active === s.id ? 'true' : undefined}
-            onClick={(event) => jumpTo(event, s.id)}
-          >
-            {s.label}
-          </a>
+          <span key={s.id} className="chip-with-info" style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <a
+              href={`#${s.id}`}
+              data-id={s.id}
+              className={`chip${active === s.id ? ' active' : ''}`}
+              aria-current={active === s.id ? 'true' : undefined}
+              onClick={(event) => jumpTo(event, s.id)}
+            >
+              {s.label}
+            </a>
+            {s.info && <InfoTip k={s.info} />}
+          </span>
         ))}
       </div>
     </nav>

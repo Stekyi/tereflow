@@ -1,6 +1,11 @@
 ﻿name = "tereflow"
 main = "worker/index.ts"
 compatibility_date = "2026-09-01"
+
+# Runs the Worker near the database it talks to (Oracle, Ashburn) instead of next to each visitor. Nearly every request makes
+# one or more calls to Oracle, so the hop between the Worker and the database costs more than the hop to the visitor.
+[placement]
+mode = "smart"
 compatibility_flags = ["nodejs_compat"]
 
 # Pinned because wrangler guessed wrong. With an OAuth login it resolved an

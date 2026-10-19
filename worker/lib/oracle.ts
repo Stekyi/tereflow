@@ -162,6 +162,24 @@ export async function oracleJson<T>(cfg: OracleConfig, r: OracleRoute): Promise<
   const key = JSON.stringify([cfg.base, r]);
   const hit = jsonCache.get(key);
   if (hit && Date.now() - hit.at < JSON_TTL_MS) return hit.value as T | null;
+
+  // The edge cache is shared by every isolate in the data centre, so a read one visitor paid for is free for the next.
+  // The data only changes after an ingest, so a few minutes of staleness is harmless.
+  const edge = edgeCache();
+  const edgeKey = edge ? new Request(`https://oracle-cache.invalid/${await sha(key)}`) : null;
+  if (edge && edgeKey) {
+    try {
+      const cachedRes = await edge.match(edgeKey);
+      if (cachedRes) {
+        const value = (await cachedRes.json()) as { v: T | null };
+        jsonCache.set(key, { at: Date.now(), value: value.v });
+        return value.v;
+      }
+    } catch {
+      // A cache read failure just means going to Oracle.
+    }
+  }
+
   const res = await oracleFetch(cfg, r);
   if (res.status === 404) {
     jsonCache.set(key, { at: Date.now(), value: null });
@@ -170,5 +188,23 @@ export async function oracleJson<T>(cfg: OracleConfig, r: OracleRoute): Promise<
   if (!res.ok) throw new Error(`oracle ${res.status}`);
   const value = (await res.json()) as T;
   jsonCache.set(key, { at: Date.now(), value });
+  if (edge && edgeKey) {
+    edge.put(edgeKey, new Response(JSON.stringify({ v: value }), { headers: { 'content-type': 'application/json', 'cache-control': `public, max-age=${EDGE_TTL_S}` } })).catch(() => undefined);
+  }
   return value;
+}
+
+const EDGE_TTL_S = 300;
+
+function edgeCache(): Cache | null {
+  try {
+    return (globalThis as unknown as { caches?: { default?: Cache } }).caches?.default ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function sha(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

@@ -3,6 +3,7 @@ import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'reac
 import { Skeletons } from './components/ui';
 import { Logo } from './components/Brand';
 import FeedbackButton from './components/FeedbackButton';
+import PageInfo from './components/PageInfo';
 import { useSession } from './lib/auth';
 import { PageTitleContext } from './lib/pageTitle';
 import { startScrollReveal } from './lib/scrollReveal';
@@ -264,6 +265,7 @@ export default function App() {
       </nav>
 
       <FeedbackButton />
+      <PageInfo />
     </div>
     </PageTitleContext.Provider>
   );

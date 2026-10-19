@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS tf_product_index (
   unit_value_usd_t  NUMBER,
   years_available   NUMBER,
   trend             VARCHAR2(30),
+  name_norm         VARCHAR2(520),
   CONSTRAINT pk_tf_product_index PRIMARY KEY (reporter_iso3, flow, cmd_code)
 )
 --;;

@@ -1,5 +1,5 @@
 import type { Env } from './db';
-import { oracleFetch, oracleJson, type OracleConfig } from './oracle';
+import { oracleJson, type OracleConfig } from './oracle';
 import { d1Catalogue, d1CountryFeeds } from './product-index-d1';
 import { openOracleBreaker, oracleBreakerOpen } from './oracle-health';
 import {
@@ -481,14 +481,19 @@ export async function loadCountryDataForCode(env: Pick<Env, 'DB'>, cfg: OracleCo
 }
 
 async function loadCountryDataFromOracle(env: Pick<Env, 'DB'>, cfg: OracleConfig, hs: string): Promise<CountryData[]> {
-  const res = await oracleFetch(cfg, { route: 'code', prefix: hs.slice(0, 2) });
-  if (res.status === 404 || res.status === 400) return loadCountryData(env, cfg);
-  if (!res.ok) throw new Error(`oracle ${res.status}`);
-  const body = (await res.json()) as {
+  type CodeBody = {
     latest: Record<string, number> | null;
     totals: Record<string, { export_usd: number | null; import_usd: number | null }> | null;
     products: Array<FeedItem & { reporter: string }> | null;
   };
+  let body: CodeBody | null;
+  try {
+    body = await oracleJson<CodeBody>(cfg, { route: 'code', prefix: hs.slice(0, 2) });
+  } catch (e) {
+    if (String(e).includes('oracle 400')) return loadCountryData(env, cfg);
+    throw e;
+  }
+  if (!body) return loadCountryData(env, cfg);
   const byIso = new Map<string, FeedItem[]>();
   for (const p of body.products ?? []) byIso.set(p.reporter, [...(byIso.get(p.reporter) ?? []), p]);
   const entities = await feedEntities(env.DB);
@@ -513,10 +518,7 @@ export async function oracleCatalogue(
 ): Promise<Array<{ hs_code: string; product_name: string | null; total_value: number }> | null> {
   if (!oracleBreakerOpen()) {
     try {
-      const res = await oracleFetch(cfg, { route: 'catalogue', tokens: p.tokens.join(','), codes: p.codes.join(','), limit: p.limit });
-      if (res.status === 404) return null;
-      if (!res.ok) throw new Error(`oracle ${res.status}`);
-      return (await res.json()) as Array<{ hs_code: string; product_name: string | null; total_value: number }>;
+      return await oracleJson<Array<{ hs_code: string; product_name: string | null; total_value: number }>>(cfg, { route: 'catalogue', tokens: p.tokens.join(','), codes: p.codes.join(','), limit: p.limit });
     } catch {
       openOracleBreaker(60);
     }

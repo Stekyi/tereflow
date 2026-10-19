@@ -267,14 +267,14 @@ export default function Country() {
   const hasPartners = data.partners_export.length > 0 || data.partners_import.length > 0;
   const sectionLinks: Section[] = [
     { id: 'overview', label: 'Overview' },
-    { id: 'imports', label: 'Imports' },
-    { id: 'exports', label: 'Exports' },
-    { id: 'balance', label: 'Trade balance' },
-    { id: 'read', label: 'What this means' },
-    ...(hasSignals ? [{ id: 'signals', label: 'Early signals' }] : []),
-    ...(data.market_context ? [{ id: 'context', label: 'The market' }] : []),
-    ...(data.blue_oceans?.length ? [{ id: 'blue-oceans', label: 'Blue oceans' }] : []),
-    ...(hasPartners ? [{ id: 'partners', label: 'Partners' }] : []),
+    { id: 'imports', label: 'Imports', info: 'country-buys' },
+    { id: 'exports', label: 'Exports', info: 'country-sells' },
+    { id: 'balance', label: 'Trade balance', info: 'trade-balance' },
+    { id: 'read', label: 'What this means', info: 'what-this-means' },
+    ...(hasSignals ? [{ id: 'signals', label: 'Early signals', info: 'early-signals' }] : []),
+    ...(data.market_context ? [{ id: 'context', label: 'The market', info: 'market-behind' }] : []),
+    ...(data.blue_oceans?.length ? [{ id: 'blue-oceans', label: 'Blue oceans', info: 'blue-oceans' }] : []),
+    ...(hasPartners ? [{ id: 'partners', label: 'Partners', info: 'partners' }] : []),
     ...(sources ? [{ id: 'sources', label: 'Sources' }] : []),
   ];
 

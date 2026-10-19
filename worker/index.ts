@@ -21,6 +21,7 @@ import { ghana } from './routes/ghana';
 import { serveSnapshot } from './lib/snapshot';
 import { oracleConfig } from './lib/oracle';
 import { withAppDb } from './lib/oracle-db';
+import { bustCache } from './lib/ttl-cache';
 import {
   closeOracleBreaker, pingOracle, readHealth, recordHealth,
 } from './lib/oracle-health';
@@ -153,7 +154,12 @@ app.get('/assets/*', async (c) => {
 app.get('*', (c) => c.env.ASSETS.fetch(c.req.raw));
 
 export default {
-  fetch: (req, env, ctx) => app.fetch(req, withAppDb(env), ctx),
+  fetch: async (req, env, ctx) => {
+    const res = await app.fetch(req, withAppDb(env), ctx);
+    // A write may have changed a setting or classification the memo is holding.
+    if (req.method !== 'GET' && req.method !== 'HEAD') bustCache();
+    return res;
+  },
   /**
    * Keep-alive only. Every few minutes it makes one light ORDS read, so Autonomous Database does not stop from idleness and
    * the first real request is not the one that wakes it, and records whether Oracle answered (read by /api/health).

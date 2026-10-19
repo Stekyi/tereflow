@@ -5,19 +5,33 @@ DECLARE
   l_flow   VARCHAR2(1)    := UPPER(SUBSTR(NVL(:flow, ''), 1, 1));
   l_iso    VARCHAR2(1000) := ',' || REGEXP_REPLACE(UPPER(NVL(:iso3s, '')), '[^A-Z,]', '') || ',';
   l_limit  PLS_INTEGER    := LEAST(GREATEST(NVL(TO_NUMBER(REGEXP_SUBSTR(NVL(:lim, ''), '^[0-9]+$')), 500), 1), 800);
-  l_re     VARCHAR2(1200);
+  l_t1 VARCHAR2(60) := REGEXP_SUBSTR(l_tokens, '[^,]+', 1, 1);
+  l_t2 VARCHAR2(60) := REGEXP_SUBSTR(l_tokens, '[^,]+', 1, 2);
+  l_t3 VARCHAR2(60) := REGEXP_SUBSTR(l_tokens, '[^,]+', 1, 3);
+  l_t4 VARCHAR2(60) := REGEXP_SUBSTR(l_tokens, '[^,]+', 1, 4);
+  l_t5 VARCHAR2(60) := REGEXP_SUBSTR(l_tokens, '[^,]+', 1, 5);
+  l_t6 VARCHAR2(60) := REGEXP_SUBSTR(l_tokens, '[^,]+', 1, 6);
+  l_t7 VARCHAR2(60) := REGEXP_SUBSTR(l_tokens, '[^,]+', 1, 7);
+  l_t8 VARCHAR2(60) := REGEXP_SUBSTR(l_tokens, '[^,]+', 1, 8);
   l_out    CLOB;
   l_pos    PLS_INTEGER := 1;
   l_len    PLS_INTEGER;
 BEGIN
   IF l_flow NOT IN ('X', 'M') THEN l_flow := NULL; END IF;
-  l_re := '(^|[^a-z0-9])(' || REPLACE(l_tokens, ',', '|') || ')';
+
   WITH m AS (
     SELECT p.* FROM tf_product_index p
      WHERE (l_iso = ',,' OR INSTR(l_iso, ',' || p.reporter_iso3 || ',') > 0)
        AND (l_flow IS NULL OR p.flow = l_flow)
        AND ((l_tokens IS NULL AND l_codes IS NULL AND l_prefix IS NULL)
-            OR (l_tokens IS NOT NULL AND REGEXP_LIKE(p.name_lc, l_re))
+            OR (l_tokens IS NOT NULL AND ((l_t1 IS NOT NULL AND INSTR(p.name_norm, ' ' || l_t1) > 0)
+                    OR (l_t2 IS NOT NULL AND INSTR(p.name_norm, ' ' || l_t2) > 0)
+                    OR (l_t3 IS NOT NULL AND INSTR(p.name_norm, ' ' || l_t3) > 0)
+                    OR (l_t4 IS NOT NULL AND INSTR(p.name_norm, ' ' || l_t4) > 0)
+                    OR (l_t5 IS NOT NULL AND INSTR(p.name_norm, ' ' || l_t5) > 0)
+                    OR (l_t6 IS NOT NULL AND INSTR(p.name_norm, ' ' || l_t6) > 0)
+                    OR (l_t7 IS NOT NULL AND INSTR(p.name_norm, ' ' || l_t7) > 0)
+                    OR (l_t8 IS NOT NULL AND INSTR(p.name_norm, ' ' || l_t8) > 0)))
             OR (l_codes IS NOT NULL AND INSTR(',' || l_codes || ',', ',' || p.cmd_code || ',') > 0)
             OR (l_prefix IS NOT NULL AND p.cmd_code LIKE l_prefix || '%'))
   )

@@ -13,6 +13,7 @@ Comtrade's own World rows (see v_world_reconciliation).
 from __future__ import annotations
 import json
 import math
+import re
 from datetime import datetime, timezone
 
 from .opportunity import NAMES
@@ -260,6 +261,11 @@ def refresh_dashboard(conn, reporter: str) -> int:
         raise
 
 
+def name_norm(name: str) -> str:
+    """Lower-case words separated by single spaces, with a space at each end, so a word-start match is a plain INSTR."""
+    return (" " + re.sub(r"[^a-z0-9]+", " ", name.lower()).strip() + " ")[:520]
+
+
 def refresh_product_index(conn, reporter: str, feed: dict | None) -> int:
     """Mirror one country's product feed into tf_product_index, for the in-database product search."""
     cur = conn.cursor()
@@ -271,12 +277,12 @@ def refresh_product_index(conn, reporter: str, feed: dict | None) -> int:
             rows.append((reporter, i["flow"], i["code"], i.get("level"), name[:500], name.lower()[:500], i["year"], i.get("value_usd"),
                          i.get("cagr_3y"), i.get("yoy_pct"), i["score"], i.get("confidence"), (i.get("signal") or "")[:30],
                          i.get("top_partner"), i.get("top_share_pct"), i.get("partner_count"), i.get("unit_value_usd_t"),
-                         i.get("years_available"), (i.get("trend") or "")[:30]))
+                         i.get("years_available"), (i.get("trend") or "")[:30], name_norm(name)))
         if rows:
             cur.executemany("""INSERT INTO tf_product_index (reporter_iso3, flow, cmd_code, classification_level, product_name, name_lc,
                                latest_year, value_usd, cagr_3y, yoy_pct, score, confidence, signal, top_partner, top_share_pct,
-                               partner_count, unit_value_usd_t, years_available, trend)
-                               VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18, :19)""", rows)
+                               partner_count, unit_value_usd_t, years_available, trend, name_norm)
+                               VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18, :19, :20)""", rows)
         conn.commit()
         return len(rows)
     except Exception:

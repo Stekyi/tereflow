@@ -8,6 +8,7 @@ import { BudgetBar } from '../components/BudgetBar';
 import { useBudget } from '../lib/budget';
 import ProductModal, { ProductCardRow } from '../components/ProductModal';
 import { CONTINENTS, type ProductCard, type ProductSummary } from '../../shared/types';
+import InfoTip from '../components/InfoTip';
 
 type FlowFilter = 'all' | 'export' | 'import';
 
@@ -215,7 +216,7 @@ export default function Home() {
       <BudgetBar budget={budget} onChange={setBudget} />
 
       <div className="mm-section-head" id="openings">
-        <h2>{splitHeading(listHeading)}</h2>
+        <h2>{splitHeading(listHeading)}<InfoTip k="product-list" /></h2>
       </div>
 
       {searchNote && (

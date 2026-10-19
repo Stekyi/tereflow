@@ -1136,8 +1136,8 @@ export const api = {
     playbook: (slug: string) =>
       req<{ playbook: Playbook; entitled: boolean }>(`/api/premium/playbooks/${slug}`),
 
-    plans: () => req<{ plans: Plan[]; provider: string }>('/api/premium/billing/plans'),
-    checkout: (plan: string) =>
+    plans: () => req<{ plans: Plan[]; provider: string; min_minor?: number; max_minor?: number }>('/api/premium/billing/plans'),
+    checkout: (plan: string, amountUsd?: number) =>
       req<{
         provider: string;
         checkout_url?: string;
@@ -1146,7 +1146,7 @@ export const api = {
         note?: string;
         payment?: WisePayment['payment'];
         details?: WisePayment['details'];
-      }>('/api/premium/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
+      }>('/api/premium/billing/checkout', { method: 'POST', body: JSON.stringify({ plan, amount_usd: amountUsd }) }),
     wise: () => req<WisePayment>('/api/premium/billing/wise'),
     wiseClaim: (reference: string, note: string) =>
       req<{ claimed: boolean }>('/api/premium/billing/wise/claim', { method: 'POST', body: JSON.stringify({ reference, note }) }),

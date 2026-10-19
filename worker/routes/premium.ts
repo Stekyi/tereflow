@@ -3,6 +3,7 @@ import type { Env } from '../lib/db';
 import { bad, json, uid } from '../lib/db';
 import { currentUser, isEntitled } from '../lib/session';
 import { clientKey, rateLimit, tooMany } from '../lib/ratelimit';
+import { cached } from '../lib/ttl-cache';
 
 export const premium = new Hono<{ Bindings: Env }>();
 
@@ -255,17 +256,28 @@ function firstSection(md: string): string {
 export const PLANS = {
   monthly: { label: 'Premium monthly', amount_minor: 1200, currency: 'USD', days: 30 },
   annual: { label: 'Premium annual', amount_minor: 11000, currency: 'USD', days: 365 },
+  // A donation of any amount buys six months. amount_minor here is only the suggested figure.
+  donation: { label: 'Support Tereflow', amount_minor: 2000, currency: 'USD', days: 183 },
 } as const;
 type PlanId = keyof typeof PLANS;
 type PlanView = { label: string; amount_minor: number; currency: string; days: number };
-const PRICE_CODE: Record<PlanId, string> = { monthly: 'PRICE_MONTHLY_USD', annual: 'PRICE_ANNUAL_USD' };
+const PRICE_CODE: Partial<Record<PlanId, string>> = { monthly: 'PRICE_MONTHLY_USD', annual: 'PRICE_ANNUAL_USD', donation: 'DONATION_SUGGESTED_USD' };
+export const DONATION_MIN_MINOR = 100;
+export const DONATION_MAX_MINOR = 1_000_000;
+
+/** One memoised read covers both the prices and the bank details, since nearly every premium call needs both. */
+function paymentSettings(env: Env): Promise<{ code: string; value: string }[]> {
+  return cached('pay-settings', async () => {
+    const { results } = await env.DB.prepare("SELECT code, value FROM code_setup WHERE code LIKE 'WISE\\_%' ESCAPE '\\' OR code IN ('PRICE_MONTHLY_USD', 'PRICE_ANNUAL_USD', 'DONATION_SUGGESTED_USD')").all<{ code: string; value: string }>();
+    return results ?? [];
+  });
+}
 
 /** Plans with prices read from the owner's settings. A missing, zero or unreadable price falls back to the shipped one. */
 export async function loadPlans(env: Env): Promise<Record<PlanId, PlanView>> {
-  const out: Record<PlanId, PlanView> = { monthly: { ...PLANS.monthly }, annual: { ...PLANS.annual } };
+  const out: Record<PlanId, PlanView> = { monthly: { ...PLANS.monthly }, annual: { ...PLANS.annual }, donation: { ...PLANS.donation } };
   try {
-    const { results } = await env.DB.prepare("SELECT code, value FROM code_setup WHERE code IN ('PRICE_MONTHLY_USD', 'PRICE_ANNUAL_USD')").all<{ code: string; value: string }>();
-    for (const r of results ?? []) {
+    for (const r of await paymentSettings(env)) {
       const id = (Object.keys(PRICE_CODE) as PlanId[]).find((k) => PRICE_CODE[k] === r.code);
       const dollars = Number(r.value);
       if (id && Number.isFinite(dollars) && dollars > 0 && dollars <= 100000) out[id].amount_minor = Math.round(dollars * 100);
@@ -276,20 +288,22 @@ export async function loadPlans(env: Env): Promise<Record<PlanId, PlanView>> {
   return out;
 }
 
-premium.get('/billing/plans', async (c) =>
-  json({
-    plans: Object.entries(await loadPlans(c.env)).map(([id, p]) => ({ id, ...p })),
-    provider: c.env.STRIPE_SECRET_KEY ? 'stripe' : (await wiseDetails(c.env)) ? 'wise' : 'stub',
-  }),
-);
+premium.get('/billing/plans', async (c) => {
+  const [plans, wise] = await Promise.all([loadPlans(c.env), wiseDetails(c.env)]);
+  return json({
+    plans: Object.entries(plans).filter(([id]) => id === 'donation').map(([id, p]) => ({ id, ...p })),
+    min_minor: DONATION_MIN_MINOR,
+    max_minor: DONATION_MAX_MINOR,
+    provider: c.env.STRIPE_SECRET_KEY ? 'stripe' : wise ? 'wise' : 'stub',
+  }, 200, { 'cache-control': 'public, max-age=30' });
+});
 
 export interface WiseDetails { holder: string; bank: string; account: string; routing: string; note: string }
 
 /** The receiving account, set by the owner in the portal. Null until a holder and an account number are both filled in. */
 export async function wiseDetails(env: Env): Promise<WiseDetails | null> {
   try {
-    const { results } = await env.DB.prepare("SELECT code, value FROM code_setup WHERE code LIKE 'WISE\\_%' ESCAPE '\\'").all<{ code: string; value: string }>();
-    const m = Object.fromEntries((results ?? []).map((r) => [r.code, (r.value ?? '').trim()]));
+    const m = Object.fromEntries((await paymentSettings(env)).filter((r) => r.code.startsWith('WISE_')).map((r) => [r.code, (r.value ?? '').trim()]));
     if (!m.WISE_HOLDER || !m.WISE_ACCOUNT) return null;
     return { holder: m.WISE_HOLDER, bank: m.WISE_BANK ?? '', account: m.WISE_ACCOUNT, routing: m.WISE_ROUTING ?? '', note: m.WISE_NOTE ?? '' };
   } catch {
@@ -347,20 +361,26 @@ premium.post('/billing/checkout', async (c) => {
   const limited = await rateLimit(c.env, 'checkout', clientKey(c.req.raw));
   if (!limited.ok) return tooMany(limited);
 
-  const body = (await c.req.json().catch(() => null)) as { plan?: PlanId } | null;
-  const planId = (body?.plan ?? 'monthly') as PlanId;
-  const plan = (await loadPlans(c.env))[planId];
-  if (!plan) return bad('Unknown plan');
+  const body = (await c.req.json().catch(() => null)) as { plan?: PlanId; amount_usd?: number } | null;
+  const planId = (body?.plan ?? 'donation') as PlanId;
+  const loaded = (await loadPlans(c.env))[planId];
+  if (!loaded) return bad('Unknown plan');
+  const plan = { ...loaded };
+  if (planId === 'donation') {
+    const minor = Math.round(Number(body?.amount_usd) * 100);
+    if (!Number.isFinite(minor) || minor < DONATION_MIN_MINOR) return bad('Please give at least $1.');
+    if (minor > DONATION_MAX_MINOR) return bad('That is above the largest amount we can take here. Please contact us.');
+    plan.amount_minor = minor;
+  }
 
   const origin = new URL(c.req.url).origin;
 
   if (c.env.STRIPE_SECRET_KEY) {
     const form = new URLSearchParams({
-      mode: 'subscription',
+      mode: planId === 'donation' ? 'payment' : 'subscription',
       'line_items[0][price_data][currency]': plan.currency.toLowerCase(),
       'line_items[0][price_data][product_data][name]': plan.label,
       'line_items[0][price_data][unit_amount]': String(plan.amount_minor),
-      'line_items[0][price_data][recurring][interval]': planId === 'annual' ? 'year' : 'month',
       'line_items[0][quantity]': '1',
       client_reference_id: user.id,
       customer_email: user.email,
@@ -370,6 +390,7 @@ premium.post('/billing/checkout', async (c) => {
       'metadata[plan]': planId,
     });
 
+    if (planId !== 'donation') form.set('line_items[0][price_data][recurring][interval]', planId === 'annual' ? 'year' : 'month');
     const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
       headers: {

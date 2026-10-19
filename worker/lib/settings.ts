@@ -1,4 +1,5 @@
 import type { Env } from './db';
+import { cached } from './ttl-cache';
 
 /**
  * Admin-editable settings.
@@ -105,6 +106,10 @@ export const CODE_TO_KEY: Record<string, keyof Settings> = {
 };
 
 export async function loadSettings(env: Env): Promise<Settings> {
+  return { ...(await cached('settings', () => readSettings(env))) };
+}
+
+async function readSettings(env: Env): Promise<Settings> {
   const settings: Settings = { ...DEFAULTS };
   try {
     const { results } = await env.DB.prepare('SELECT code, value FROM code_setup').all<{

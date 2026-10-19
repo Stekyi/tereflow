@@ -165,7 +165,9 @@ export async function oracleJson<T>(cfg: OracleConfig, r: OracleRoute): Promise<
 
   // The edge cache is shared by every isolate in the data centre, so a read one visitor paid for is free for the next.
   // The data only changes after an ingest, so a few minutes of staleness is harmless.
-  const edge = edgeCache();
+  // Only the list-style reads are worth sharing through the edge cache. Per-country reads would each cost a cache subrequest,
+  // and a Worker is limited to 50 subrequests per request, which the countries list (14 countries x 2 reads) would exhaust.
+  const edge = r.route === 'search' || r.route === 'catalogue' || r.route === 'code' || r.route === 'coverage' ? edgeCache() : null;
   const edgeKey = edge ? new Request(`https://oracle-cache.invalid/${await sha(key)}`) : null;
   if (edge && edgeKey) {
     try {
@@ -188,13 +190,17 @@ export async function oracleJson<T>(cfg: OracleConfig, r: OracleRoute): Promise<
   if (!res.ok) throw new Error(`oracle ${res.status}`);
   const value = (await res.json()) as T;
   jsonCache.set(key, { at: Date.now(), value });
-  if (edge && edgeKey) {
+  // Big feeds (the per-country product feed runs to megabytes) are not put in the edge cache: serialising and parsing
+  // them costs more CPU than the Worker is allowed per request.
+  const size = Number(res.headers.get('content-length') ?? 0);
+  if (edge && edgeKey && !(size > EDGE_MAX_BYTES) && r.route !== 'products') {
     edge.put(edgeKey, new Response(JSON.stringify({ v: value }), { headers: { 'content-type': 'application/json', 'cache-control': `public, max-age=${EDGE_TTL_S}` } })).catch(() => undefined);
   }
   return value;
 }
 
 const EDGE_TTL_S = 300;
+const EDGE_MAX_BYTES = 100_000;
 
 function edgeCache(): Cache | null {
   try {

@@ -1456,13 +1456,20 @@ pub.get('/countries', async (c) => {
   const MIN_YEARS_FOR_SIGNALS = 3;
 
   const countriesCfg = oracleConfig(c.env);
+  // One read for every country's overrides, instead of one per country: each is a subrequest, and a Worker gets 50.
+  const allClassifications = countriesCfg ? await loadClassificationsBulk(c.env.DB, []) : null;
+  const classFor = (id: string): Map<string, ExportClassification> => {
+    const merged = new Map(allClassifications?.get('*') ?? []);
+    for (const [hs, row] of allClassifications?.get(id) ?? []) merged.set(hs, row);
+    return merged;
+  };
   const summaries = await Promise.all(
     rows.map(async (r): Promise<CountrySummary> => {
       if (countriesCfg && r.is_active === 1 && r.iso3) {
         try {
           const [d, feed] = await Promise.all([oracleDashboard(countriesCfg, r.iso3), oracleProducts(countriesCfg, r.iso3)]);
           if (d) {
-            const cls = await loadClassifications(c.env.DB, r.id);
+            const cls = classFor(r.id);
             const dom = dominantCodes(d.overview.export_chapter_shares, 0.25);
             // An opening: a non-traditional product above one million dollars that scores 45 or better.
             const openings = feed
@@ -1489,8 +1496,9 @@ pub.get('/countries', async (c) => {
               top_partner: d.partners_export[0]?.name ?? null,
             };
           }
-        } catch {
+        } catch (err) {
           // Oracle unreachable: fall through to the stored figures rather than hide the country.
+          console.error('countries: oracle summary failed for', r.iso3, String(err));
         }
       }
       const years = productYears.get(r.id) ?? 0;

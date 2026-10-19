@@ -29,11 +29,19 @@ DECLARE
   l_chunk   PLS_INTEGER := 1;
   l_len     PLS_INTEGER;
 
+  -- The session is pooled and shared with the trade-data routes. Left case-insensitive, it would stop their indexes being used.
+  PROCEDURE reset_nls IS
+  BEGIN
+    EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_COMP = BINARY';
+    EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_SORT = BINARY';
+  END;
+
   PROCEDURE fail(p_status PLS_INTEGER, p_msg VARCHAR2) IS
   BEGIN
     :status_code := p_status;
     owa_util.mime_header('application/json', TRUE, 'utf-8');
     htp.prn(JSON_OBJECT('error' VALUE p_msg RETURNING VARCHAR2));
+    reset_nls;
   END;
 
   -- Raises when the statement is not one the gateway will run.
@@ -152,6 +160,7 @@ BEGIN
   END LOOP;
 
   COMMIT;
+  reset_nls;
   l_out.put('results', l_results);
   l_buf := l_out.to_clob;
   owa_util.mime_header('application/json', TRUE, 'utf-8');

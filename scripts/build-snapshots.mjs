@@ -96,6 +96,13 @@ try {
     console.log(`  built ${p} (${out[`snap:${p}`].length} bytes)`);
   }
   const countries = JSON.parse(out['snap:/api/countries']).countries ?? [];
+  // Refuse to publish a countries page that has lost its figures. Serving it would replace a working page with an empty one
+  // for two days, which is how the country cards went blank. A country with no trade loaded (Sierra Leone) is allowed.
+  const active = countries.filter((x) => x.is_active);
+  const withFigures = active.filter((x) => x.export_usd != null || x.import_usd != null);
+  if (active.length > 0 && withFigures.length < Math.ceil(active.length * 0.7)) {
+    throw new Error(`countries snapshot has figures for only ${withFigures.length} of ${active.length} active countries; not publishing`);
+  }
   for (const c of countries.filter((x) => x.is_active && x.slug)) {
     const p = `/api/dashboard/${c.slug}`;
     // A dashboard with figures but no product families means the Worker swallowed an Oracle error while building it

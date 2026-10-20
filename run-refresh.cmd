@@ -8,8 +8,10 @@ set PYTHONPATH=.
 REM Monthly first (cheap: World totals only), yearly after. A quota stop in one does not block the other.
 python -u -m tereflow_oracle ingest-monthly --country GHA NGA TGO CIV LBR CHN USA --years 2021 2022 2023 2024 2025 >> "..\%LOG%" 2>&1
 python -m tereflow_oracle ingest --incremental >> "..\%LOG%" 2>&1
-if errorlevel 1 (echo ingest failed, skipping snapshots >> "..\%LOG%" & exit /b 1)
+if errorlevel 1 (echo ingest failed, retrying once >> "..\%LOG%" & python -m tereflow_oracle ingest --incremental >> "..\%LOG%" 2>&1)
+if errorlevel 1 (echo ingest failed twice, rebuilding snapshots from what Oracle holds >> "..\%LOG%")
 python -m tereflow_oracle analytics >> "..\%LOG%" 2>&1
+if errorlevel 1 (echo analytics failed, retrying once >> "..\%LOG%" & python -m tereflow_oracle analytics >> "..\%LOG%" 2>&1)
 cd ..
 call npm run snapshots >> "%LOG%" 2>&1
 exit /b %errorlevel%

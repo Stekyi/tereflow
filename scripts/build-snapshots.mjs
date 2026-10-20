@@ -13,7 +13,7 @@
  * Oracle credentials come from .dev.vars, which stays out of git.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -82,7 +82,13 @@ try {
   run(['d1', 'execute', 'tereflow', '--local', '--persist-to', state, '--file', sql, '--yes'], 'local import');
 
   console.log('starting the Worker locally');
-  dev = spawn(npx, ['wrangler', 'dev', '--local', '--port', String(PORT), '--persist-to', state], {
+  // App data (entities, settings, classifications) lives in Oracle, so the local Worker has to read it from there like
+  // production does. The local D1 copy above only serves the old trade tables.
+  const envFile = existsSync('.env') ? readFileSync('.env', 'utf8') : '';
+  const fromEnv = (k) => (envFile.match(new RegExp(`^${k}=(.*)$`, 'm'))?.[1] ?? '').trim().replace(/^["']|["']$/g, '');
+  const appVars = ['ORACLE_APP_CLIENT_ID', 'ORACLE_APP_CLIENT_SECRET'].flatMap((k) => (fromEnv(k) ? ['--var', `${k}:${fromEnv(k)}`] : []));
+  if (appVars.length < 4) throw new Error('ORACLE_APP_CLIENT_ID/SECRET missing from .env; the snapshot would read stale app data from D1');
+  dev = spawn(npx, ['wrangler', 'dev', '--local', '--port', String(PORT), '--persist-to', state, '--var', 'APP_DB:oracle', ...appVars], {
     stdio: 'ignore',
     shell: process.platform === 'win32',
   });

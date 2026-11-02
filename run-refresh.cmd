@@ -5,6 +5,8 @@ for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmm"'
 set LOG=logs\refresh-%stamp%.log
 cd oracle
 set PYTHONPATH=.
+REM Keep Oracle's active-country list in step with the admin tick boxes, or the sandbox rejects a country the app shows as active.
+python -m tereflow_oracle sync-countries >> "..\%LOG%" 2>&1
 REM Monthly first (cheap: World totals only), yearly after. A quota stop in one does not block the other.
 python -u -m tereflow_oracle ingest-monthly --country GHA NGA TGO CIV LBR CHN USA --years 2021 2022 2023 2024 2025 >> "..\%LOG%" 2>&1
 python -m tereflow_oracle ingest --incremental >> "..\%LOG%" 2>&1

@@ -164,7 +164,7 @@ export default function Portal() {
         <div className="portal-main">
           {section === 'overview' && <Overview onError={onError} />}
           {section === 'registry' && <Registry t={t} onError={onError} />}
-          {section === 'pipeline' && <Pipeline onError={onError} />}
+          {section === 'pipeline' && <Pipeline t={t} onError={onError} />}
           {section === 'countries' && <CountryOnboarding t={t} onError={onError} />}
           {section === 'sources' && <Sources t={t} onError={onError} />}
           {section === 'products' && <Products t={t} onError={onError} />}
@@ -582,7 +582,34 @@ function Registry({ t, onError }: { t: Toaster; onError: OnError }) {
 
 /* ---- Pipeline ---- */
 
-function Pipeline({ onError }: { onError: OnError }) {
+function Pipeline({ t, onError }: { t: Toaster; onError: OnError }) {
+  async function setSwitch(c: PortalCountryRow, next: boolean) {
+    setCountries((prev) => prev.map((x) => (x.slug === c.slug ? { ...x, is_active: next ? 1 : 0 } : x)));
+    try {
+      await api.admin.setActive(c.slug, next);
+      t.ok(`${c.name} ${next ? 'switched on' : 'switched off'}`);
+    } catch (e) {
+      setCountries((prev) => prev.map((x) => (x.slug === c.slug ? { ...x, is_active: next ? 0 : 1 } : x)));
+      onError(e);
+    }
+  }
+
+  async function downloadCollector() {
+    try {
+      const { blob, filename } = await api.admin.collectorBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename || 'tereflow-collector.zip';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      onError(e);
+    }
+  }
+
   const [runs, setRuns] = useState<PortalRun[]>([]);
   const [countries, setCountries] = useState<PortalCountryRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -657,13 +684,23 @@ function Pipeline({ onError }: { onError: OnError }) {
         )}
       </Panel>
 
+      <Panel title="Collection script">
+        <p className="small dim" style={{ marginTop: 0 }}>
+          A zip with collect.cmd and the collector. Unzip it on any Windows PC with Python, double-click
+          collect.cmd (or pass arguments such as --country EST FIN --years 2023 2024) and it downloads the
+          trade data and writes the analysis files. It needs your own free Comtrade key and holds no
+          Tereflow secrets.
+        </p>
+        <button className="btn" onClick={() => void downloadCollector()}>Download collector (.zip)</button>
+      </Panel>
+
       <Panel title={`Countries (${countries.length})`}>
         <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr>
                 <th>Country</th>
-                <th>Active</th>
+                <th>Switch</th>
                 <th>Last ingest</th>
                 <th className="align-right">Coverage</th>
                 <th className="align-right">Facts</th>
@@ -676,9 +713,11 @@ function Pipeline({ onError }: { onError: OnError }) {
                 <tr key={c.slug}>
                   <td>{c.name}{c.iso3 ? ` (${c.iso3})` : ''}</td>
                   <td>
-                    <span className={`badge ${c.is_active ? 'on' : 'off'}`}>
-                      {c.is_active ? 'On' : 'Off'}
-                    </span>
+                    <Toggle
+                      checked={!!c.is_active}
+                      onChange={(v: boolean) => void setSwitch(c, v)}
+                      label={`${c.name} switch`}
+                    />
                   </td>
                   <td>{fmtDate(c.last_ingest_at)}</td>
                   <td className="align-right">{c.coverage_score == null ? '—' : c.coverage_score.toFixed(0)}</td>

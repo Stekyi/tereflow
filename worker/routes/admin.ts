@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { attachSources, bad, getEntityBySlug, json, slugify, uid } from '../lib/db';
 import { requireAdmin } from '../lib/auth';
+import { buildZip } from '../lib/zip';
+import { COLLECTOR_FILES } from '../generated/collector-bundle';
 import { currentUser } from '../lib/session';
 import { discoverCountryConfig, dominanceCandidates } from '../providers/discover';
 import { loadSettings } from '../lib/settings';
@@ -282,6 +284,21 @@ admin.patch('/entities/:slug/blue-ocean', async (c) => {
     .run();
   if (!res.meta.changes) return bad('Not found', 404);
   return json({ slug: c.req.param('slug'), blue_ocean_visibility: visibility });
+});
+
+/**
+ * The collection and analysis package, for running Comtrade collection on any PC.
+ * Holds no Tereflow secrets: it uses the operator's own Comtrade key and writes local CSV files.
+ */
+admin.get('/collector/package', () => {
+  const zip = buildZip(COLLECTOR_FILES, 'tereflow-collector');
+  return new Response(zip, {
+    headers: {
+      'content-type': 'application/zip',
+      'content-disposition': 'attachment; filename="tereflow-collector.zip"',
+      'cache-control': 'no-store',
+    },
+  });
 });
 
 admin.delete('/entities/:slug', async (c) => {

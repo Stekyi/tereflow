@@ -12,6 +12,7 @@
     "deploy": "npm run build && wrangler deploy",
     "typecheck": "tsc -b --noEmit",
     "snapshots": "node scripts/build-snapshots.mjs",
+    "collector:build": "node scripts/build-collector.mjs",
     "db:create": "wrangler d1 create tereflow",
     "db:migrate:local": "wrangler d1 migrations apply tereflow --local",
     "db:migrate": "wrangler d1 migrations apply tereflow --remote",

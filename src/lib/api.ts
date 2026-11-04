@@ -783,6 +783,7 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(input),
       }),
+    collectorBlob: () => adminBlob('/api/admin/collector/package'),
     setActive: (slug: string, is_active: boolean) =>
       req<{ slug: string; is_active: boolean }>(`/api/admin/entities/${slug}/activation`, {
         method: 'PATCH',

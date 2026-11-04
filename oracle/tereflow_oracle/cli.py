@@ -5,6 +5,7 @@ import os
 import re
 import secrets
 import sys
+import time
 from pathlib import Path
 
 import requests
@@ -71,6 +72,22 @@ def cmd_create_app_user(conn, _a):
     print("created TEREFLOW_APP; credentials appended to .env")
 
 
+def run_resilient(ing, a, countries, years, tries: int = 4):
+    """Run an ingest, and if the database drops the connection (DPY-4011 and friends) reconnect and carry on.
+
+    Finished country-years are skipped on a rerun, so retrying costs nothing already done."""
+    import oracledb
+    for attempt in range(1, tries + 1):
+        try:
+            return ing.run(countries, years)
+        except oracledb.Error as e:
+            if attempt == tries:
+                raise
+            print(f"database connection lost ({str(e)[:80]}); reconnecting, attempt {attempt + 1} of {tries}")
+            time.sleep(15 * attempt)
+            ing.conn = db.connect(app=a.app)
+
+
 def cmd_ingest(conn, a):
     countries = [c.upper() for c in a.country] or active_countries(conn)
     if not countries:
@@ -83,7 +100,7 @@ def cmd_ingest(conn, a):
         for c in countries:
             yrs = incremental_years(conn, c, a.base_years)
             print(f"{c}: incremental years {yrs}")
-            r = ing.run([c], yrs)
+            r = run_resilient(ing, a, [c], yrs)
             if s is None:
                 s = r
             else:
@@ -91,7 +108,7 @@ def cmd_ingest(conn, a):
                 s.failed += r.failed; s.rows += r.rows
                 s.stopped_on_rate_limit = s.stopped_on_rate_limit or r.stopped_on_rate_limit
     else:
-        s = ing.run(countries, a.years or default_years(a.years_back))
+        s = run_resilient(ing, a, countries, a.years or default_years(a.years_back))
     print(f"run {s.run_id}: {s.status} success={s.success} skipped={s.skipped} no_data={s.no_data} failed={s.failed} rows={s.rows:,}")
     if not a.dry_run and s.status in ("SUCCESS", "PARTIAL") and not a.no_analytics:
         for c in countries:

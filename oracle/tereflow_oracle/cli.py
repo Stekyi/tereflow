@@ -19,7 +19,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def active_countries(conn) -> list[str]:
     cur = conn.cursor()
-    cur.execute("SELECT iso3 FROM tf_country WHERE is_active = 1 ORDER BY iso3")
+    # The admin switch (app_entities.is_active) is the only one; tf_country just holds the trade-side country list.
+    cur.execute("""SELECT c.iso3 FROM tf_country c WHERE EXISTS
+                   (SELECT 1 FROM app_entities e WHERE e.iso3 = c.iso3 AND e.kind = 'country' AND e.is_active = 1)
+                   ORDER BY c.iso3""")
     return [r[0] for r in cur]
 
 

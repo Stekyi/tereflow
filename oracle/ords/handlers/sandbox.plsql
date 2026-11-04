@@ -35,7 +35,8 @@ BEGIN
 
   BEGIN
     SELECT iso3, name, slug INTO l_p_iso, l_p_name, l_p_slug
-    FROM tf_country WHERE is_active = 1 AND (LOWER(slug) = LOWER(l_primary) OR iso3 = UPPER(l_primary));
+    FROM tf_country c WHERE EXISTS (SELECT 1 FROM app_entities e WHERE e.iso3 = c.iso3 AND e.kind = 'country' AND e.is_active = 1)
+      AND (LOWER(c.slug) = LOWER(l_primary) OR c.iso3 = UPPER(l_primary));
   EXCEPTION WHEN NO_DATA_FOUND THEN
     fail(400, 'Primary country is not an active country with an ISO3 code'); RETURN;
   END;

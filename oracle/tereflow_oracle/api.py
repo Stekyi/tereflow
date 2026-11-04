@@ -87,7 +87,9 @@ def trade_sandbox(body: SandboxIn, _=Depends(auth)):
     years = sandbox_years()
     with pool().acquire() as c:
         cur = c.cursor()
-        cur.execute("SELECT iso3, name, slug FROM tf_country WHERE is_active=1 AND (LOWER(slug)=LOWER(:p) OR iso3=UPPER(:p))", {"p": primary_in})
+        cur.execute("""SELECT c.iso3, c.name, c.slug FROM tf_country c
+                       WHERE EXISTS (SELECT 1 FROM app_entities e WHERE e.iso3 = c.iso3 AND e.kind = 'country' AND e.is_active = 1)
+                         AND (LOWER(c.slug)=LOWER(:p) OR c.iso3=UPPER(:p))""", {"p": primary_in})
         row = cur.fetchone()
         if not row:
             raise HTTPException(400, "Primary country is not an active country with an ISO3 code")

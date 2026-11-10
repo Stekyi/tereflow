@@ -43,3 +43,31 @@ description for screen readers (required), choose a JPEG, PNG or WebP file up to
 
 Hide keeps an image but stops showing it; Delete removes it for good. Categories are rows in the
 `media_categories` table, so adding a new kind of image needs no code change. SVG files are refused on purpose.
+
+## Finance module (institutions and figures)
+
+Everything is deterministic: no scraping, no AI. A person prepares the figures, a script or the admin checks them,
+and only a file with zero problems is loaded.
+
+**One-off setup** (already done on the live database): `python scripts/finance/bank_load.py create-tables` then `seed-defs`.
+
+**Every time:**
+1. Register each institution once: Admin, Finance tab, "Register an institution" (or
+   `python scripts/finance/bank_load.py institution CODE "Name" GHA`). Rows for unregistered institutions are rejected.
+2. Fill the template (see "Bank data" above).
+3. Load it, either way:
+   - **Admin, Finance tab, Upload figures (CSV).** In Excel open the Data sheet, Save As CSV. "Check only" lists every
+     problem by row without saving. "Check and load" saves. Tick Replace to overwrite earlier figures for the same
+     institution, period and metric.
+   - **Script, straight from the Excel file:** `python scripts/finance/bank_load.py load FILE.xlsx [--dry-run] [--replace]`
+4. A wrong load can be undone: Admin, Finance, Upload history, Revert removes every row from that upload.
+
+Rankings on `/finance/<ISO3>` use each institution's latest period per metric. Whether higher or lower ranks first is the
+`better` field of each metric in `templates/finance_config.json` (re-run `seed-defs` after editing it).
+
+## Other config files (no code change needed)
+
+- `shared/config/sectors.json`: sector choices.
+- `shared/config/country-groups.json`: EU member list used for tariffs.
+- `oracle/tereflow_oracle/data/worldbank_map.json`: World Bank indicators.
+- Tables: `media_categories` (image kinds) and `fin_metric_defs` (finance metrics).

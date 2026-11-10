@@ -62,6 +62,7 @@ type SectionId =
   | 'premium'
   | 'content'
   | 'media'
+  | 'finance'
   | 'feedback'
   | 'setup';
 
@@ -79,6 +80,7 @@ const SECTIONS: { id: SectionId; label: string; icon: string }[] = [
   { id: 'premium', label: 'Premium', icon: 'M12 3l2.9 6 6.1.9-4.5 4.3 1 6-5.5-2.9L6.5 20l1-6L3 9.9 9.1 9z' },
   { id: 'content', label: 'Content', icon: 'M6 4h9l3 3v13H6zM9 9h6M9 13h6' },
   { id: 'media', label: 'Images', icon: 'M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9h.01' },
+  { id: 'finance', label: 'Finance', icon: 'M4 20h16M6 20V10M12 20V4M18 20v-7' },
   { id: 'feedback', label: 'Feedback', icon: 'M4 5h16v11H9l-5 4z' },
   { id: 'setup', label: 'Setup', icon: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM4 12h2M18 12h2M12 4v2M12 18v2' },
 ];
@@ -175,6 +177,7 @@ export default function Portal() {
           {section === 'premium' && <Premium onError={onError} />}
           {section === 'content' && <Content onError={onError} />}
           {section === 'media' && <Media t={t} onError={onError} />}
+          {section === 'finance' && <FinanceAdmin t={t} onError={onError} />}
           {section === 'feedback' && <Feedback t={t} onError={onError} />}
           {section === 'setup' && <Setup onError={onError} />}
         </div>
@@ -579,6 +582,96 @@ function Registry({ t, onError }: { t: Toaster; onError: OnError }) {
         analysis here. Rebuild feeds only fans subscriber feeds out from analysis that already
         exists.
       </p>
+    </>
+  );
+}
+
+/* ---- Finance ---- */
+
+function FinanceAdmin({ t, onError }: { t: Toaster; onError: OnError }) {
+  type Ov = Awaited<ReturnType<typeof api.financeAdmin.overview>>;
+  const [ov, setOv] = useState<Ov | null>(null);
+  const [code, setCode] = useState('');
+  const [name, setName] = useState('');
+  const [iso, setIso] = useState('');
+  const [kind, setKind] = useState('bank');
+  const [file, setFile] = useState<File | null>(null);
+  const [replace, setReplace] = useState(false);
+  const [report, setReport] = useState<{ ok: boolean; text: string; problems: { row: number; column: string; message: string }[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => { api.financeAdmin.overview().then(setOv).catch(onError); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function addInst() {
+    try {
+      await api.financeAdmin.addInstitution({ code, name, country_iso3: iso, kind });
+      t.ok('Institution saved');
+      setCode(''); setName(''); setIso('');
+      load();
+    } catch (e) { onError(e); }
+  }
+
+  async function send(dry: boolean) {
+    if (!file) return onError(new Error('Choose a CSV file first'));
+    setBusy(true);
+    try {
+      const r = await api.financeAdmin.upload({ filename: file.name, content: await file.text(), dry_run: dry, replace });
+      if (r.error) throw new Error(r.error);
+      setReport({ ok: r.ok, problems: r.problems ?? [], text: r.ok ? (dry ? `Valid: ${r.rows_read} rows would be loaded.` : `Loaded ${r.rows_loaded} rows.`) : `Not loaded: ${r.problems.length} problem(s).` });
+      if (r.ok && !dry) { t.ok('Loaded'); load(); }
+    } catch (e) { onError(e); } finally { setBusy(false); }
+  }
+
+  if (!ov) return <Skeletons n={4} />;
+  return (
+    <>
+      <p className="small dim" style={{ marginTop: 0 }}>
+        Register institutions first, then upload the filled template. In Excel, open the Data sheet and use Save As, CSV. Allowed metrics: {ov.metric_defs.map((d) => d.code).join(', ')}. To load the Excel file itself, use scripts/finance/bank_load.py (see docs/operator-guide.md).
+      </p>
+      <Panel title="Register an institution">
+        <div style={{ display: 'grid', gap: 8, maxWidth: 420 }}>
+          <input placeholder="Code, e.g. GCB_BANK" value={code} onChange={(e) => setCode(e.target.value)} />
+          <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+          <input placeholder="Country ISO3, e.g. GHA" value={iso} onChange={(e) => setIso(e.target.value)} />
+          <select value={kind} onChange={(e) => setKind(e.target.value)}>
+            {['bank', 'dfi', 'microfinance', 'insurer', 'other'].map((k) => <option key={k}>{k}</option>)}
+          </select>
+          <div><button className="btn" onClick={() => void addInst()}>Save institution</button></div>
+        </div>
+      </Panel>
+      <Panel title="Upload figures (CSV)">
+        <div style={{ display: 'grid', gap: 8, maxWidth: 420 }}>
+          <input type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <label><input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> Replace earlier figures for the same institution, period and metric</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" disabled={busy} onClick={() => void send(true)}>Check only</button>
+            <button className="btn" disabled={busy} onClick={() => void send(false)}>Check and load</button>
+          </div>
+        </div>
+        {report && (
+          <div style={{ marginTop: 10 }}>
+            <strong>{report.text}</strong>
+            <ul className="small">{report.problems.map((p, i) => <li key={i}>Row {p.row} [{p.column}]: {p.message}</li>)}</ul>
+          </div>
+        )}
+      </Panel>
+      <Panel title={`Institutions (${ov.institutions.length})`}>
+        {ov.institutions.length === 0 ? <p className="small dim" style={{ margin: 0 }}>None yet.</p> : (
+          <div className="table-wrap"><table className="data-table"><thead><tr><th>Code</th><th>Name</th><th>Country</th><th>Kind</th></tr></thead>
+            <tbody>{ov.institutions.map((i) => <tr key={i.code}><td>{i.code}</td><td>{i.name}</td><td>{i.country_iso3}</td><td>{i.kind}</td></tr>)}</tbody></table></div>
+        )}
+      </Panel>
+      <Panel title="Upload history">
+        {ov.uploads.length === 0 ? <p className="small dim" style={{ margin: 0 }}>None yet.</p> : (
+          <div className="table-wrap"><table className="data-table"><thead><tr><th>When</th><th>File</th><th className="align-right">Rows</th><th>Status</th><th /></tr></thead>
+            <tbody>{ov.uploads.map((u) => (
+              <tr key={u.id}><td>{u.uploaded_at}</td><td>{u.filename}</td><td className="align-right">{u.rows_loaded}</td><td>{u.status}</td>
+                <td>{u.status === 'loaded' && <button className="btn" onClick={() => { if (window.confirm('Remove every row from this upload?')) void api.financeAdmin.revert(u.id).then(load).catch(onError); }}>Revert</button>}</td></tr>
+            ))}</tbody></table></div>
+        )}
+      </Panel>
     </>
   );
 }

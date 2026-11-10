@@ -1,3 +1,4 @@
+import sectorsConfig from './config/sectors.json';
 import type { ScoreBand } from './opportunity';
 export type EntityKind = 'country' | 'intl_org' | 'regional_body';
 export type SourceCategory = 'export' | 'import' | 'commerce';
@@ -1027,24 +1028,8 @@ export interface Rating {
 }
 
 /** Rough sector list to keep card creation to a couple of taps. */
-export const SECTOR_OPTIONS = [
-  'Agriculture & food',
-  'Minerals & energy',
-  'Chemicals',
-  'Plastics & rubber',
-  'Textiles & apparel',
-  'Wood & paper',
-  'Metals',
-  'Machinery & electronics',
-  'Transport equipment',
-  'Construction materials',
-  'Pharmaceuticals & health',
-  'Consumer goods',
-  'Logistics & freight',
-  'Financial services',
-  'Professional services',
-  'Technology & software',
-] as const;
+// Read from shared/config/sectors.json so a sector can be added without a code change.
+export const SECTOR_OPTIONS: readonly string[] = sectorsConfig.sectors;
 
 // --- premium ----------------------------------------------------------------
 

@@ -1,3 +1,4 @@
+import countryGroups from '../../shared/config/country-groups.json';
 import { Hono } from 'hono';
 import type { Env } from '../lib/db';
 import { bad, json } from '../lib/db';
@@ -17,7 +18,7 @@ export const tariffs = new Hono<{ Bindings: Env }>();
 const TOP_BUYERS = 4;
 // Comtrade's catch-all areas are not countries with a tariff; see shared/markets.ts.
 // Belgium, France and the Netherlands apply the EU tariff, which the source reports as one reporter.
-const EU_MEMBERS = new Set(['AUT', 'BEL', 'BGR', 'HRV', 'CYP', 'CZE', 'DNK', 'EST', 'FIN', 'FRA', 'DEU', 'GRC', 'HUN', 'IRL', 'ITA', 'LVA', 'LTU', 'LUX', 'MLT', 'NLD', 'POL', 'PRT', 'ROU', 'SVK', 'SVN', 'ESP', 'SWE']);
+const EU_MEMBERS = new Set<string>(countryGroups.EU_MEMBERS);
 
 tariffs.get('/:country/:hs', async (c) => {
   const limited = await rateLimit(c.env, 'lookup', clientKey(c.req.raw));

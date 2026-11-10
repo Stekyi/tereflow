@@ -1,0 +1,21 @@
+{
+    "_about":  "Sector choices shown in filters and playbooks. Edit this file to add or rename a sector; no code change needed.",
+    "sectors":  [
+                    "Agriculture \u0026 food",
+                    "Minerals \u0026 energy",
+                    "Chemicals",
+                    "Plastics \u0026 rubber",
+                    "Textiles \u0026 apparel",
+                    "Wood \u0026 paper",
+                    "Metals",
+                    "Machinery \u0026 electronics",
+                    "Transport equipment",
+                    "Construction materials",
+                    "Pharmaceuticals \u0026 health",
+                    "Consumer goods",
+                    "Logistics \u0026 freight",
+                    "Financial services",
+                    "Professional services",
+                    "Technology \u0026 software"
+                ]
+}

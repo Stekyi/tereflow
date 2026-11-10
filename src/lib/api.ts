@@ -1106,6 +1106,33 @@ export const api = {
       }),
   },
 
+  finance: (country: string) =>
+    req<{
+      country: string;
+      country_name: string;
+      last_period: string | null;
+      institutions: { code: string; name: string; kind: string; website: string | null; metrics: { metric_code: string; period: string; value: number; unit: string; currency: string | null; source_note: string; rate_type: string | null }[] }[];
+      metric_defs: { code: string; label: string }[];
+      rankings: { metric_code: string; label: string; better: string; ranked: { rank: number; institution_code: string; value: number; unit: string; period: string; rate_type: string | null }[] }[];
+    }>(`/api/finance/${encodeURIComponent(country)}`),
+  financeAdmin: {
+    overview: () =>
+      req<{
+        institutions: { code: string; name: string; country_iso3: string; kind: string; website: string | null; is_active: number }[];
+        metric_defs: { code: string; label: string; units: string; is_rate: number; better: string }[];
+        uploads: { id: string; filename: string; rows_read: number; rows_loaded: number; status: string; uploaded_by: string | null; uploaded_at: string }[];
+      }>('/api/admin/finance'),
+    addInstitution: (input: { code: string; name: string; country_iso3: string; kind?: string; website?: string }) =>
+      req<{ code: string }>('/api/admin/finance/institutions', { method: 'POST', body: JSON.stringify(input) }),
+    upload: async (input: { filename: string; content: string; dry_run: boolean; replace: boolean }) => {
+      const headers = new Headers({ 'content-type': 'application/json' });
+      const token = getAdminToken();
+      if (token) headers.set('authorization', `Bearer ${token}`);
+      const res = await fetch('/api/admin/finance/upload', { method: 'POST', headers, body: JSON.stringify(input), credentials: 'same-origin' });
+      return (await res.json()) as { ok: boolean; rows_read?: number; rows_loaded?: number; problems: { row: number; column: string; message: string }[]; error?: string };
+    },
+    revert: (id: string) => req<{ ok: true }>(`/api/admin/finance/uploads/${id}`, { method: 'DELETE' }),
+  },
   media: {
     list: () =>
       req<{

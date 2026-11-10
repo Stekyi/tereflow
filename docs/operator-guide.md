@@ -71,3 +71,14 @@ Rankings on `/finance/<ISO3>` use each institution's latest period per metric. W
 - `shared/config/country-groups.json`: EU member list used for tariffs.
 - `oracle/tereflow_oracle/data/worldbank_map.json`: World Bank indicators.
 - Tables: `media_categories` (image kinds) and `fin_metric_defs` (finance metrics).
+
+## Business Model Canvas (premium)
+
+A premium user builds a canvas at `/canvas` (no menu link yet): pick a country, a 6-digit HS code, supply or procurement,
+and English or German. The nine Osterwalder blocks are filled by rules from the Guide for that product and country:
+lines tagged "from data" come from Tereflow's own trade data, lines tagged "typical" are standard trade practice from
+the template and should be checked. The user can edit, add or remove any line, save, switch language (their own lines are
+kept), export as text, or print to PDF. Every canvas is stored against the user, country and HS code.
+
+To change labels, helper text or typical lines, edit `shared/config/canvas.json` (no code change). The German text is a
+first draft and should be reviewed by a native speaker.

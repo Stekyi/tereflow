@@ -126,6 +126,12 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
 // original uploaded files as plain responses rather than JSON, so they need a
 // fetch that keeps the raw body. Both reuse getAdminToken() so there is one
 // source of truth for the bearer, not a second token system.
+async function adminBlobPlain(path: string): Promise<string> {
+  const res = await fetch(path, { credentials: 'same-origin' });
+  if (!res.ok) throw new Error(`Export failed (${res.status})`);
+  return res.text();
+}
+
 async function adminBlob(path: string): Promise<{ blob: Blob; filename: string }> {
   const headers = new Headers({ accept: '*/*' });
   const token = getAdminToken();
@@ -1152,6 +1158,24 @@ export const api = {
     setActive: (id: string, is_active: boolean) =>
       req<{ ok: true }>(`/api/admin/media/${id}`, { method: 'PATCH', body: JSON.stringify({ is_active }) }),
     remove: (id: string) => req<{ ok: true }>(`/api/admin/media/${id}`, { method: 'DELETE' }),
+  },
+  canvas: {
+    list: () => req<{ canvases: { id: string; title: string; country_slug: string; hs_code: string; role: string; lang: string; updated_at: string }[] }>('/api/canvas'),
+    create: (input: { country: string; hs: string; role: 'supply' | 'procurement'; lang: 'en' | 'de'; budget?: number }) =>
+      req<{ id: string; title: string }>('/api/canvas', { method: 'POST', body: JSON.stringify(input) }),
+    get: (id: string) =>
+      req<{
+        id: string; title: string; country_slug: string; hs_code: string; role: string; lang: 'en' | 'de'; updated_at: string;
+        blocks: Record<string, { text: string; source: 'data' | 'typical' | 'user' }[]>;
+        defs: { key: string; label: string; help: string }[];
+        next: { guide: string; finance: string };
+      }>(`/api/canvas/${encodeURIComponent(id)}`),
+    save: (id: string, blocks: Record<string, { text: string; source: string }[]>) =>
+      req<{ ok: true }>(`/api/canvas/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ blocks }) }),
+    regenerate: (id: string, lang: 'en' | 'de') =>
+      req<{ ok: true }>(`/api/canvas/${encodeURIComponent(id)}/regenerate`, { method: 'POST', body: JSON.stringify({ lang }) }),
+    exportText: (id: string) => adminBlobPlain(`/api/canvas/${encodeURIComponent(id)}/export`),
+    remove: (id: string) => req<{ deleted: true }>(`/api/canvas/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   },
   forecast: (country: string, flow: 'X' | 'M' = 'X') =>
     req<{

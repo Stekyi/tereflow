@@ -4,6 +4,7 @@ export const APP_TABLES: readonly string[] = [
   'bids',
   'billing_events',
   'business_cards',
+  'canvases',
   'code_setup',
   'conversations',
   'country_configs',

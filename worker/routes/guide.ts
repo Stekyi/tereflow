@@ -115,7 +115,7 @@ guide.get('/:country/:hs', async (c) => {
 type Built = { body: Record<string, unknown> & { available: boolean; inputs?: { country: string; product: string; [k: string]: unknown } }; response?: undefined } | { response: Response };
 
 /** The guide for one product in one country. Shared by the live route and the save route, so a saved run is exactly what the page showed. */
-async function buildGuide(env: Env, countryKey: string, hs: string, role: Role, budget: number | null, via: string | null): Promise<Built> {
+export async function buildGuide(env: Env, countryKey: string, hs: string, role: Role, budget: number | null, via: string | null): Promise<Built> {
   const key = countryKey.trim().toLowerCase();
   const entity = await env.DB.prepare("SELECT iso3, name FROM entities WHERE kind = 'country' AND (slug = ? OR lower(iso3) = ?)")
     .bind(key, key).first<{ iso3: string | null; name: string }>();
@@ -198,7 +198,10 @@ async function buildGuide(env: Env, countryKey: string, hs: string, role: Role, 
     body: {
       locked: false,
       available: true,
-      inputs: { country: facts.country, product: facts.product, hs, role, budget_usd: budget },
+      inputs: { country: facts.country, product: facts.product, hs, role, budget_usd: budget, iso3: home },
+      buyers: facts.buyers.slice(0, 6),
+      suppliers: facts.suppliers.slice(0, 6),
+      fx: facts.fx,
       lens,
       refs: {
         partners: [...buyers, ...suppliers, ...buyer_markets.map((m) => ({ name: m.name }))]

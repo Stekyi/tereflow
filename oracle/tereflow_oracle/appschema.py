@@ -250,7 +250,7 @@ def create(conn, prefix: str = "app_", drop: bool = False) -> dict:
 
 
 # Oracle-only application tables that have no D1 definition (created by their own job, not copied from D1).
-EXTRA_APP_TABLES = {'forecasts', 'media_assets', 'media_categories', 'fin_institutions', 'fin_metric_defs', 'fin_uploads', 'fin_metrics'}
+EXTRA_APP_TABLES = {'forecasts', 'media_assets', 'media_categories', 'fin_institutions', 'fin_metric_defs', 'fin_uploads', 'fin_metrics', 'canvases'}
 
 
 def export_tables_ts() -> str:

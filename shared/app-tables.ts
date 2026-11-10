@@ -24,6 +24,8 @@ export const APP_TABLES: readonly string[] = [
   'kb_relationship',
   'listings',
   'manual_payments',
+  'media_assets',
+  'media_categories',
   'messages',
   'notifications',
   'playbooks',

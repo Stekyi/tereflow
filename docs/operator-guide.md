@@ -29,3 +29,17 @@ Edit that file to add or drop an indicator. Only codes that exist in the indicat
 ## Trade collection on any PC
 
 Admin, Pipeline tab, "Download collector (.zip)". See the README inside the zip.
+## Images (Admin, Images tab)
+
+Real photographs only. Open the admin, choose **Images**, pick a category, add a subject (optional) and a short
+description for screen readers (required), choose a JPEG, PNG or WebP file up to 5 MB, and press Upload.
+
+| Category | Subject to enter |
+| --- | --- |
+| Hero images | leave empty |
+| Country images | the country's ISO3 code, for example GHA |
+| Product category images | the 2-digit HS chapter, for example 18 |
+| How-it-works images | the step name |
+
+Hide keeps an image but stops showing it; Delete removes it for good. Categories are rows in the
+`media_categories` table, so adding a new kind of image needs no code change. SVG files are refused on purpose.

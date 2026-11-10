@@ -1106,6 +1106,26 @@ export const api = {
       }),
   },
 
+  media: {
+    list: () =>
+      req<{
+        categories: { code: string; label: string; help: string | null }[];
+        images: { id: string; category: string; subject: string | null; title: string | null; alt_text: string; content_type: string; bytes: number; uploaded_by: string | null; uploaded_at: string; is_active: number; url: string }[];
+        max_bytes: number;
+      }>('/api/admin/media'),
+    upload: async (form: FormData) => {
+      const headers = new Headers();
+      const token = getAdminToken();
+      if (token) headers.set('authorization', `Bearer ${token}`);
+      const res = await fetch('/api/admin/media', { method: 'POST', body: form, headers, credentials: 'same-origin' });
+      const b = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(b.error ?? `Upload failed (${res.status})`);
+      return b;
+    },
+    setActive: (id: string, is_active: boolean) =>
+      req<{ ok: true }>(`/api/admin/media/${id}`, { method: 'PATCH', body: JSON.stringify({ is_active }) }),
+    remove: (id: string) => req<{ ok: true }>(`/api/admin/media/${id}`, { method: 'DELETE' }),
+  },
   forecast: (country: string, flow: 'X' | 'M' = 'X') =>
     req<{
       country: string;

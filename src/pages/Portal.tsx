@@ -61,6 +61,7 @@ type SectionId =
   | 'network'
   | 'premium'
   | 'content'
+  | 'media'
   | 'feedback'
   | 'setup';
 
@@ -77,6 +78,7 @@ const SECTIONS: { id: SectionId; label: string; icon: string }[] = [
   { id: 'network', label: 'Network', icon: 'M4 5h16v10H4zM8 19h8' },
   { id: 'premium', label: 'Premium', icon: 'M12 3l2.9 6 6.1.9-4.5 4.3 1 6-5.5-2.9L6.5 20l1-6L3 9.9 9.1 9z' },
   { id: 'content', label: 'Content', icon: 'M6 4h9l3 3v13H6zM9 9h6M9 13h6' },
+  { id: 'media', label: 'Images', icon: 'M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9h.01' },
   { id: 'feedback', label: 'Feedback', icon: 'M4 5h16v11H9l-5 4z' },
   { id: 'setup', label: 'Setup', icon: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM4 12h2M18 12h2M12 4v2M12 18v2' },
 ];
@@ -172,6 +174,7 @@ export default function Portal() {
           {section === 'network' && <Network onError={onError} />}
           {section === 'premium' && <Premium onError={onError} />}
           {section === 'content' && <Content onError={onError} />}
+          {section === 'media' && <Media t={t} onError={onError} />}
           {section === 'feedback' && <Feedback t={t} onError={onError} />}
           {section === 'setup' && <Setup onError={onError} />}
         </div>
@@ -576,6 +579,100 @@ function Registry({ t, onError }: { t: Toaster; onError: OnError }) {
         analysis here. Rebuild feeds only fans subscriber feeds out from analysis that already
         exists.
       </p>
+    </>
+  );
+}
+
+/* ---- Images ---- */
+
+function Media({ t, onError }: { t: Toaster; onError: OnError }) {
+  type Data = Awaited<ReturnType<typeof api.media.list>>;
+  const [data, setData] = useState<Data | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [category, setCategory] = useState('');
+  const [subject, setSubject] = useState('');
+  const [alt, setAlt] = useState('');
+  const [title, setTitle] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+
+  const load = useCallback(() => {
+    api.media.list().then((d) => {
+      setData(d);
+      setCategory((c) => c || d.categories[0]?.code || '');
+    }).catch(onError);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function upload() {
+    if (!file) return onError(new Error('Choose an image first'));
+    setBusy(true);
+    try {
+      const f = new FormData();
+      f.set('file', file);
+      f.set('category', category);
+      f.set('subject', subject);
+      f.set('title', title);
+      f.set('alt_text', alt);
+      await api.media.upload(f);
+      t.ok('Image uploaded');
+      setFile(null); setSubject(''); setAlt(''); setTitle('');
+      load();
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!data) return <Skeletons n={4} />;
+  const help = data.categories.find((c) => c.code === category)?.help;
+
+  return (
+    <>
+      <p className="small dim" style={{ marginTop: 0 }}>
+        Real photographs only, uploaded by a person. JPEG, PNG or WebP, up to {Math.round(data.max_bytes / 1048576)} MB. Every image needs a short description for screen readers.
+      </p>
+      <Panel title="Upload an image">
+        <div className="field-row" style={{ display: 'grid', gap: 10 }}>
+          <label>Category
+            <select value={category} onChange={(e) => setCategory(e.target.value)}>
+              {data.categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+            </select>
+          </label>
+          {help && <span className="tiny dim">{help}</span>}
+          <label>Subject (optional)
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. GHA, or 18, or step name" />
+          </label>
+          <label>Title (optional)
+            <input value={title} onChange={(e) => setTitle(e.target.value)} />
+          </label>
+          <label>Description for screen readers (required)
+            <input value={alt} onChange={(e) => setAlt(e.target.value)} placeholder="What the photo shows" />
+          </label>
+          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <div><button className="btn" disabled={busy} onClick={() => void upload()}>{busy ? 'Uploading...' : 'Upload'}</button></div>
+        </div>
+      </Panel>
+      <Panel title={`Images (${data.images.length})`}>
+        {data.images.length === 0 ? (
+          <p className="small dim" style={{ margin: 0 }}>No images yet.</p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+            {data.images.map((i) => (
+              <div key={i.id} style={{ border: '1px solid var(--border, #ddd)', borderRadius: 8, padding: 8, opacity: i.is_active ? 1 : 0.5 }}>
+                <img src={i.url} alt={i.alt_text} loading="lazy" style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 6 }} />
+                <div className="tiny" style={{ marginTop: 6 }}>{i.category}{i.subject ? ` / ${i.subject}` : ''}</div>
+                <div className="tiny dim">{i.title ?? i.alt_text}</div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <button className="btn" onClick={() => void api.media.setActive(i.id, !i.is_active).then(load).catch(onError)}>{i.is_active ? 'Hide' : 'Show'}</button>
+                  <button className="btn" onClick={() => { if (window.confirm('Delete this image?')) void api.media.remove(i.id).then(load).catch(onError); }}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
     </>
   );
 }

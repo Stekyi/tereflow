@@ -1,4 +1,4 @@
-﻿name = "tereflow"
+name = "tereflow"
 main = "worker/index.ts"
 compatibility_date = "2026-09-01"
 
@@ -81,3 +81,8 @@ ALLOW_DEV_TIER_SWITCH = "false"
 #   COMTRADE_API_KEY   - optional, raises UN Comtrade rate limit
 #   CENSUS_API_KEY     - optional, US Census international trade API
 #   SESSION_SECRET     - HMAC key for user sessions (Phase 2)
+
+# Real photographs uploaded by an operator in the admin (Images). Served through /api/media/:id.
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "tereflow-media"

@@ -9,6 +9,8 @@ export interface Env {
   DB: D1Database;
   CACHE: KVNamespace;
   ASSETS: Fetcher;
+  /** Operator-uploaded photographs. */
+  MEDIA: R2Bucket;
   APP_NAME: string;
   ADMIN_EMAILS: string;
   ADMIN_TOKEN?: string;

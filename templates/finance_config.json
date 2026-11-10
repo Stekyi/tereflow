@@ -1,0 +1,19 @@
+{
+  "_about": "Allowed values for the bank Excel template. Edit this file to add a metric, unit or rate type; no code change is needed. Every metric row is checked against it.",
+  "columns": ["institution_code", "country_iso3", "period", "metric_code", "value", "unit", "currency", "source_note", "rate_type"],
+  "required": ["institution_code", "country_iso3", "period", "metric_code", "value", "unit", "source_note"],
+  "metrics": {
+    "TOTAL_ASSETS":        {"label": "Total assets",                 "units": ["currency"], "rate": false},
+    "TOTAL_LOANS":         {"label": "Total loans",                  "units": ["currency"], "rate": false},
+    "TOTAL_DEPOSITS":      {"label": "Total deposits",               "units": ["currency"], "rate": false},
+    "NPL_RATIO":           {"label": "Non-performing loans ratio",   "units": ["percent"],  "rate": false},
+    "CAPITAL_ADEQUACY":    {"label": "Capital adequacy ratio",       "units": ["percent"],  "rate": false},
+    "RETURN_ON_ASSETS":    {"label": "Return on assets",             "units": ["percent"],  "rate": false},
+    "BRANCH_COUNT":        {"label": "Branches",                     "units": ["count"],    "rate": false},
+    "LENDING_RATE":        {"label": "Lending rate",                 "units": ["percent"],  "rate": true},
+    "DEPOSIT_RATE":        {"label": "Deposit rate",                 "units": ["percent"],  "rate": true},
+    "TRADE_FINANCE_FEE":   {"label": "Trade finance fee",            "units": ["percent", "currency"], "rate": true}
+  },
+  "rate_types": ["fixed", "variable", "indicative", "policy"],
+  "period_format": "YYYY, YYYY-MM or YYYY-Qn (for example 2025, 2025-06, 2025-Q2)"
+}

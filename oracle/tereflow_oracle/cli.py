@@ -124,7 +124,7 @@ def cmd_worldbank(conn, a):
     from . import worldbank
     countries = [c.upper() for c in a.country] or [r[0] for r in conn.cursor().execute(
         "SELECT iso3 FROM app_entities WHERE kind = 'country' AND is_active = 1 AND iso3 IS NOT NULL ORDER BY iso3")]
-    n = worldbank.load(conn, countries, a.from_year, a.dry_run)
+    n = worldbank.load(conn, countries, a.from_year, a.dry_run, map_path=a.map)
     print(f"{n:,} observations for {len(countries)} countries")
 
 
@@ -241,6 +241,7 @@ def main(argv=None):
     wbp.add_argument("--country", nargs="*", default=[])
     wbp.add_argument("--from-year", type=int, default=2005)
     wbp.add_argument("--dry-run", action="store_true")
+    wbp.add_argument("--map", default=None, help="indicator map JSON (default data/worldbank_map.json)")
     for fname in ("forecast-eval", "forecast-run"):
         fp = sub.add_parser(fname)
         fp.add_argument("--flow", choices=["X", "M", "both"], default="both")

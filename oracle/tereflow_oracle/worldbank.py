@@ -7,6 +7,9 @@ written. Re-running replaces that source's rows for the country and indicator, s
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import requests
 
 API = "https://api.worldbank.org/v2/country/{iso3}/indicator/{wb}"
@@ -14,46 +17,10 @@ SOURCE = "World Bank WDI"
 SOURCE_URL = "https://data.worldbank.org/indicator/{wb}"
 
 # Tereflow indicator code -> World Bank indicator code.
-MAP: dict[str, str] = {
-    "POP_TOTAL": "SP.POP.TOTL",
-    "POP_GROWTH": "SP.POP.GROW",
-    "POP_URBAN_SHARE": "SP.URB.TOTL.IN.ZS",
-    "POP_DENSITY": "EN.POP.DNST",
-    "AGE_DEPENDENCY": "SP.POP.DPND",
-    "LFP_RATE": "SL.TLF.CACT.ZS",
-    "EMPLOYMENT_RATE": "SL.EMP.TOTL.SP.ZS",
-    "UNEMPLOYMENT": "SL.UEM.TOTL.ZS",
-    "UNEMPLOYMENT_YOUTH": "SL.UEM.1524.ZS",
-    "LIFE_EXPECTANCY": "SP.DYN.LE00.IN",
-    "BIRTH_RATE": "SP.DYN.CBRT.IN",
-    "INTERNET_USERS": "IT.NET.USER.ZS",
-    "MOBILE_PENETRATION": "IT.CEL.SETS.P2",
-    "ELECTRICITY_ACCESS": "EG.ELC.ACCS.ZS",
-    "GDP": "NY.GDP.MKTP.CD",
-    "GDP_GROWTH": "NY.GDP.MKTP.KD.ZG",
-    "GDP_PER_CAPITA": "NY.GDP.PCAP.CD",
-    "GNI_PER_CAPITA": "NY.GNP.PCAP.CD",
-    "GDP_AGRI_SHARE": "NV.AGR.TOTL.ZS",
-    "GDP_INDUSTRY_SHARE": "NV.IND.TOTL.ZS",
-    "GDP_SERVICES_SHARE": "NV.SRV.TOTL.ZS",
-    "INFLATION": "FP.CPI.TOTL.ZG",
-    "CPI": "FP.CPI.TOTL",
-    "EXCHANGE_RATE": "PA.NUS.FCRF",
-    "PPP_FACTOR": "PA.NUS.PPP",
-    "CONSUMER_SPENDING": "NE.CON.PRVT.CD",
-    "FDI_INFLOW": "BX.KLT.DINV.CD.WD",
-    "FDI_OUTFLOW": "BM.KLT.DINV.CD.WD",
-    "TRADE_OPENNESS": "NE.TRD.GNFS.ZS",
-    "CURRENT_ACCOUNT": "BN.CAB.XOKA.GD.ZS",
-    "PUBLIC_DEBT": "GC.DOD.TOTL.GD.ZS",
-    "TAX_CORPORATE": "IC.TAX.TOTL.CP.ZS",
-    "REG_TIME": "IC.REG.DURS",
-    "CUSTOMS_TIME": "IC.EXP.TMBC",
-    "LOGISTICS_PERFORMANCE": "LP.LPI.OVRL.XQ",
-    "POVERTY_RATE": "SI.POV.NAHC",
-    "GINI": "SI.POV.GINI",
-    "LABOUR_PRODUCTIVITY": "SL.GDP.PCAP.EM.KD",
-}
+def load_map(path: str | None = None) -> dict[str, str]:
+    """Indicator map from data/worldbank_map.json (or a file passed with --map), so nothing is hardcoded."""
+    p = Path(path) if path else Path(__file__).parent / "data" / "worldbank_map.json"
+    return json.loads(p.read_text(encoding="utf-8"))["map"]
 
 
 def fetch(iso3: str, wb: str, from_year: int, session=None) -> list[tuple[int, float]]:
@@ -77,7 +44,8 @@ def fetch(iso3: str, wb: str, from_year: int, session=None) -> list[tuple[int, f
         page += 1
 
 
-def load(conn, countries: list[str], from_year: int = 2005, dry_run: bool = False, log=print, session=None) -> int:
+def load(conn, countries: list[str], from_year: int = 2005, dry_run: bool = False, log=print, session=None, map_path: str | None = None) -> int:
+    MAP = load_map(map_path)
     cur = conn.cursor()
     cur.execute("SELECT code, name, category, unit FROM app_indicator_definitions WHERE is_active = 1")
     defs = {r[0]: r for r in cur}

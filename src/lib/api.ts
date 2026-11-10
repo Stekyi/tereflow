@@ -1106,6 +1106,14 @@ export const api = {
       }),
   },
 
+  forecast: (country: string, flow: 'X' | 'M' = 'X') =>
+    req<{
+      country: string;
+      country_name: string;
+      flow: string;
+      model: string;
+      items: { hs6: string; name: string; base_year: number; base_value_usd: number; p_grow: number; growth_pred: number; growth_low: number; growth_high: number }[];
+    }>(`/api/forecast/${encodeURIComponent(country)}?flow=${flow}`),
   premium: {
     subscriptions: () => req<{ subscriptions: Subscription[] }>('/api/premium/subscriptions'),
     follow: (input: { kind: SubscriptionKind; value: string; label?: string }) =>

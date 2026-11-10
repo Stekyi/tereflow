@@ -1,6 +1,7 @@
 """Command line: python -m tereflow_oracle <command>."""
 from __future__ import annotations
 import argparse
+import json
 import os
 import re
 import secrets
@@ -119,6 +120,24 @@ def cmd_ingest(conn, a):
     sys.exit(0 if s.status in ("SUCCESS",) else 2)
 
 
+def cmd_worldbank(conn, a):
+    from . import worldbank
+    countries = [c.upper() for c in a.country] or [r[0] for r in conn.cursor().execute(
+        "SELECT iso3 FROM app_entities WHERE kind = 'country' AND is_active = 1 AND iso3 IS NOT NULL ORDER BY iso3")]
+    n = worldbank.load(conn, countries, a.from_year, a.dry_run)
+    print(f"{n:,} observations for {len(countries)} countries")
+
+
+def cmd_forecast(conn, a):
+    from . import forecast
+    flows = ["X", "M"] if a.flow == "both" else [a.flow]
+    if a.cmd == "forecast-run":
+        print(f"{forecast.cmd_run(conn, flows):,} forecasts written")
+        return
+    for r in forecast.cmd_eval(conn, flows, Path(a.out) if Path(a.out).is_absolute() else ROOT / a.out):
+        print(json.dumps(r) if "error" in r else f"{r['flow']}: AUC model {r['auc_model']} vs momentum {r['auc_momentum']}; top-10% precision {r['precision_top10_model']} vs {r['precision_top10_momentum']} (base {r['base_rate_test']})")
+
+
 def cmd_ingest_monthly(conn, a):
     from . import monthly, national
     years = a.years or default_years(6)
@@ -218,6 +237,14 @@ def main(argv=None):
     i.add_argument("--no-analytics", action="store_true")
     i.add_argument("--incremental", action="store_true", help="fill gaps in the base years, then only the current year")
     i.add_argument("--base-years", type=int, default=5)
+    wbp = sub.add_parser("worldbank", help="load World Bank country indicators")
+    wbp.add_argument("--country", nargs="*", default=[])
+    wbp.add_argument("--from-year", type=int, default=2005)
+    wbp.add_argument("--dry-run", action="store_true")
+    for fname in ("forecast-eval", "forecast-run"):
+        fp = sub.add_parser(fname)
+        fp.add_argument("--flow", choices=["X", "M", "both"], default="both")
+        fp.add_argument("--out", default="reports")
     mo = sub.add_parser("ingest-monthly")
     mo.add_argument("--country", nargs="+", required=True)
     mo.add_argument("--years", nargs="*", type=int)
@@ -275,7 +302,7 @@ def main(argv=None):
             n += k
         print(f"{n:,} lines indexed")
         return
-    {"sync-countries": cmd_sync_countries, "create-app-user": cmd_create_app_user, "ingest": cmd_ingest,
+    {"sync-countries": cmd_sync_countries, "create-app-user": cmd_create_app_user, "ingest": cmd_ingest, "forecast-eval": cmd_forecast, "forecast-run": cmd_forecast, "worldbank": cmd_worldbank,
      "analytics": cmd_analytics, "ingest-monthly": cmd_ingest_monthly, "ingest-tariffs": cmd_ingest_tariffs, "build-kb": cmd_build_kb, "status": cmd_status, "check": cmd_check, "define-ords": cmd_define_ords}[a.cmd](conn, a)
 
 

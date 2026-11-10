@@ -14,6 +14,8 @@ if errorlevel 1 (echo ingest failed, retrying once >> "..\%LOG%" & python -m ter
 if errorlevel 1 (echo ingest failed twice, rebuilding snapshots from what Oracle holds >> "..\%LOG%")
 python -m tereflow_oracle analytics >> "..\%LOG%" 2>&1
 if errorlevel 1 (echo analytics failed, retrying once >> "..\%LOG%" & python -m tereflow_oracle analytics >> "..\%LOG%" 2>&1)
+REM World Bank indicators are annual; refreshing nightly is cheap and keeps new countries filled in.
+python -m tereflow_oracle worldbank >> "..\%LOG%" 2>&1
 cd ..
 call npm run snapshots >> "%LOG%" 2>&1
 exit /b %errorlevel%

@@ -36,6 +36,7 @@ const Thread = lazy(() => import('./pages/Thread'));
 const Me = lazy(() => import('./pages/Me'));
 const Feed = lazy(() => import('./pages/Feed'));
 const Playbooks = lazy(() => import('./pages/Playbooks'));
+const Outlook = lazy(() => import('./pages/Outlook'));
 const PlaybookDetail = lazy(() => import('./pages/PlaybookDetail'));
 const Upgrade = lazy(() => import('./pages/Upgrade'));
 const TradeSandbox = lazy(() => import('./pages/TradeSandbox'));
@@ -50,6 +51,7 @@ const TITLES: Record<string, string> = {
   '/me/card': 'My business card',
   '/feed': 'Your feed',
   '/playbooks': 'How to start',
+  '/outlook': 'Growth outlook',
   '/upgrade': 'Premium',
   '/sandbox': 'Trade sandbox',
   '/news': 'Trade news',
@@ -171,6 +173,7 @@ export default function App() {
             <Route path="/me/card" element={<CardEditor />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/playbooks" element={<Playbooks />} />
+            <Route path="/outlook/:country" element={<Outlook />} />
             <Route path="/playbooks/:slug" element={<PlaybookDetail />} />
             <Route path="/upgrade" element={<Upgrade />} />
             <Route path="/sandbox" element={<TradeSandbox />} />

@@ -15,6 +15,7 @@ import { resolve } from './routes/resolve';
 import { tariffs } from './routes/tariffs';
 import { notifications } from './routes/notifications';
 import { premium } from './routes/premium';
+import { forecast } from './routes/forecast';
 import { feedback } from './routes/feedback';
 import { portal } from './routes/portal';
 import { ghana } from './routes/ghana';
@@ -103,6 +104,7 @@ app.route('/api/resolve', resolve);
 app.route('/api/tariffs', tariffs);
 app.route('/api/notifications', notifications);
 app.route('/api/premium', premium);
+app.route('/api/forecast', forecast);
 app.route('/api/feedback', feedback);
 app.route('/api', pub);
 

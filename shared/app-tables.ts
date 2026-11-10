@@ -17,6 +17,7 @@ export const APP_TABLES: readonly string[] = [
   'feed_items',
   'feedback',
   'follows',
+  'forecasts',
   'guide_runs',
   'indicator_definitions',
   'indicator_observations',

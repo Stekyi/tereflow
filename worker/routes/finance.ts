@@ -149,14 +149,16 @@ financeAdmin.post('/upload', async (c) => {
   const actor = await currentUser(c.req.raw, c.env);
   const id = uid('fup_');
   await c.env.DB.prepare('INSERT INTO fin_uploads (id, filename, rows_read, rows_loaded, status, uploaded_by) VALUES (?, ?, ?, ?, ?, ?)').bind(id, (b.filename ?? 'upload.csv').slice(0, 300), rows.length, rows.length, 'loaded', actor?.email ?? 'admin').run();
+  // One gateway call per 150 statements, so a large file does not exhaust the Worker's subrequest limit.
+  const stmts: D1PreparedStatement[] = [];
   for (const r of rows) {
     if (b.replace) {
-      await c.env.DB.prepare("DELETE FROM fin_metrics WHERE institution_code = ? AND period = ? AND metric_code = ? AND COALESCE(rate_type, '-') = ?").bind(r.institution_code, r.period, r.metric_code, r.rate_type ?? '-').run();
+      stmts.push(c.env.DB.prepare("DELETE FROM fin_metrics WHERE institution_code = ? AND period = ? AND metric_code = ? AND COALESCE(rate_type, '-') = ?").bind(r.institution_code, r.period, r.metric_code, r.rate_type ?? '-'));
     }
-    await c.env.DB.prepare('INSERT INTO fin_metrics (institution_code, country_iso3, period, metric_code, value, unit, currency, source_note, rate_type, upload_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(r.institution_code, r.country_iso3, r.period, r.metric_code, r.value, r.unit, r.currency, r.source_note, r.rate_type, id).run();
+    stmts.push(c.env.DB.prepare('INSERT INTO fin_metrics (institution_code, country_iso3, period, metric_code, value, unit, currency, source_note, rate_type, upload_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(r.institution_code, r.country_iso3, r.period, r.metric_code, r.value, r.unit, r.currency, r.source_note, r.rate_type, id));
   }
-  return json({ ok: true, id, rows_loaded: rows.length, problems: [] }, 201);
+  for (let i = 0; i < stmts.length; i += 150) await c.env.DB.batch(stmts.slice(i, i + 150));  return json({ ok: true, id, rows_loaded: rows.length, problems: [] }, 201);
 });
 
 financeAdmin.delete('/uploads/:id', async (c) => {

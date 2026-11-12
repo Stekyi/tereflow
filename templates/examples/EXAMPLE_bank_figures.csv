@@ -1,0 +1,3 @@
+institution_code,country_iso3,period,metric_code,value,unit,currency,source_note,rate_type
+EXAMPLE_BANK,GHA,2025,NPL_RATIO,14.2,percent,,EXAMPLE ONLY - replace with a real report and page,
+EXAMPLE_BANK,GHA,2025-06,LENDING_RATE,28.5,percent,GHS,EXAMPLE ONLY - replace with a real rate card,indicative

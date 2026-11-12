@@ -1112,6 +1112,31 @@ export const api = {
       }),
   },
 
+  freshness: () =>
+    req<{
+      comtrade_note: string;
+      recorded_at: string | null;
+      countries: { iso3: string; name: string; national_source: { name: string; url: string | null; frequency: string; note: string | null } | null; flows: { flow: string; comtrade_latest_year: number | null; national_latest_period: string | null; national_ytd: { pct: number; through: string; periods: number } | null }[] }[];
+    }>('/api/freshness'),
+  nationalAdmin: {
+    overview: () =>
+      req<{
+        sources: { country_iso3: string; source_name: string; source_url: string | null; frequency: string; note: string | null }[];
+        uploads: { id: string; filename: string; rows_read: number; rows_loaded: number; status: string; uploaded_at: string }[];
+        priority: string[];
+        formats: Record<string, string>;
+      }>('/api/admin/national'),
+    addSource: (input: { country_iso3: string; source_name: string; source_url?: string; frequency: string; note?: string }) =>
+      req<{ country_iso3: string }>('/api/admin/national/sources', { method: 'POST', body: JSON.stringify(input) }),
+    upload: async (input: { filename: string; content: string; dry_run: boolean; replace: boolean }) => {
+      const headers = new Headers({ 'content-type': 'application/json' });
+      const token = getAdminToken();
+      if (token) headers.set('authorization', `Bearer ${token}`);
+      const res = await fetch('/api/admin/national/upload', { method: 'POST', headers, body: JSON.stringify(input), credentials: 'same-origin' });
+      return (await res.json()) as { ok: boolean; rows_read?: number; rows_loaded?: number; problems: { row: number; column: string; message: string }[]; error?: string };
+    },
+    revert: (id: string) => req<{ ok: true }>(`/api/admin/national/uploads/${id}`, { method: 'DELETE' }),
+  },
   financeCountries: () => req<{ countries: { country_iso3: string; country_name: string; institutions: number }[] }>('/api/finance'),
   finance: (country: string) =>
     req<{

@@ -260,7 +260,7 @@ export default function Home() {
       )}
       {products.length > 0 && (
         <p className="tiny dim" style={{ margin: '2px 0 0' }}>
-          Latest trade year in this list: {Math.max(...products.map((p) => p.year))}. {homeCfg.vintage_note}
+          Latest trade year in this list: {Math.max(...products.map((p) => p.year))}. {homeCfg.vintage_note} <Link to="/data-sources">Sources and update frequency</Link>
         </p>
       )}
       <p className="tiny dim" style={{ margin: '2px 0 12px' }}>

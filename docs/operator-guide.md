@@ -82,3 +82,58 @@ kept), export as text, or print to PDF. Every canvas is stored against the user,
 
 To change labels, helper text or typical lines, edit `shared/config/canvas.json` (no code change). The German text is a
 first draft and should be reviewed by a native speaker.
+
+## National statistics (monthly and quarterly series)
+
+For countries whose own statistics office publishes faster than UN Comtrade. A person finds the figures, fills the template,
+and the system validates and stores them. Nothing is scraped. Priority countries are listed in `templates/national_config.json`.
+
+**One-off setup** (already done on the live database): `python scripts/national/national_load.py create-tables`.
+
+**Every time:**
+1. Register the country's source once: Admin, **National data**, "Register a national source" (name, web address, update
+   frequency monthly, quarterly or annual). Or: `python scripts/national/national_load.py source GHA "Ghana Statistical Service" --frequency monthly --url URL`.
+   The frequency decides which period format is accepted (`2026-03`, `2026-Q1` or `2026`).
+2. Make the template: `python scripts/national/national_load.py make` (writes `templates/national_template.xlsx`; a filled
+   example is in `templates/examples/`). Columns: `country_iso3, flow, period, hs_code, value_usd, source_note`.
+   `flow` is X (exports) or M (imports). `hs_code` is TOTAL or a 2, 4 or 6 digit code. `value_usd` is US dollars in plain
+   digits: convert local currency first and say how in `source_note`. `source_note` is required on every row.
+3. Check, with no database: `python scripts/national/national_load.py check FILE --frequency monthly [--report problems.csv]`.
+4. Load, either way:
+   - **Admin, National data, Upload a series (CSV).** "Check only" lists problems by row. "Check and load" saves. Tick Replace to overwrite earlier figures for the same country, flow, period and product.
+   - **Script:** `python scripts/national/national_load.py load FILE [--dry-run] [--replace]`.
+5. A wrong load can be undone from Upload history, Revert.
+
+**What users see:** the public **Data sources** page (`/data-sources`, linked from the openings list) shows, for every country and
+flow, the latest Comtrade year, the national source and how often it updates, the latest national period held, and the change
+so far this year against the same periods last year. Year to date appears only when both years cover exactly the same periods.
+The nightly job refreshes the Comtrade side (`national_load.py freshness`).
+
+## Running everything: quick reference
+
+| Job | Command | Dry run | Log |
+| --- | --- | --- | --- |
+| Trade data collection | `python -m tereflow_oracle ingest --country EST` (or the downloadable collector zip) | `--dry-run` | prints countries, years, rows |
+| Monthly totals | `python -m tereflow_oracle ingest-monthly [--country ..]` (default: active countries) | | prints per country |
+| Analysis and dashboards | `python -m tereflow_oracle analytics` | | prints per country, retries dropped connections |
+| World Bank indicators | `python -m tereflow_oracle worldbank --dry-run` | `--dry-run` | prints observations per country |
+| Growth forecast | `python -m tereflow_oracle forecast-eval` then `forecast-run` | eval only reads | report in `reports/` |
+| Bank figures | `python scripts/finance/bank_load.py load FILE` | `--dry-run` | prints rows read, problems, rows loaded |
+| National series | `python scripts/national/national_load.py load FILE` | `--dry-run` | prints rows read, problems, rows loaded |
+| Whole nightly refresh | `run-refresh.cmd` (scheduled) | | `logs\refresh-<date>.log` |
+
+Every loader rejects a file with any bad row, naming the row and column, and never stores a partial file.
+
+## Plan success criteria, checked 11 Nov 2026
+
+| Criterion | Status |
+| --- | --- |
+| No hardcoded country, product, metric or image lists | Met for lists the operator needs to change (sectors, EU members, World Bank indicators, finance metrics, image categories, national frequencies, landing copy, nightly country list). Remaining by design: `worker/providers/discover.ts` (name aliases for the discovery parser), `worker/providers/countries/ghana.ts` (the Ghana-specific provider) and `shared/frameworks.ts` (the standard Incoterms list). |
+| Operator can upload bank Excel and images without a developer | Met. Images in Admin; bank data by CSV in Admin or Excel through the script. The Admin cannot read .xlsx itself (a Cloudflare Worker CPU limit), so Excel goes through the script. |
+| Scripts run from the command line with clear output | Met. |
+| Welcome page states the purpose | Met. |
+| Every major data view offers a next action | Met on the openings list, product detail, Finance, Canvas and Outlook. Not yet on every secondary page. |
+| Business Model Canvas, nine blocks, German and English, editable, exportable | Met. German text is a first draft and needs a native review. |
+| Free and Premium enforced with visible upgrade paths | Met (Canvas, Outlook, saved runs are 402 for free users; upgrade links shown). |
+| Africa-first defaults without blocking global data | Met. |
+| Documentation for every new script and admin workflow | Met in this guide. |

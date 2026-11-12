@@ -39,6 +39,7 @@ const Playbooks = lazy(() => import('./pages/Playbooks'));
 const Outlook = lazy(() => import('./pages/Outlook'));
 const Finance = lazy(() => import('./pages/Finance'));
 const FinanceIndex = lazy(() => import('./pages/Finance').then((m) => ({ default: m.FinanceIndex })));
+const DataSources = lazy(() => import('./pages/DataSources'));
 const CanvasPage = lazy(() => import('./pages/Canvas'));
 const CanvasStart = lazy(() => import('./pages/Canvas').then((m) => ({ default: m.CanvasStart })));
 const PlaybookDetail = lazy(() => import('./pages/PlaybookDetail'));
@@ -58,6 +59,7 @@ const TITLES: Record<string, string> = {
   '/outlook': 'Growth outlook',
   '/finance': 'Finance',
   '/canvas': 'Business Model Canvas',
+  '/data-sources': 'Data sources',
   '/upgrade': 'Premium',
   '/sandbox': 'Trade sandbox',
   '/news': 'Trade news',
@@ -183,6 +185,7 @@ export default function App() {
             <Route path="/outlook/:country" element={<Outlook />} />
             <Route path="/finance" element={<FinanceIndex />} />
             <Route path="/finance/:country" element={<Finance />} />
+            <Route path="/data-sources" element={<DataSources />} />
             <Route path="/canvas" element={<CanvasStart />} />
             <Route path="/canvas/:id" element={<CanvasPage />} />
             <Route path="/playbooks/:slug" element={<PlaybookDetail />} />

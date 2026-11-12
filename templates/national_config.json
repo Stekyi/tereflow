@@ -1,0 +1,10 @@
+{
+  "_about": "Template for national statistics series (monthly or quarterly trade values from a country's own statistics office). Edit this file to change allowed values; no code change is needed.",
+  "columns": ["country_iso3", "flow", "period", "hs_code", "value_usd", "source_note"],
+  "required": ["country_iso3", "flow", "period", "hs_code", "value_usd", "source_note"],
+  "flows": {"X": "exports", "M": "imports"},
+  "frequencies": ["monthly", "quarterly", "annual"],
+  "period_formats": {"monthly": "YYYY-MM, for example 2026-03", "quarterly": "YYYY-Qn, for example 2026-Q1", "annual": "YYYY, for example 2025"},
+  "hs_code": "TOTAL for the country's overall total, or a 2, 4 or 6 digit HS code",
+  "priority_countries": ["CIV", "GHA", "NGA", "KEN", "NLD", "GBR", "ARE", "IND", "CHN"]
+}

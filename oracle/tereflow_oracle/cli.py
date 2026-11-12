@@ -142,7 +142,7 @@ def cmd_ingest_monthly(conn, a):
     from . import monthly, national
     years = a.years or default_years(6)
     client = None
-    for c in [x.upper() for x in a.country]:
+    for c in [x.upper() for x in a.country] or active_countries(conn):
         # The UK has its own monthly source; every other country comes from Comtrade.
         if c in national.registry() and hasattr(national.registry()[c], "fetch_monthly"):
             print(c, monthly.ingest_monthly(conn, c, years))
@@ -264,7 +264,7 @@ def main(argv=None):
         fp.add_argument("--flow", choices=["X", "M", "both"], default="both")
         fp.add_argument("--out", default="reports")
     mo = sub.add_parser("ingest-monthly")
-    mo.add_argument("--country", nargs="+", required=True)
+    mo.add_argument("--country", nargs="*", default=[], help="default: every active country")
     mo.add_argument("--years", nargs="*", type=int)
     tf = sub.add_parser("ingest-tariffs")
     tf.add_argument("--reporter", nargs="+", required=True)

@@ -63,6 +63,7 @@ type SectionId =
   | 'content'
   | 'media'
   | 'finance'
+  | 'national'
   | 'feedback'
   | 'setup';
 
@@ -81,6 +82,7 @@ const SECTIONS: { id: SectionId; label: string; icon: string }[] = [
   { id: 'content', label: 'Content', icon: 'M6 4h9l3 3v13H6zM9 9h6M9 13h6' },
   { id: 'media', label: 'Images', icon: 'M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9h.01' },
   { id: 'finance', label: 'Finance', icon: 'M4 20h16M6 20V10M12 20V4M18 20v-7' },
+  { id: 'national', label: 'National data', icon: 'M4 19 10 13l4 3 6-8' },
   { id: 'feedback', label: 'Feedback', icon: 'M4 5h16v11H9l-5 4z' },
   { id: 'setup', label: 'Setup', icon: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM4 12h2M18 12h2M12 4v2M12 18v2' },
 ];
@@ -178,6 +180,7 @@ export default function Portal() {
           {section === 'content' && <Content onError={onError} />}
           {section === 'media' && <Media t={t} onError={onError} />}
           {section === 'finance' && <FinanceAdmin t={t} onError={onError} />}
+          {section === 'national' && <NationalAdmin t={t} onError={onError} />}
           {section === 'feedback' && <Feedback t={t} onError={onError} />}
           {section === 'setup' && <Setup onError={onError} />}
         </div>
@@ -582,6 +585,81 @@ function Registry({ t, onError }: { t: Toaster; onError: OnError }) {
         analysis here. Rebuild feeds only fans subscriber feeds out from analysis that already
         exists.
       </p>
+    </>
+  );
+}
+
+/* ---- National data ---- */
+
+function NationalAdmin({ t, onError }: { t: Toaster; onError: OnError }) {
+  type Ov = Awaited<ReturnType<typeof api.nationalAdmin.overview>>;
+  const [ov, setOv] = useState<Ov | null>(null);
+  const [iso, setIso] = useState('');
+  const [name, setName] = useState('');
+  const [url, setUrl] = useState('');
+  const [freq, setFreq] = useState('monthly');
+  const [file, setFile] = useState<File | null>(null);
+  const [replace, setReplace] = useState(false);
+  const [report, setReport] = useState<{ text: string; problems: { row: number; column: string; message: string }[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => { api.nationalAdmin.overview().then(setOv).catch(onError); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function addSource() {
+    try { await api.nationalAdmin.addSource({ country_iso3: iso, source_name: name, source_url: url || undefined, frequency: freq }); t.ok('Source saved'); setIso(''); setName(''); setUrl(''); load(); } catch (e) { onError(e); }
+  }
+  async function send(dry: boolean) {
+    if (!file) return onError(new Error('Choose a CSV file first'));
+    setBusy(true);
+    try {
+      const r = await api.nationalAdmin.upload({ filename: file.name, content: await file.text(), dry_run: dry, replace });
+      if (r.error) throw new Error(r.error);
+      setReport({ problems: r.problems ?? [], text: r.ok ? (dry ? `Valid: ${r.rows_read} rows would be loaded.` : `Loaded ${r.rows_loaded} rows.`) : `Not loaded: ${r.problems.length} problem(s).` });
+      if (r.ok && !dry) { t.ok('Loaded'); load(); }
+    } catch (e) { onError(e); } finally { setBusy(false); }
+  }
+  if (!ov) return <Skeletons n={4} />;
+  return (
+    <>
+      <p className="small dim" style={{ marginTop: 0 }}>
+        Monthly or quarterly figures from a country's own statistics office. Register the source first (its update frequency decides which period format is accepted), then upload the filled template as CSV (in Excel: Data sheet, Save As CSV). Template and script: scripts/national and docs/operator-guide.md. Priority countries: {ov.priority.join(', ')}.
+      </p>
+      <Panel title="Register a national source">
+        <div style={{ display: 'grid', gap: 8, maxWidth: 440 }}>
+          <input placeholder="Country ISO3, e.g. GHA" value={iso} onChange={(e) => setIso(e.target.value)} />
+          <input placeholder="Source name, e.g. Ghana Statistical Service" value={name} onChange={(e) => setName(e.target.value)} />
+          <input placeholder="Source web address (optional)" value={url} onChange={(e) => setUrl(e.target.value)} />
+          <select value={freq} onChange={(e) => setFreq(e.target.value)}>{Object.entries(ov.formats).map(([k, v]) => <option key={k} value={k}>{k}: {v}</option>)}</select>
+          <div><button className="btn" onClick={() => void addSource()}>Save source</button></div>
+        </div>
+      </Panel>
+      <Panel title="Upload a series (CSV)">
+        <div style={{ display: 'grid', gap: 8, maxWidth: 440 }}>
+          <input type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <label><input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> Replace earlier figures for the same country, flow, period and product</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" disabled={busy} onClick={() => void send(true)}>Check only</button>
+            <button className="btn" disabled={busy} onClick={() => void send(false)}>Check and load</button>
+          </div>
+        </div>
+        {report && <div style={{ marginTop: 10 }}><strong>{report.text}</strong><ul className="small">{report.problems.map((p, i) => <li key={i}>Row {p.row} [{p.column}]: {p.message}</li>)}</ul></div>}
+      </Panel>
+      <Panel title={`Sources (${ov.sources.length})`}>
+        {ov.sources.length === 0 ? <p className="small dim" style={{ margin: 0 }}>None yet.</p> : (
+          <div className="table-wrap"><table className="data-table"><thead><tr><th>Country</th><th>Source</th><th>Updates</th></tr></thead>
+            <tbody>{ov.sources.map((s) => <tr key={s.country_iso3}><td>{s.country_iso3}</td><td>{s.source_name}</td><td>{s.frequency}</td></tr>)}</tbody></table></div>
+        )}
+      </Panel>
+      <Panel title="Upload history">
+        {ov.uploads.length === 0 ? <p className="small dim" style={{ margin: 0 }}>None yet.</p> : (
+          <div className="table-wrap"><table className="data-table"><thead><tr><th>When</th><th>File</th><th className="align-right">Rows</th><th>Status</th><th /></tr></thead>
+            <tbody>{ov.uploads.map((u) => (
+              <tr key={u.id}><td>{u.uploaded_at}</td><td>{u.filename}</td><td className="align-right">{u.rows_loaded}</td><td>{u.status}</td>
+                <td>{u.status === 'loaded' && <button className="btn" onClick={() => { if (window.confirm('Remove every row from this upload?')) void api.nationalAdmin.revert(u.id).then(load).catch(onError); }}>Revert</button>}</td></tr>
+            ))}</tbody></table></div>
+        )}
+      </Panel>
     </>
   );
 }

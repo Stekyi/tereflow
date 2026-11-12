@@ -48,11 +48,23 @@ def make(cfg: dict, out: Path) -> None:
     wb.save(out)
 
 
-def check(cfg: dict, path: Path) -> tuple[int, list[tuple[int, str, str]]]:
+def _rows(path: Path):
+    """Yields data rows as lists, from the Data sheet of an Excel file or from a CSV (as saved from that sheet)."""
+    if path.suffix.lower() == ".csv":
+        with path.open(newline="", encoding="utf-8-sig") as fh:
+            yield from csv.reader(fh)
+        return
     wb = load_workbook(path, read_only=True, data_only=True)
     if "Data" not in wb.sheetnames:
-        return 0, [(0, "sheet", "no sheet called Data")]
-    rows = wb["Data"].iter_rows(values_only=True)
+        raise ValueError("no sheet called Data")
+    yield from wb["Data"].iter_rows(values_only=True)
+
+
+def check(cfg: dict, path: Path) -> tuple[int, list[tuple[int, str, str]]]:
+    try:
+        rows = _rows(path)
+    except ValueError as e:
+        return 0, [(0, "sheet", str(e))]
     header = [str(h).strip() if h is not None else "" for h in next(rows, [])]
     problems: list[tuple[int, str, str]] = []
     missing = [c for c in cfg["columns"] if c not in header]

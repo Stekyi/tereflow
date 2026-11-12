@@ -8,7 +8,7 @@ set PYTHONPATH=.
 REM Keep Oracle's active-country list in step with the admin tick boxes, or the sandbox rejects a country the app shows as active.
 python -m tereflow_oracle sync-countries >> "..\%LOG%" 2>&1
 REM Monthly first (cheap: World totals only), yearly after. A quota stop in one does not block the other.
-python -u -m tereflow_oracle ingest-monthly --country GHA NGA TGO CIV LBR CHN USA --years 2021 2022 2023 2024 2025 >> "..\%LOG%" 2>&1
+python -u -m tereflow_oracle ingest-monthly >> "..\%LOG%" 2>&1
 python -m tereflow_oracle ingest --incremental >> "..\%LOG%" 2>&1
 if errorlevel 1 (echo ingest failed, retrying once >> "..\%LOG%" & python -m tereflow_oracle ingest --incremental >> "..\%LOG%" 2>&1)
 if errorlevel 1 (echo ingest failed twice, rebuilding snapshots from what Oracle holds >> "..\%LOG%")
@@ -17,5 +17,6 @@ if errorlevel 1 (echo analytics failed, retrying once >> "..\%LOG%" & python -m 
 REM World Bank indicators are annual; refreshing nightly is cheap and keeps new countries filled in.
 python -m tereflow_oracle worldbank >> "..\%LOG%" 2>&1
 cd ..
+python scripts\national\national_load.py freshness >> "%LOG%" 2>&1
 call npm run snapshots >> "%LOG%" 2>&1
 exit /b %errorlevel%

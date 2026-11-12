@@ -799,7 +799,7 @@ export function CompanyLinksBlock({ name }: { name: string | null }) {
       <p style={{ margin: '4px 0 0' }}>
         UN Comtrade has no company names, so Tereflow cannot list them. These free searches open outside Tereflow, and we do not store or verify what they show:{' '}
         <a href={`https://www.importyeti.com/search?q=${enc}`} target="_blank" rel="noopener noreferrer">US import shipments (ImportYeti)</a>
-        {' Â· '}
+        {' · '}
         <a href={`https://opencorporates.com/companies?q=${enc}`} target="_blank" rel="noopener noreferrer">company registers (OpenCorporates)</a>.
         {' '}ImportYeti covers only goods shipped into the United States. Search results match on the product wording, so expect noise.
       </p>
@@ -1154,6 +1154,44 @@ function ProductHistoryChart({ rows }: { rows: NonNullable<ProductInsight['time_
 
 /* ---------- modal ---------- */
 
+const STAGES = [
+  { key: 'data', label: 'Data', sub: 'What the trade shows' },
+  { key: 'insight', label: 'Insight', sub: 'What it means' },
+  { key: 'action', label: 'Action', sub: 'What to do next' },
+] as const;
+
+/** Stage 3. Data and insight without action are useless, so every product ends here: concrete next steps, free first. */
+function ActionStage({ insight, focusSlug, entitled }: { insight: ProductInsight; focusSlug: string | null; entitled: boolean }) {
+  const country = focusSlug ?? '';
+  const qs = country ? `?country=${encodeURIComponent(country)}` : '';
+  const steps: { to: string; title: string; text: string; premium?: boolean }[] = [
+    { to: `/guide${qs}`, title: 'Run the Guide', text: 'Walk from the problem, through the supply chain, to the questions to ask and the plays to try.' },
+    { to: entitled ? `/canvas?hs=${insight.hs_code}${country ? `&country=${encodeURIComponent(country)}` : ''}` : '/upgrade', title: 'Build your Business Model Canvas', text: 'The app presets the nine blocks for this product. You model the rest.', premium: true },
+    { to: '/finance', title: 'Check who can finance it', text: 'Banks and lenders by country, with their published figures.' },
+    { to: `/network?q=${encodeURIComponent(insight.name)}`, title: 'Find people to trade with', text: 'Buyers, sellers and suppliers for this product, ready to message.' },
+    { to: `/sandbox?${new URLSearchParams({ ...(country ? { primary: country } : {}), hs: insight.hs_code, flow: insight.focus_flow }).toString()}`, title: 'Compare markets in the Sandbox', text: 'Put this product against partner countries, side by side.' },
+  ];
+  return (
+    <div className="action-stage">
+      <p className="small dim" style={{ margin: '0 0 8px' }}>You have seen the data and what it means. Now do something with it.</p>
+      <ol className="action-list">
+        {steps.map((st, i) => (
+          <li key={st.title}>
+            <Link className="action-card" to={st.to}>
+              <span className="action-num">{i + 1}</span>
+              <span className="action-body"><strong>{st.title}{st.premium && !entitled && <span className="badge premium" style={{ marginLeft: 8 }}>Premium</span>}</strong><span className="tiny dim">{st.text}</span></span>
+              <span aria-hidden>{'\u203a'}</span>
+            </Link>
+          </li>
+        ))}
+      </ol>
+      <CompanyLinksBlock name={insight.name ?? null} />
+      {insight.focus_slug && <p className="tiny" style={{ margin: '10px 0 0' }}><Link to={`/feasibility/${insight.focus_slug}/${insight.hs_code}?flow=${insight.focus_flow ?? 'export'}`}>Open the full feasibility report</Link></p>}
+      <DiscoveryBlock hs={insight.hs_code} />
+    </div>
+  );
+}
+
 export default function ProductModal({
   hsCode,
   countrySlug = null,
@@ -1186,6 +1224,9 @@ export default function ProductModal({
   // The score is the one figure here that asks to be trusted, so it opens to
   // show the four terms behind it rather than staying a bare number.
   const [scoreOpen, setScoreOpen] =   useState(openScore);
+  // The three stages of every product: what the trade shows, what it means, what to do.
+  const [stage, setStage] = useState<'data' | 'insight' | 'action'>(openScore ? 'insight' : 'data');
+  useEffect(() => { setStage(openScore ? 'insight' : 'data'); }, [hs, openScore]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
@@ -1420,9 +1461,26 @@ export default function ProductModal({
               </div>
             )}
 
+            <div className="stage-steps" role="tablist" aria-label="Data, insight, action">
+              {STAGES.map((st, i) => (
+                <button
+                  key={st.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={stage === st.key}
+                  className={`stage-step${stage === st.key ? ' on' : ''}`}
+                  onClick={() => setStage(st.key)}
+                >
+                  <span className="stage-num">{i + 1}</span>
+                  <span className="stage-text"><strong>{st.label}</strong><small>{st.sub}</small></span>
+                </button>
+              ))}
+            </div>
+
             <div className="insight-body">
               <div className="insight-main">
                 <div className="insight-tiles">
+                  {stage === 'insight' && (
                   <Tile
                     k={MOMENTUM_SCORE_LABEL}
                     v={insight.score != null ? `${insight.score}/100` : 'Not scored'}
@@ -1441,12 +1499,16 @@ export default function ProductModal({
                         : 'A score is only given where the pipeline ranked this product for a country. No score is not a low score.'
                     }
                   />
+                  )}
+                  {stage === 'data' && (
                   <Tile
                     k="3-year growth"
                     v={growth.text}
                     s={growthWhose ? `For ${growthWhose}` : undefined}
                     tone={growth.tone}
                   />
+                  )}
+                  {stage === 'data' && (
                   <Tile
                     k="Unit value"
                     v={fmtUnitValue(insight.unit_value_usd_t)}
@@ -1463,6 +1525,8 @@ export default function ProductModal({
                             : undefined
                     }
                   />
+                  )}
+                  {stage === 'data' && (
                   <Tile
                     k={insight.focus_flow === 'import' ? 'Import value' : 'Export value'}
                     v={fmtUsd(insight.value_usd)}
@@ -1476,7 +1540,8 @@ export default function ProductModal({
                           : undefined
                     }
                   />
-                  {focusShare != null && insight.focus_name && insight.focus_flow && (
+                  )}
+                  {stage === 'data' && focusShare != null && insight.focus_name && insight.focus_flow && (
                     <Tile
                       k="Market share"
                       v={fmtPct(focusShare * 100, 1)}
@@ -1484,6 +1549,7 @@ export default function ProductModal({
                       text
                     />
                   )}
+                  {stage === 'insight' && (
                   <Tile
                     k="Price premium"
                     v={PRICE_PREMIUM_LABEL[insight.price_premium]}
@@ -1494,13 +1560,14 @@ export default function ProductModal({
                     }
                     text
                   />
+                  )}
                 </div>
 
-                {scoreOpen && insight.score_breakdown && (
+                {stage === 'insight' && scoreOpen && insight.score_breakdown && (
                   <ScoreBreakdown breakdown={insight.score_breakdown} />
                 )}
 
-                {showBorrowedPrice && (
+                {stage === 'data' && showBorrowedPrice && (
                   <p className="tiny dim" style={{ margin: '10px 0 0' }}>
                     The headline seller reported no weight for this product, so the unit value
                     shown is {insight.price_from_name}'s. It stands in for the price here rather
@@ -1510,6 +1577,8 @@ export default function ProductModal({
 
                 {insight.focus_slug && (
                   <div className="card" style={{ marginTop: 16 }}>
+                    {stage === 'data' && (
+                    <>
                     <p className="card-title">Product performance over time</p>
                     <p className="tiny dim" style={{ margin: '0 0 8px' }}>
                       {insight.focus_name} {insight.focus_flow}s of HS {insight.hs_code}, by year.
@@ -1517,33 +1586,25 @@ export default function ProductModal({
                     <ProductHistoryChart rows={insight.time_series} />
                     <ProvenanceBlock notes={insight.provenance ?? []} rows={insight.time_series} />
                     <UnitCostBlock rows={insight.time_series} />
-                {insight.reexport && <ReexportBlock signal={insight.reexport} />}
-                {insight.seasonality !== undefined && <SeasonalityBlock signal={insight.seasonality} />}
-                {insight.supply && <SupplyBlock signal={insight.supply} />}
-                <RegulatoryBlock hs={insight.hs_code} />
-                {insight.focus_slug && <ProductionBlock slug={insight.focus_slug} hs={insight.hs_code} />}
-                {insight.focus_slug && insight.focus_flow !== 'import' && <ByproductBlock slug={insight.focus_slug} hs={insight.hs_code} />}
-                {insight.focus_slug && insight.focus_flow !== 'import' && /^\d{6}$/.test(insight.hs_code) && <ProspectBlock slug={insight.focus_slug} hs={insight.hs_code} />}
-                {insight.focus_slug && insight.focus_flow !== 'import' && /^\d{6}$/.test(insight.hs_code) && <TariffBlock slug={insight.focus_slug} hs={insight.hs_code} />}
-                <LandedCostBlock key={insight.hs_code} unitValueUsdT={insight.unit_value_usd_t ?? null} />
-                <CompanyLinksBlock name={insight.name ?? null} />
-                {insight.focus_slug && <p className="tiny" style={{ margin: '10px 0 0' }}><Link to={`/feasibility/${insight.focus_slug}/${insight.hs_code}?flow=${insight.focus_flow ?? 'export'}`}>Open the full feasibility report</Link></p>}
-                <div className="card" style={{ marginTop: 12 }}>
-                  <p className="card-title">What to do next</p>
-                  <ul className="small" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
-                    <li><Link to={`/guide?country=${encodeURIComponent(insight.focus_slug)}`}>Start the Guide</Link> <span className="dim">(free): from the problem to the questions and plays.</span></li>
-                    <li>
-                      <Link to={entitled ? `/canvas?country=${encodeURIComponent(insight.focus_slug)}&hs=${insight.hs_code}` : '/upgrade'}>Get the full action plan and Business Model Canvas</Link>{' '}
-                      <span className="badge premium">Premium</span>
-                    </li>
-                    <li><Link to="/finance">See banks and lenders</Link> <span className="dim">that could finance it.</span></li>
-                    <li><Link to="/network">Find people to trade with</Link> <span className="dim">in the Network.</span></li>
-                  </ul>
-                </div>
-                <DiscoveryBlock hs={insight.hs_code} />
+                    </>
+                    )}
+                {stage === 'insight' && insight.reexport && <ReexportBlock signal={insight.reexport} />}
+                {stage === 'insight' && insight.seasonality !== undefined && <SeasonalityBlock signal={insight.seasonality} />}
+                {stage === 'insight' && insight.supply && <SupplyBlock signal={insight.supply} />}
+                {stage === 'insight' && <RegulatoryBlock hs={insight.hs_code} />}
+                {stage === 'insight' && insight.focus_slug && <ProductionBlock slug={insight.focus_slug} hs={insight.hs_code} />}
+                {stage === 'insight' && insight.focus_slug && insight.focus_flow !== 'import' && <ByproductBlock slug={insight.focus_slug} hs={insight.hs_code} />}
+                {stage === 'insight' && insight.focus_slug && insight.focus_flow !== 'import' && /^\d{6}$/.test(insight.hs_code) && <ProspectBlock slug={insight.focus_slug} hs={insight.hs_code} />}
+                {stage === 'insight' && insight.focus_slug && insight.focus_flow !== 'import' && /^\d{6}$/.test(insight.hs_code) && <TariffBlock slug={insight.focus_slug} hs={insight.hs_code} />}
+                {stage === 'insight' && <LandedCostBlock key={insight.hs_code} unitValueUsdT={insight.unit_value_usd_t ?? null} />}
+                {stage === 'action' && (
+                  <ActionStage insight={insight} focusSlug={insight.focus_slug ?? null} entitled={entitled} />
+                )}
                   </div>
                 )}
 
+                {stage === 'data' && (
+                <>
                 <div className="product-summary">
                   <div>
                     <span className="tiny dim">Exports on record</span>
@@ -1569,8 +1630,10 @@ export default function ProductModal({
                     market.
                   </p>
                 )}
+                </>
+                )}
 
-                {budget > 0 && (
+                {stage === 'insight' && budget > 0 && (
                   <div className="card budget-card" style={{ marginTop: 16 }}>
                     <p className="card-title">What ${budget.toLocaleString()} buys</p>
                     {modalFit.tonnes == null ? (
@@ -1596,6 +1659,7 @@ export default function ProductModal({
                   </div>
                 )}
 
+                {stage === 'insight' && (
                 <div className="card" style={{ marginTop: 16 }}>
                   <p className="card-title">Where demand is growing fastest</p>
                   {insight.target_markets.length === 0 ? (
@@ -1626,7 +1690,10 @@ export default function ProductModal({
                     </>
                   )}
                 </div>
+                )}
 
+                {stage === 'data' && (
+                <>
                 {/* Who this country actually trades with, when the source
                     knows. This is a different question from the world totals
                     below it, and the two must not be allowed to blur: one says
@@ -1651,7 +1718,10 @@ export default function ProductModal({
                   <CountryTable title="Sold by" rows={insight.sellers} />
                   <CountryTable title="Bought by" rows={insight.buyers} />
                 </div>
+                </>
+                )}
 
+                {stage === 'action' && (
                 <div className="card">
                   <p className="card-title">Who else follows this</p>
                   {insight.subscriber_count === 0 ? (
@@ -1691,8 +1761,9 @@ export default function ProductModal({
                     </ul>
                   )}
                 </div>
+                )}
 
-                {insight.related.length > 0 && (
+                {stage === 'insight' && insight.related.length > 0 && (
                   <div className="card">
                     <p className="card-title">Related products</p>
                     <div className="row related-chips" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -1710,25 +1781,10 @@ export default function ProductModal({
                   </div>
                 )}
 
-                <Link
-                  className="btn primary block"
-                  to={
-                    `/sandbox?${new URLSearchParams({
-                      ...(focusSlug ? { primary: focusSlug } : {}),
-                      hs: insight.hs_code,
-                      flow: insight.focus_flow,
-                    }).toString()}`
-                  }
-                >
-                  Compare Markets in Sandbox
-                </Link>
-
-                <Link
-                  className="btn block"
-                  to={`/network?q=${encodeURIComponent(insight.name)}`}
-                >
-                  Find partners for this product
-                </Link>
+                <div className="stage-nav">
+                  {stage !== 'data' && <button type="button" className="btn" onClick={() => setStage(stage === 'action' ? 'insight' : 'data')}>{'\u2039'} Back</button>}
+                  {stage !== 'action' && <button type="button" className="btn primary" onClick={() => setStage(stage === 'data' ? 'insight' : 'action')}>{stage === 'data' ? 'Next: what it means' : 'Next: what to do'} {'\u203a'}</button>}
+                </div>
               </div>
 
               <aside className="insight-aside">

@@ -3238,3 +3238,33 @@ textarea {
 
 html, body { overflow-x: clip; }
 .mm-hero { margin-bottom: 28px; }
+
+/* ---- Makeover: the three stages (data, insight, action), the view switch and the country grid ---- */
+.stage-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0 10px; }
+.stage-step { display: flex; gap: 10px; align-items: center; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; color: inherit; font: inherit; }
+.stage-step .stage-num { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); font-weight: 700; flex: none; }
+.stage-step .stage-text { display: flex; flex-direction: column; min-width: 0; }
+.stage-step small { color: var(--muted, #667085); font-size: 12px; }
+.stage-step.on { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 8%, var(--surface)); }
+.stage-step.on .stage-num { background: var(--brand); color: #fff; }
+.stage-nav { display: flex; gap: 10px; justify-content: space-between; margin: 18px 0 4px; }
+.stage-nav .btn.primary { margin-left: auto; }
+.action-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.action-card { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: inherit; text-decoration: none; }
+.action-card:hover { border-color: var(--brand); }
+.action-num { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; flex: none; }
+.action-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.pipeline-strip { list-style: none; display: flex; gap: 10px; flex-wrap: wrap; padding: 0; margin: 16px 0 0; }
+.pipeline-strip li { display: flex; flex-direction: column; padding: 10px 14px; border: 1px solid rgba(255,255,255,.25); border-radius: 12px; min-width: 130px; }
+.pipeline-strip span { font-size: 12px; opacity: .8; }
+.mm-hero.simple { min-height: 0; padding-bottom: 20px; }
+.view-switch { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); margin: 16px 0 14px; }
+.view-switch button { border: 0; background: transparent; padding: 8px 16px; border-radius: 999px; font: inherit; cursor: pointer; color: inherit; }
+.view-switch button.on { background: var(--brand); color: #fff; }
+.country-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.country-card { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: inherit; text-decoration: none; }
+.country-card:hover { border-color: var(--brand); }
+.country-figs { display: flex; gap: 16px; }
+.country-figs span { display: flex; flex-direction: column; font-weight: 650; }
+.country-figs small { font-weight: 400; color: var(--muted, #667085); font-size: 11px; }
+@media (max-width: 640px) { .stage-step small { display: none; } .stage-step { padding: 8px; } .pipeline-strip li { min-width: 0; flex: 1; } }

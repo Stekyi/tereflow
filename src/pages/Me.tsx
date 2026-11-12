@@ -106,6 +106,46 @@ export default function Me() {
         <span className="dim">›</span>
       </Link>
 
+      <Link className="list-item" to="/messages">
+        <span className="grow">
+          <span className="name">Messages</span>
+          <span className="tiny dim">Your conversations</span>
+        </span>
+        <span className="dim">&rsaquo;</span>
+      </Link>
+
+      <Link className="list-item" to="/canvas">
+        <span className="grow">
+          <span className="name">My canvases</span>
+          <span className="tiny dim">Business Model Canvases you have built (premium)</span>
+        </span>
+        <span className="dim">&rsaquo;</span>
+      </Link>
+
+      <Link className="list-item" to="/market">
+        <span className="grow">
+          <span className="name">Market Square</span>
+          <span className="tiny dim">Listings and auctions from other traders</span>
+        </span>
+        <span className="dim">&rsaquo;</span>
+      </Link>
+
+      <Link className="list-item" to="/activity">
+        <span className="grow">
+          <span className="name">Activity</span>
+          <span className="tiny dim">What is moving across the network</span>
+        </span>
+        <span className="dim">&rsaquo;</span>
+      </Link>
+
+      <Link className="list-item" to="/news">
+        <span className="grow">
+          <span className="name">Trade news</span>
+          <span className="tiny dim">Headlines from shipping and trade</span>
+        </span>
+        <span className="dim">&rsaquo;</span>
+      </Link>
+
       <Link className="list-item" to="/market/mine">
         <span className="grow">
           <span className="name">My listings</span>

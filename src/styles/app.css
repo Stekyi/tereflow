@@ -3268,3 +3268,5 @@ html, body { overflow-x: clip; }
 .country-figs span { display: flex; flex-direction: column; font-weight: 650; }
 .country-figs small { font-weight: 400; color: var(--muted, #667085); font-size: 11px; }
 @media (max-width: 640px) { .stage-step small { display: none; } .stage-step { padding: 8px; } .pipeline-strip li { min-width: 0; flex: 1; } }
+
+.stage-steps { scroll-margin-top: 72px; }

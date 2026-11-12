@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useStageScroll } from '../lib/useStageScroll';
 import { Link } from 'react-router-dom';
 import {
   Bar,
@@ -1234,6 +1235,7 @@ export default function ProductModal({
   // The three stages of every product: what the trade shows, what it means, what to do.
   const [stage, setStage] = useState<'data' | 'insight' | 'action'>(openScore ? 'insight' : 'data');
   useEffect(() => { setStage(openScore ? 'insight' : 'data'); }, [hs, openScore]);
+  useStageScroll(stage);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);

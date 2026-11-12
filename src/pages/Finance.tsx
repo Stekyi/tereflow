@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSession } from '../lib/auth';
+import { useStageScroll } from '../lib/useStageScroll';
 import { api } from '../lib/api';
 import { Empty, Skeletons } from '../components/ui';
 
@@ -39,6 +40,7 @@ export default function Finance() {
   const [data, setData] = useState<Fin | null>(null);
   const [loading, setLoading] = useState(true);
   const [stage, setStage] = useState<'data' | 'insight' | 'action'>('data');
+  useStageScroll(stage);
   useEffect(() => {
     setLoading(true);
     api.finance(country).then(setData).catch(() => setData(null)).finally(() => setLoading(false));

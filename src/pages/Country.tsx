@@ -105,7 +105,7 @@ export default function Country() {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { user, refresh } = useSession();
+  const { user, refresh, entitled } = useSession();
   const t = useToast();
   const [subs, setSubs] = useState<Map<string, string>>(new Map());
   // One product modal, scoped to this country and the flow the row or bar was
@@ -534,6 +534,16 @@ export default function Country() {
       ) : (
         data.recommendations.map((r, i) => <Rec key={i} rec={r} />)
       )}
+      <div className="card" style={{ marginTop: 12 }}>
+        <p className="card-title">What to do next</p>
+        <ul className="small" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+          <li><Link to={`/guide?country=${encodeURIComponent(slug)}`}>Start the Guide</Link> <span className="dim">(free): pick a product and walk from the problem to a supply idea.</span></li>
+          <li><Link to={entitled ? `/canvas?country=${encodeURIComponent(slug)}` : '/upgrade'}>Build a Business Model Canvas</Link> <span className="badge premium">Premium</span></li>
+          {data.entity.iso3 && <li><Link to={`/finance/${data.entity.iso3}`}>See banks and lenders in {data.entity.name}</Link></li>}
+          <li><Link to="/network">Find people to trade with</Link></li>
+          <li><Link to="/data-sources">See where this data comes from and how fresh it is</Link></li>
+        </ul>
+      </div>
       </section>
 
       <section id="signals" className="section-anchor" aria-label="Early signals">

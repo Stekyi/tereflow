@@ -19,4 +19,5 @@ python -m tereflow_oracle worldbank >> "..\%LOG%" 2>&1
 cd ..
 python scripts\national\national_load.py freshness >> "%LOG%" 2>&1
 call npm run snapshots >> "%LOG%" 2>&1
+if errorlevel 1 (echo snapshots refused or failed, waiting 3 minutes and retrying once >> "%LOG%" & timeout /t 180 /nobreak >nul & call npm run snapshots >> "%LOG%" 2>&1)
 exit /b %errorlevel%

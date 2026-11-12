@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { Empty, Skeletons } from '../components/ui';
 
@@ -72,6 +72,9 @@ export default function Finance() {
           {i.metrics[0] && <div className="tiny dim">Source: {i.metrics[0].source_note}</div>}
         </div>
       ))}
+      <p className="small" style={{ marginTop: 16 }}>
+        <Link to={`/guide?country=${country.toLowerCase()}`}>Start the Guide for this market</Link> · <Link to="/canvas">Build a Business Model Canvas</Link> (premium) · <Link to="/network">Find people to trade with</Link>
+      </p>
     </>
   );
 }

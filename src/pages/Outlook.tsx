@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { Chips, Empty, Skeletons } from '../components/ui';
 
@@ -64,7 +64,7 @@ export default function OutlookPage() {
             <tbody>
               {data.items.map((i) => (
                 <tr key={i.hs6}>
-                  <td>{i.name} <span className="tiny dim">{i.hs6}</span></td>
+                  <td>{i.name} <span className="tiny dim">{i.hs6}</span> <Link className="tiny" to={`/guide?country=${country.toLowerCase()}`}>Guide</Link></td>
                   <td className="align-right">{usd(i.base_value_usd)}</td>
                   <td className="align-right">{Math.round(i.p_grow * 100)}%</td>
                   <td className="align-right">{pct(i.growth_pred)}</td>

@@ -13,7 +13,7 @@
  * Oracle credentials come from .dev.vars, which stays out of git.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync, openSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -89,7 +89,8 @@ try {
   const appVars = ['ORACLE_APP_CLIENT_ID', 'ORACLE_APP_CLIENT_SECRET'].flatMap((k) => (fromEnv(k) ? ['--var', `${k}:${fromEnv(k)}`] : []));
   if (appVars.length < 4) throw new Error('ORACLE_APP_CLIENT_ID/SECRET missing from .env; the snapshot would read stale app data from D1');
   dev = spawn(npx, ['wrangler', 'dev', '--local', '--port', String(PORT), '--persist-to', state, '--var', 'APP_DB:oracle', ...appVars], {
-    stdio: 'ignore',
+    // SNAPSHOT_DEBUG=1 keeps the local Worker's output in logs/snapshot-worker.log, which is where Oracle errors show up.
+    stdio: process.env.SNAPSHOT_DEBUG ? ['ignore', openSync('logs/snapshot-worker.log', 'w'), openSync('logs/snapshot-worker.log', 'a')] : 'ignore',
     shell: process.platform === 'win32',
   });
   await waitReady();

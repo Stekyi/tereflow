@@ -213,25 +213,28 @@ export default function App() {
           <div className="mm-footer-cols">
             <div>
               <span className="mm-footer-brand">Tereflow</span>
-              <p>Global trade intelligence: who sells it, who buys it, and where the opening is.</p>
+              <p>Trade intelligence, Africa first. Data, then insight, then action.</p>
             </div>
             <div>
               <h4>Explore</h4>
-              <NavLink to="/">Products</NavLink>
+              <NavLink to="/">Openings</NavLink>
+              <NavLink to="/guide">Guide</NavLink>
               <NavLink to="/countries">Countries</NavLink>
-              <NavLink to="/sandbox">Trade Sandbox</NavLink>
-              <NavLink to="/guide">Problem to supply</NavLink>
-              <NavLink to="/news">Trade news</NavLink>
+              <NavLink to="/finance">Finance</NavLink>
+              <NavLink to="/sandbox">Sandbox</NavLink>
+              <NavLink to="/data-sources">Data sources</NavLink>
             </div>
             <div>
               <h4>Community</h4>
               <NavLink to="/network">Network</NavLink>
               <NavLink to="/messages">Messages</NavLink>
+              <NavLink to="/news">Trade news</NavLink>
               <NavLink to="/me">Me</NavLink>
             </div>
             <div>
               <h4>Premium</h4>
               <NavLink to="/upgrade">Go premium</NavLink>
+              <NavLink to="/canvas">Business Model Canvas</NavLink>
               <NavLink to="/opportunities">Opportunities</NavLink>
               <NavLink to="/feed">Your feed</NavLink>
             </div>

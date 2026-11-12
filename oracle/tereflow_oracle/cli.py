@@ -183,11 +183,28 @@ def cmd_build_kb(conn, a):
 
 
 def cmd_analytics(conn, a):
-    for c in [x.upper() for x in a.country] or active_countries(conn):
-        print(f"metrics {c}: {analytics.refresh_metrics(conn, c):,} products")
-        if c in opportunity.CONFIG:
-            print(f"opportunities {c}: {opportunity.refresh_opportunities(conn, c):,} scored")
-        print(f"dashboard {c}: {dashboard.refresh_dashboard(conn, c)} payloads cached")
+    """Refresh metrics, opportunities and dashboards per country. A dropped connection reconnects and retries that country."""
+    import oracledb
+    countries = [x.upper() for x in a.country] or active_countries(conn)
+    failed = []
+    for c in countries:
+        for attempt in range(1, 4):
+            try:
+                print(f"metrics {c}: {analytics.refresh_metrics(conn, c):,} products")
+                if c in opportunity.CONFIG:
+                    print(f"opportunities {c}: {opportunity.refresh_opportunities(conn, c):,} scored")
+                print(f"dashboard {c}: {dashboard.refresh_dashboard(conn, c)} payloads cached")
+                break
+            except oracledb.Error as e:
+                print(f"{c}: database error ({str(e)[:80]}), attempt {attempt} of 3")
+                if attempt == 3:
+                    failed.append(c)
+                    break
+                time.sleep(10 * attempt)
+                conn = db.connect(app=a.app)
+    if failed:
+        print(f"analytics failed for: {', '.join(failed)}")
+        sys.exit(2)
 
 
 def cmd_define_ords(conn, _a):

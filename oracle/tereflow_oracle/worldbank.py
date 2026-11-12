@@ -8,6 +8,7 @@ written. Re-running replaces that source's rows for the country and indicator, s
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import requests
@@ -28,8 +29,18 @@ def fetch(iso3: str, wb: str, from_year: int, session=None) -> list[tuple[int, f
     out: list[tuple[int, float]] = []
     page = 1
     while True:
-        r = http.get(API.format(iso3=iso3, wb=wb), timeout=60,
-                     params={"format": "json", "per_page": 200, "page": page, "date": f"{from_year}:2030"})
+        r = None
+        for attempt in range(4):
+            try:
+                r = http.get(API.format(iso3=iso3, wb=wb), timeout=30,
+                             params={"format": "json", "per_page": 200, "page": page, "date": f"{from_year}:2030"})
+                if r.status_code < 500:
+                    break
+            except requests.RequestException:
+                r = None
+            time.sleep(2 * (attempt + 1))
+        if r is None:
+            raise RuntimeError(f"World Bank unreachable for {iso3} {wb}")
         if not r.ok:
             raise RuntimeError(f"World Bank HTTP {r.status_code} for {iso3} {wb}")
         body = r.json()

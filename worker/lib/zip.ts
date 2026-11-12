@@ -25,7 +25,7 @@ export function buildZip(files: Record<string, string>, folder: string): Uint8Ar
     offset += a.length;
   };
   for (const [name, text] of Object.entries(files)) {
-    const nameB = enc.encode(`${folder}/${name}`);
+    const nameB = enc.encode(folder ? `${folder}/${name}` : name);
     const data = enc.encode(text);
     const crc = crc32(data);
     const lh = new DataView(new ArrayBuffer(30));

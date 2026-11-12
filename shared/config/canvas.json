@@ -1,46 +1,332 @@
 {
   "_about": "Business Model Canvas settings. Osterwalder's nine blocks. Labels, helper text and the typical-practice lines are editable here with no code change. The German text is a first draft and should be reviewed by a native speaker. Template lines are marked 'typical' in the app; lines taken from Tereflow's own trade data are marked 'from data'. Placeholders: {product} {country} {buyers} {suppliers} {iso3}.",
-  "languages": ["en", "de"],
+  "languages": [
+    "en",
+    "de"
+  ],
   "blocks": [
-    {"key": "customer_segments", "label": {"en": "Customer Segments", "de": "Kundensegmente"}, "help": {"en": "Who you sell to. In trade: the importing countries, and the kind of buyer (distributor, processor, retailer).", "de": "An wen Sie verkaufen. Im Handel: die Importländer und die Art der Abnehmer (Händler, Verarbeiter, Einzelhandel)."}},
-    {"key": "value_propositions", "label": {"en": "Value Propositions", "de": "Wertangebote"}, "help": {"en": "Why a buyer picks you: price, quality, reliability, origin, certification.", "de": "Warum ein Abnehmer Sie wählt: Preis, Qualität, Zuverlässigkeit, Herkunft, Zertifizierung."}},
-    {"key": "channels", "label": {"en": "Channels", "de": "Kanäle"}, "help": {"en": "How the goods and the offer reach the buyer: direct sale, agents, trade fairs, platforms, freight route.", "de": "Wie Ware und Angebot den Abnehmer erreichen: Direktverkauf, Agenten, Messen, Plattformen, Transportweg."}},
-    {"key": "customer_relationships", "label": {"en": "Customer Relationships", "de": "Kundenbeziehungen"}, "help": {"en": "How you keep buyers: samples, contracts, regular contact, after-sales handling of claims.", "de": "Wie Sie Abnehmer halten: Muster, Verträge, regelmäßiger Kontakt, Reklamationsabwicklung."}},
-    {"key": "revenue_streams", "label": {"en": "Revenue Streams", "de": "Einnahmequellen"}, "help": {"en": "How money comes in: price per tonne or unit, volume, payment terms.", "de": "Wie Geld hereinkommt: Preis je Tonne oder Einheit, Menge, Zahlungsbedingungen."}},
-    {"key": "key_resources", "label": {"en": "Key Resources", "de": "Schlüsselressourcen"}, "help": {"en": "What you need to have: supply, working capital, storage, licences, staff.", "de": "Was Sie benötigen: Ware, Betriebskapital, Lager, Lizenzen, Personal."}},
-    {"key": "key_activities", "label": {"en": "Key Activities", "de": "Schlüsselaktivitäten"}, "help": {"en": "What you must do: source, grade, pack, document, ship, collect payment.", "de": "Was Sie tun müssen: beschaffen, sortieren, verpacken, dokumentieren, verschiffen, Zahlung einziehen."}},
-    {"key": "key_partnerships", "label": {"en": "Key Partnerships", "de": "Schlüsselpartnerschaften"}, "help": {"en": "Who you depend on: suppliers, forwarders, customs brokers, inspectors, banks.", "de": "Auf wen Sie angewiesen sind: Lieferanten, Spediteure, Zollagenten, Prüfstellen, Banken."}},
-    {"key": "cost_structure", "label": {"en": "Cost Structure", "de": "Kostenstruktur"}, "help": {"en": "What it costs: goods, freight, insurance, duties, finance, certification, currency risk.", "de": "Was es kostet: Ware, Fracht, Versicherung, Zölle, Finanzierung, Zertifizierung, Währungsrisiko."}}
+    {
+      "key": "customer_segments",
+      "label": {
+        "en": "Customer Segments",
+        "de": "Kundensegmente"
+      },
+      "help": {
+        "en": "Who you sell to. In trade: the importing countries, and the kind of buyer (distributor, processor, retailer).",
+        "de": "An wen Sie verkaufen. Im Handel: die Importländer und die Art der Abnehmer (Händler, Verarbeiter, Einzelhandel)."
+      }
+    },
+    {
+      "key": "value_propositions",
+      "label": {
+        "en": "Value Propositions",
+        "de": "Wertangebote"
+      },
+      "help": {
+        "en": "Why a buyer picks you: price, quality, reliability, origin, certification.",
+        "de": "Warum ein Abnehmer Sie wählt: Preis, Qualität, Zuverlässigkeit, Herkunft, Zertifizierung."
+      }
+    },
+    {
+      "key": "channels",
+      "label": {
+        "en": "Channels",
+        "de": "Kanäle"
+      },
+      "help": {
+        "en": "How the goods and the offer reach the buyer: direct sale, agents, trade fairs, platforms, freight route.",
+        "de": "Wie Ware und Angebot den Abnehmer erreichen: Direktverkauf, Agenten, Messen, Plattformen, Transportweg."
+      }
+    },
+    {
+      "key": "customer_relationships",
+      "label": {
+        "en": "Customer Relationships",
+        "de": "Kundenbeziehungen"
+      },
+      "help": {
+        "en": "How you keep buyers: samples, contracts, regular contact, after-sales handling of claims.",
+        "de": "Wie Sie Abnehmer halten: Muster, Verträge, regelmäßiger Kontakt, Reklamationsabwicklung."
+      }
+    },
+    {
+      "key": "revenue_streams",
+      "label": {
+        "en": "Revenue Streams",
+        "de": "Einnahmequellen"
+      },
+      "help": {
+        "en": "How money comes in: price per tonne or unit, volume, payment terms.",
+        "de": "Wie Geld hereinkommt: Preis je Tonne oder Einheit, Menge, Zahlungsbedingungen."
+      }
+    },
+    {
+      "key": "key_resources",
+      "label": {
+        "en": "Key Resources",
+        "de": "Schlüsselressourcen"
+      },
+      "help": {
+        "en": "What you need to have: supply, working capital, storage, licences, staff.",
+        "de": "Was Sie benötigen: Ware, Betriebskapital, Lager, Lizenzen, Personal."
+      }
+    },
+    {
+      "key": "key_activities",
+      "label": {
+        "en": "Key Activities",
+        "de": "Schlüsselaktivitäten"
+      },
+      "help": {
+        "en": "What you must do: source, grade, pack, document, ship, collect payment.",
+        "de": "Was Sie tun müssen: beschaffen, sortieren, verpacken, dokumentieren, verschiffen, Zahlung einziehen."
+      }
+    },
+    {
+      "key": "key_partnerships",
+      "label": {
+        "en": "Key Partnerships",
+        "de": "Schlüsselpartnerschaften"
+      },
+      "help": {
+        "en": "Who you depend on: suppliers, forwarders, customs brokers, inspectors, banks.",
+        "de": "Auf wen Sie angewiesen sind: Lieferanten, Spediteure, Zollagenten, Prüfstellen, Banken."
+      }
+    },
+    {
+      "key": "cost_structure",
+      "label": {
+        "en": "Cost Structure",
+        "de": "Kostenstruktur"
+      },
+      "help": {
+        "en": "What it costs: goods, freight, insurance, duties, finance, certification, currency risk.",
+        "de": "Was es kostet: Ware, Fracht, Versicherung, Zölle, Finanzierung, Zertifizierung, Währungsrisiko."
+      }
+    }
   ],
   "typical": {
     "supply": {
-      "customer_relationships": {"en": ["Send samples and agree specifications before the first order", "Put terms in a written sales contract (Incoterms, quality, payment)", "Keep regular contact and handle claims quickly"], "de": ["Muster senden und Spezifikationen vor der ersten Bestellung vereinbaren", "Bedingungen in einem schriftlichen Kaufvertrag festhalten (Incoterms, Qualität, Zahlung)", "Regelmäßigen Kontakt pflegen und Reklamationen schnell bearbeiten"]},
-      "channels": {"en": ["Direct sale to importers and distributors", "Trade fairs and buyer introductions", "Freight forwarder and customs broker for the physical route"], "de": ["Direktverkauf an Importeure und Händler", "Messen und Vermittlung von Abnehmern", "Spediteur und Zollagent für den physischen Transportweg"]},
-      "key_resources": {"en": ["Reliable supply of {product} in the quantity and grade buyers ask for", "Working capital to carry stock until payment", "Export documents and any licences or certificates the buyer's country requires"], "de": ["Verlässliche Lieferung von {product} in der gewünschten Menge und Qualität", "Betriebskapital, um Lagerbestände bis zur Zahlung zu finanzieren", "Exportdokumente sowie Lizenzen oder Zertifikate, die das Käuferland verlangt"]},
-      "key_activities": {"en": ["Source and grade the product", "Pack, label and prepare export documents", "Arrange freight, insurance and customs clearance", "Collect payment and keep records"], "de": ["Produkt beschaffen und sortieren", "Verpacken, etikettieren und Exportdokumente erstellen", "Fracht, Versicherung und Zollabfertigung organisieren", "Zahlung einziehen und Unterlagen führen"]},
-      "key_partnerships": {"en": ["Freight forwarder and shipping line", "Customs broker", "A bank for payment terms and trade finance (see /finance/{iso3})", "Inspection or certification body where the buyer requires it"], "de": ["Spediteur und Reederei", "Zollagent", "Eine Bank für Zahlungsbedingungen und Handelsfinanzierung (siehe /finance/{iso3})", "Prüf- oder Zertifizierungsstelle, falls vom Käufer verlangt"]},
-      "cost_structure": {"en": ["Cost of the goods", "Freight, insurance and port charges", "Duties and taxes in the buyer's country", "Finance costs and bank fees", "Certification and inspection"], "de": ["Warenkosten", "Fracht, Versicherung und Hafengebühren", "Zölle und Steuern im Käuferland", "Finanzierungskosten und Bankgebühren", "Zertifizierung und Prüfung"]}
+      "customer_relationships": {
+        "en": [
+          "Send samples and agree specifications before the first order",
+          "Put terms in a written sales contract (Incoterms, quality, payment)",
+          "Keep regular contact and handle claims quickly"
+        ],
+        "de": [
+          "Muster senden und Spezifikationen vor der ersten Bestellung vereinbaren",
+          "Bedingungen in einem schriftlichen Kaufvertrag festhalten (Incoterms, Qualität, Zahlung)",
+          "Regelmäßigen Kontakt pflegen und Reklamationen schnell bearbeiten"
+        ]
+      },
+      "channels": {
+        "en": [
+          "Direct sale to importers and distributors",
+          "Trade fairs and buyer introductions",
+          "Freight forwarder and customs broker for the physical route"
+        ],
+        "de": [
+          "Direktverkauf an Importeure und Händler",
+          "Messen und Vermittlung von Abnehmern",
+          "Spediteur und Zollagent für den physischen Transportweg"
+        ]
+      },
+      "key_resources": {
+        "en": [
+          "Reliable supply of {product} in the quantity and grade buyers ask for",
+          "Working capital to carry stock until payment",
+          "Export documents and any licences or certificates the buyer's country requires"
+        ],
+        "de": [
+          "Verlässliche Lieferung von {product} in der gewünschten Menge und Qualität",
+          "Betriebskapital, um Lagerbestände bis zur Zahlung zu finanzieren",
+          "Exportdokumente sowie Lizenzen oder Zertifikate, die das Käuferland verlangt"
+        ]
+      },
+      "key_activities": {
+        "en": [
+          "Source and grade the product",
+          "Pack, label and prepare export documents",
+          "Arrange freight, insurance and customs clearance",
+          "Collect payment and keep records"
+        ],
+        "de": [
+          "Produkt beschaffen und sortieren",
+          "Verpacken, etikettieren und Exportdokumente erstellen",
+          "Fracht, Versicherung und Zollabfertigung organisieren",
+          "Zahlung einziehen und Unterlagen führen"
+        ]
+      },
+      "key_partnerships": {
+        "en": [
+          "Freight forwarder and shipping line",
+          "Customs broker",
+          "A bank for payment terms and trade finance (see /finance/{iso3})",
+          "Inspection or certification body where the buyer requires it"
+        ],
+        "de": [
+          "Spediteur und Reederei",
+          "Zollagent",
+          "Eine Bank für Zahlungsbedingungen und Handelsfinanzierung (siehe /finance/{iso3})",
+          "Prüf- oder Zertifizierungsstelle, falls vom Käufer verlangt"
+        ]
+      },
+      "cost_structure": {
+        "en": [
+          "Cost of the goods",
+          "Freight, insurance and port charges",
+          "Duties and taxes in the buyer's country",
+          "Finance costs and bank fees",
+          "Certification and inspection"
+        ],
+        "de": [
+          "Warenkosten",
+          "Fracht, Versicherung und Hafengebühren",
+          "Zölle und Steuern im Käuferland",
+          "Finanzierungskosten und Bankgebühren",
+          "Zertifizierung und Prüfung"
+        ]
+      }
     },
     "procurement": {
-      "customer_relationships": {"en": ["Qualify suppliers with samples and references before ordering", "Agree specifications and inspection rights in a written contract", "Review supplier performance after each shipment"], "de": ["Lieferanten vor der Bestellung mit Mustern und Referenzen qualifizieren", "Spezifikationen und Prüfrechte in einem schriftlichen Vertrag festlegen", "Lieferantenleistung nach jeder Lieferung bewerten"]},
-      "channels": {"en": ["Direct purchase from producers or exporters", "Agents and sourcing platforms", "Freight forwarder and customs broker for the inbound route"], "de": ["Direkteinkauf bei Produzenten oder Exporteuren", "Agenten und Beschaffungsplattformen", "Spediteur und Zollagent für den Importweg"]},
-      "key_resources": {"en": ["Working capital for the order and import duties", "Storage and onward distribution for {product}", "Import licences and documents your country requires"], "de": ["Betriebskapital für Bestellung und Einfuhrabgaben", "Lagerung und Weiterverteilung von {product}", "Einfuhrlizenzen und Dokumente, die Ihr Land verlangt"]},
-      "key_activities": {"en": ["Find and qualify suppliers", "Negotiate price, quality and terms", "Arrange freight, insurance and customs clearance", "Inspect goods on arrival and handle claims"], "de": ["Lieferanten finden und qualifizieren", "Preis, Qualität und Bedingungen verhandeln", "Fracht, Versicherung und Zollabfertigung organisieren", "Ware bei Ankunft prüfen und Reklamationen abwickeln"]},
-      "key_partnerships": {"en": ["Suppliers in the source countries", "Freight forwarder and customs broker", "A bank for letters of credit and payment (see /finance/{iso3})", "Independent inspection before shipment"], "de": ["Lieferanten in den Ursprungsländern", "Spediteur und Zollagent", "Eine Bank für Akkreditive und Zahlung (siehe /finance/{iso3})", "Unabhängige Prüfung vor Verschiffung"]},
-      "cost_structure": {"en": ["Purchase price of the goods", "Freight, insurance and port charges", "Import duties and taxes", "Finance costs and bank fees", "Inspection and testing"], "de": ["Einkaufspreis der Ware", "Fracht, Versicherung und Hafengebühren", "Einfuhrzölle und Steuern", "Finanzierungskosten und Bankgebühren", "Prüfung und Tests"]}
+      "customer_relationships": {
+        "en": [
+          "Qualify suppliers with samples and references before ordering",
+          "Agree specifications and inspection rights in a written contract",
+          "Review supplier performance after each shipment"
+        ],
+        "de": [
+          "Lieferanten vor der Bestellung mit Mustern und Referenzen qualifizieren",
+          "Spezifikationen und Prüfrechte in einem schriftlichen Vertrag festlegen",
+          "Lieferantenleistung nach jeder Lieferung bewerten"
+        ]
+      },
+      "channels": {
+        "en": [
+          "Direct purchase from producers or exporters",
+          "Agents and sourcing platforms",
+          "Freight forwarder and customs broker for the inbound route"
+        ],
+        "de": [
+          "Direkteinkauf bei Produzenten oder Exporteuren",
+          "Agenten und Beschaffungsplattformen",
+          "Spediteur und Zollagent für den Importweg"
+        ]
+      },
+      "key_resources": {
+        "en": [
+          "Working capital for the order and import duties",
+          "Storage and onward distribution for {product}",
+          "Import licences and documents your country requires"
+        ],
+        "de": [
+          "Betriebskapital für Bestellung und Einfuhrabgaben",
+          "Lagerung und Weiterverteilung von {product}",
+          "Einfuhrlizenzen und Dokumente, die Ihr Land verlangt"
+        ]
+      },
+      "key_activities": {
+        "en": [
+          "Find and qualify suppliers",
+          "Negotiate price, quality and terms",
+          "Arrange freight, insurance and customs clearance",
+          "Inspect goods on arrival and handle claims"
+        ],
+        "de": [
+          "Lieferanten finden und qualifizieren",
+          "Preis, Qualität und Bedingungen verhandeln",
+          "Fracht, Versicherung und Zollabfertigung organisieren",
+          "Ware bei Ankunft prüfen und Reklamationen abwickeln"
+        ]
+      },
+      "key_partnerships": {
+        "en": [
+          "Suppliers in the source countries",
+          "Freight forwarder and customs broker",
+          "A bank for letters of credit and payment (see /finance/{iso3})",
+          "Independent inspection before shipment"
+        ],
+        "de": [
+          "Lieferanten in den Ursprungsländern",
+          "Spediteur und Zollagent",
+          "Eine Bank für Akkreditive und Zahlung (siehe /finance/{iso3})",
+          "Unabhängige Prüfung vor Verschiffung"
+        ]
+      },
+      "cost_structure": {
+        "en": [
+          "Purchase price of the goods",
+          "Freight, insurance and port charges",
+          "Import duties and taxes",
+          "Finance costs and bank fees",
+          "Inspection and testing"
+        ],
+        "de": [
+          "Einkaufspreis der Ware",
+          "Fracht, Versicherung und Hafengebühren",
+          "Einfuhrzölle und Steuern",
+          "Finanzierungskosten und Bankgebühren",
+          "Prüfung und Tests"
+        ]
+      }
     }
   },
   "data_lines": {
-    "buyers": {"en": "Importers in the main buyer markets: {list}", "de": "Importeure in den wichtigsten Abnehmermärkten: {list}"},
-    "suppliers": {"en": "Producers and exporters in the main supplier countries: {list}", "de": "Produzenten und Exporteure in den wichtigsten Lieferländern: {list}"},
-    "estimate": {"en": "Indicative annual return range for the budget entered: {low} to {high}", "de": "Indikative jährliche Ertragsspanne für das eingegebene Budget: {low} bis {high}"},
-    "estimate_none": {"en": "No return range can be given from the data held. Get a quote from a buyer.", "de": "Aus den vorliegenden Daten lässt sich keine Ertragsspanne angeben. Holen Sie ein Angebot bei einem Abnehmer ein."},
-    "risk": {"en": "Overall risk label from the Guide: {level}", "de": "Gesamtrisiko laut Guide: {level}"},
-    "fx": {"en": "Currency risk: {reason}", "de": "Währungsrisiko: {reason}"},
-    "play_how": {"en": "{title}: {how}", "de": "{title}: {how}"},
-    "play_reward": {"en": "Expected reward: {reward}", "de": "Erwarteter Nutzen: {reward}"},
-    "play_risk": {"en": "Risk to plan for: {risk}", "de": "Risiko, das einzuplanen ist: {risk}"},
-    "question": {"en": "Find out: {q}", "de": "Zu klären: {q}"},
-    "chain_actors": {"en": "{stage}: {actors}", "de": "{stage}: {actors}"}
+    "buyers": {
+      "en": "Importers in the main buyer markets: {list}",
+      "de": "Importeure in den wichtigsten Abnehmermärkten: {list}"
+    },
+    "suppliers": {
+      "en": "Producers and exporters in the main supplier countries: {list}",
+      "de": "Produzenten und Exporteure in den wichtigsten Lieferländern: {list}"
+    },
+    "estimate": {
+      "en": "Indicative annual return range for the budget entered: {low} to {high}",
+      "de": "Indikative jährliche Ertragsspanne für das eingegebene Budget: {low} bis {high}"
+    },
+    "estimate_none": {
+      "en": "No return range can be given from the data held. Get a quote from a buyer.",
+      "de": "Aus den vorliegenden Daten lässt sich keine Ertragsspanne angeben. Holen Sie ein Angebot bei einem Abnehmer ein."
+    },
+    "risk": {
+      "en": "Overall risk label from the Guide: {level}",
+      "de": "Gesamtrisiko laut Guide: {level}"
+    },
+    "fx": {
+      "en": "Currency risk: {reason}",
+      "de": "Währungsrisiko: {reason}"
+    },
+    "play_how": {
+      "en": "{title}: {how}",
+      "de": "{title}: {how}"
+    },
+    "play_reward": {
+      "en": "Expected reward: {reward}",
+      "de": "Erwarteter Nutzen: {reward}"
+    },
+    "play_risk": {
+      "en": "Risk to plan for: {risk}",
+      "de": "Risiko, das einzuplanen ist: {risk}"
+    },
+    "question": {
+      "en": "Find out: {q}",
+      "de": "Zu klären: {q}"
+    },
+    "chain_actors": {
+      "en": "{stage}: {actors}",
+      "de": "{stage}: {actors}"
+    },
+    "finance_rates": {
+      "en": "Cost of borrowing in {country}: {rates}. Source: Tereflow Finance page.",
+      "de": "Kreditkosten in {country}: {rates}. Quelle: Finanzseite von Tereflow."
+    },
+    "finance_fee": {
+      "en": "Published trade finance fee: {bank} charges {fee}% per quarter for an import letter of credit (sight).",
+      "de": "Ver?ffentlichte Handelsfinanzierungsgeb?hr: {bank} berechnet {fee}% pro Quartal f?r ein Import-Akkreditiv (Sicht)."
+    },
+    "rate_names": {
+      "en": "average bank lending rate {lend}% ({lp}); policy rate {pol}% ({pp})",
+      "de": "durchschnittlicher Bankkreditzins {lend}% ({lp}); Leitzins {pol}% ({pp})"
+    }
   }
 }

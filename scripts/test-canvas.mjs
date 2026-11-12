@@ -44,6 +44,14 @@ assert.ok(proc.customer_segments[0].text.includes('Vietnam') && !proc.customer_s
 assert.ok(canvasToText('T', en, 'en', 'now').includes('[typical]'));
 assert.ok(canvasToText('T', buildCanvas(g, 'de'), 'de', 'now').includes('[\u00fcblich]'));
 
+// finance lines appear only when finance figures exist, are tagged as data, and are never invented
+const fin = buildCanvas({ ...g, finance: { lending: { value: 15.94, period: '2026-08' }, policy: { value: 14, period: '2026-09' }, lcFee: { bank: 'Fidelity Bank Ghana Limited', value: 1 } } }, 'en');
+assert.ok(fin.cost_structure.some((l) => l.source === 'data' && l.text.includes('15.94') && l.text.includes('14')), 'borrowing cost line from finance data');
+assert.ok(fin.cost_structure.some((l) => l.source === 'data' && l.text.includes('Fidelity') && l.text.includes('1%')), 'published trade finance fee line');
+const finDe = buildCanvas({ ...g, finance: { lending: { value: 15.94, period: '2026-08' } } }, 'de');
+assert.ok(finDe.cost_structure.some((l) => l.text.includes('Kreditkosten') && l.text.includes('15.94')), 'German line, and no policy rate when none is held');
+assert.ok(!finDe.cost_structure.some((l) => /\{\w+\}/.test(l.text)), 'no placeholder left over');
+assert.equal(buildCanvas({ ...g, finance: null }, 'en').cost_structure.length, buildCanvas(g, 'en').cost_structure.length, 'no finance figures, no extra lines');
 // ---- year to date ----
 const m = (p, v) => ({ period: p, value_usd: v });
 assert.deepEqual(ytdGrowth([m('2025-01', 100), m('2025-02', 100), m('2026-01', 150), m('2026-02', 150)]), { pct: 50, through: '2026-02', periods: 2 });

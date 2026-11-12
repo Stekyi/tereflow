@@ -101,7 +101,87 @@
                                                         ],
                                               "rate":  true,
                                               "better":  "lower"
-                                          }
+                                          },
+                    "PROFIT_AFTER_TAX":  {
+                                             "label":  "Profit after tax",
+                                             "units":  [
+                                                           "currency"
+                                                       ],
+                                             "rate":  false,
+                                             "better":  "higher"
+                                         },
+                    "RETURN_ON_EQUITY":  {
+                                             "label":  "Return on equity",
+                                             "units":  [
+                                                           "percent"
+                                                       ],
+                                             "rate":  false,
+                                             "better":  "higher"
+                                         },
+                    "COST_TO_INCOME":  {
+                                           "label":  "Cost to income ratio",
+                                           "units":  [
+                                                         "percent"
+                                                     ],
+                                           "rate":  false,
+                                           "better":  "lower"
+                                       },
+                    "POLICY_RATE":  {
+                                        "label":  "Central bank policy rate",
+                                        "units":  [
+                                                      "percent"
+                                                  ],
+                                        "rate":  true,
+                                        "better":  "none"
+                                    },
+                    "REFERENCE_RATE":  {
+                                           "label":  "Reference (base) rate for loan pricing",
+                                           "units":  [
+                                                         "percent"
+                                                     ],
+                                           "rate":  true,
+                                           "better":  "lower"
+                                       },
+                    "FEE_LC_IMPORT_SIGHT":  {
+                                                "label":  "Import letter of credit, sight: establishment fee (per quarter)",
+                                                "units":  [
+                                                              "percent"
+                                                          ],
+                                                "rate":  true,
+                                                "better":  "lower"
+                                            },
+                    "FEE_LC_IMPORT_USANCE":  {
+                                                 "label":  "Import letter of credit, usance: establishment fee (per quarter)",
+                                                 "units":  [
+                                                               "percent"
+                                                           ],
+                                                 "rate":  true,
+                                                 "better":  "lower"
+                                             },
+                    "FEE_LC_EXPORT_NEGOTIATION":  {
+                                                      "label":  "Export letter of credit: negotiation fee",
+                                                      "units":  [
+                                                                    "percent"
+                                                                ],
+                                                      "rate":  true,
+                                                      "better":  "lower"
+                                                  },
+                    "FEE_GUARANTEE_PERIODIC":  {
+                                                   "label":  "Guarantee or bond: periodic charge (per quarter)",
+                                                   "units":  [
+                                                                 "percent"
+                                                             ],
+                                                   "rate":  true,
+                                                   "better":  "lower"
+                                               },
+                    "FEE_COLLECTION_EXPORT":  {
+                                                  "label":  "Export bill for collection: handling commission",
+                                                  "units":  [
+                                                                "percent"
+                                                            ],
+                                                  "rate":  true,
+                                                  "better":  "lower"
+                                              }
                 },
     "rate_types":  [
                        "fixed",

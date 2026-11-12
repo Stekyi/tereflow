@@ -611,6 +611,8 @@ export interface OpportunityFeed {
 export type { TradeNewsPayload, TradeNewsItem } from '../../shared/trade-news';
 import type { TradeNewsPayload } from '../../shared/trade-news';
 
+export interface FinMetric { institution_code?: string; metric_code: string; period: string; value: number; unit: string; currency: string | null; source_note: string; rate_type: string | null }
+
 export const api = {
   stats: () => req<HomeStats>('/api/stats'),
   tradeNews: () => req<TradeNewsPayload>('/api/trade-news'),
@@ -1136,16 +1138,24 @@ export const api = {
       return (await res.json()) as { ok: boolean; rows_read?: number; rows_loaded?: number; problems: { row: number; column: string; message: string }[]; error?: string };
     },
     revert: (id: string) => req<{ ok: true }>(`/api/admin/national/uploads/${id}`, { method: 'DELETE' }),
+    templateBlob: () => adminBlob('/api/admin/national/template'),
   },
   financeCountries: () => req<{ countries: { country_iso3: string; country_name: string; institutions: number }[] }>('/api/finance'),
   finance: (country: string) =>
     req<{
       country: string;
       country_name: string;
+      country_slug: string | null;
       last_period: string | null;
-      institutions: { code: string; name: string; kind: string; website: string | null; metrics: { metric_code: string; period: string; value: number; unit: string; currency: string | null; source_note: string; rate_type: string | null }[] }[];
+      year: string | null;
+      institutions: { code: string; name: string; kind: string; website: string | null; metrics: FinMetric[] }[];
+      sector: { code: string; name: string; metrics: FinMetric[] } | null;
+      central_bank: { code: string; name: string; website: string | null; metrics: FinMetric[] } | null;
       metric_defs: { code: string; label: string }[];
       rankings: { metric_code: string; label: string; better: string; ranked: { rank: number; institution_code: string; value: number; unit: string; period: string; rate_type: string | null }[] }[];
+      insights: { id: string; title: string; text: string; evidence: string[] }[];
+      fees: { metric_code: string; label: string; rows: { institution_code: string; name: string; value: number; period: string; source_note: string }[] }[];
+      sources: string[];
     }>(`/api/finance/${encodeURIComponent(country)}`),
   financeAdmin: {
     overview: () =>
@@ -1164,6 +1174,7 @@ export const api = {
       return (await res.json()) as { ok: boolean; rows_read?: number; rows_loaded?: number; problems: { row: number; column: string; message: string }[]; error?: string };
     },
     revert: (id: string) => req<{ ok: true }>(`/api/admin/finance/uploads/${id}`, { method: 'DELETE' }),
+    templateBlob: () => adminBlob('/api/admin/finance/template'),
   },
   media: {
     list: () =>

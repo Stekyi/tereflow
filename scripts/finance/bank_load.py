@@ -91,7 +91,7 @@ def main(argv=None) -> int:
     sd = sub.add_parser("seed-defs"); sd.add_argument("--config", default=str(bt.DEFAULT_CONFIG))
     ins = sub.add_parser("institution")
     ins.add_argument("code"); ins.add_argument("name"); ins.add_argument("iso3")
-    ins.add_argument("--kind", default="bank", choices=["bank", "dfi", "microfinance", "insurer", "other"]); ins.add_argument("--website")
+    ins.add_argument("--kind", default="bank", choices=["bank", "dfi", "microfinance", "insurer", "central_bank", "sector", "other"]); ins.add_argument("--website")
     ld = sub.add_parser("load")
     ld.add_argument("file"); ld.add_argument("--config", default=str(bt.DEFAULT_CONFIG))
     ld.add_argument("--dry-run", action="store_true"); ld.add_argument("--replace", action="store_true")

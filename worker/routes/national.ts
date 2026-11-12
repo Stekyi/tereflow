@@ -7,6 +7,7 @@ import { parseCsv } from '../../shared/csv/parse';
 import { ISO3_NAME } from '../../shared/country-names';
 import cfg from '../../templates/national_config.json';
 import { ytdGrowth } from '../../shared/national-series';
+import { buildXlsx } from '../lib/xlsx';
 
 /**
  * National statistics: monthly or quarterly series from a country's own statistics office, loaded by an operator, and the
@@ -62,6 +63,34 @@ nationalAdmin.get('/', async (c) => {
     c.env.DB.prepare('SELECT id, filename, rows_read, rows_loaded, status, uploaded_by, uploaded_at FROM nat_uploads ORDER BY uploaded_at DESC LIMIT 30').all(),
   ]);
   return json({ sources: s.results ?? [], uploads: u.results ?? [], priority: (cfg as { priority_countries: string[] }).priority_countries, formats: (cfg as { period_formats: Record<string, string> }).period_formats });
+});
+
+/** The national statistics template, from the same config the upload validates against. */
+nationalAdmin.get('/template', async (c) => {
+  const k = cfg as { columns: string[]; period_formats: Record<string, string>; hs_code: string; priority_countries: string[] };
+  const src = await c.env.DB.prepare('SELECT country_iso3, source_name, frequency FROM nat_sources WHERE is_active = 1 ORDER BY country_iso3').all<{ country_iso3: string; source_name: string; frequency: string }>();
+  const xlsx = buildXlsx([
+    { name: 'Data', rows: [k.columns], widths: [14, 8, 12, 12, 20, 70] },
+    {
+      name: 'How to fill',
+      widths: [18, 110],
+      rows: [
+        ['Column', 'What to enter'],
+        ['country_iso3', 'Three capital letters. The country needs a registered national source first (see the Sources sheet).'],
+        ['flow', 'X for exports, M for imports.'],
+        ['period', `Must match the update frequency registered for the country. ${Object.entries(k.period_formats).map(([a, b]) => `${a}: ${b}`).join('. ')}.`],
+        ['hs_code', k.hs_code],
+        ['value_usd', 'US dollars, plain digits. If the office publishes in local currency, convert first and say how in source_note.'],
+        ['source_note', 'REQUIRED on every row: the release, table and date it came from.'],
+        [null, null],
+        ['Rules', 'One row per country, flow, period and product. Duplicates and any bad row refuse the whole file, with every problem listed by row.'],
+        ['Priority countries', k.priority_countries.join(', ')],
+      ],
+    },
+    { name: 'Sources', widths: [14, 46, 14], rows: [['country_iso3', 'source name', 'updates'], ...(src.results ?? []).map((s) => [s.country_iso3, s.source_name, s.frequency])] },
+    { name: 'Example', widths: [14, 8, 12, 12, 20, 70], rows: [k.columns, ['GHA', 'X', '2026-03', 'TOTAL', 1250000000, 'EXAMPLE ONLY: statistics office release, table 2'], ['GHA', 'X', '2026-03', '1801', 310000000, 'EXAMPLE ONLY: statistics office release, table 4']] },
+  ]);
+  return new Response(xlsx, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="tereflow-national-template.xlsx"', 'cache-control': 'no-store' } });
 });
 
 nationalAdmin.post('/sources', async (c) => {

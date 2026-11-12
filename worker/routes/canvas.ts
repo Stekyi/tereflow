@@ -16,6 +16,29 @@ const MAX_CANVASES = 50;
 const MAX_LINES = 20;
 const MAX_LINE = 600;
 
+/** Latest published cost-of-borrowing figures for a country from the Finance module, if any are loaded. */
+async function financeFor(env: Env, iso3: string): Promise<CanvasInput['finance']> {
+  try {
+    const { results } = await env.DB.prepare(
+      `SELECT m.metric_code, m.value, m.period, m.institution_code, i.name, i.kind FROM fin_metrics m JOIN fin_institutions i ON i.code = m.institution_code
+        WHERE m.country_iso3 = ? AND m.metric_code IN ('LENDING_RATE', 'POLICY_RATE', 'FEE_LC_IMPORT_SIGHT') ORDER BY m.period DESC`,
+    ).bind(iso3).all<{ metric_code: string; value: number; period: string; name: string; kind: string }>();
+    const rows = results ?? [];
+    const first = (code: string, kinds: string[]) => rows.find((r) => r.metric_code === code && kinds.includes(r.kind));
+    const lending = first('LENDING_RATE', ['sector']);
+    const policy = first('POLICY_RATE', ['central_bank']);
+    const fee = first('FEE_LC_IMPORT_SIGHT', ['bank']);
+    if (!lending && !policy && !fee) return null;
+    return {
+      ...(lending ? { lending: { value: lending.value, period: lending.period } } : {}),
+      ...(policy ? { policy: { value: policy.value, period: policy.period } } : {}),
+      ...(fee ? { lcFee: { bank: fee.name, value: fee.value } } : {}),
+    };
+  } catch {
+    return null; // Finance is an addition. Never let it stop a canvas being built.
+  }
+}
+
 async function owner(c: { req: { raw: Request }; env: Env }) {
   const user = await currentUser(c.req.raw, c.env);
   return user && isEntitled(user) ? user : null;
@@ -64,7 +87,9 @@ canvas.post('/', async (c) => {
   const body = (built as { body: Record<string, unknown> & { available: boolean } }).body;
   if (!body.available) return bad('There is not enough trade data for that product to build a canvas', 422);
   const lg = lang(b.lang);
-  const blocks = buildCanvas(body as unknown as CanvasInput, lg);
+  const input = body as unknown as CanvasInput;
+  input.finance = input.inputs.iso3 ? await financeFor(c.env, input.inputs.iso3) : null;
+  const blocks = buildCanvas(input, lg);
   const inputs = body.inputs as { country: string; product: string };
   const id = uid('cv_');
   const title = `${inputs.product} in ${inputs.country}, ${role === 'supply' ? 'supply' : 'procurement'}`;
@@ -108,7 +133,9 @@ canvas.post('/:id/regenerate', async (c) => {
   if ('response' in built && built.response) return built.response;
   const body = (built as { body: Record<string, unknown> & { available: boolean } }).body;
   if (!body.available) return bad('Trade data is not available to rebuild this canvas', 422);
-  const fresh = buildCanvas(body as unknown as CanvasInput, lg);
+  const input = body as unknown as CanvasInput;
+  input.finance = input.inputs.iso3 ? await financeFor(c.env, input.inputs.iso3) : null;
+  const fresh = buildCanvas(input, lg);
   const old = JSON.parse(row.blocks_json) as Blocks;
   const merged: Blocks = {};
   for (const k of Object.keys(fresh)) merged[k] = [...(old[k] ?? []).filter((l) => l.source === 'user'), ...fresh[k]];

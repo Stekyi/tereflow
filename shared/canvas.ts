@@ -20,6 +20,8 @@ export interface CanvasInput {
   risk?: { level: string; reasons: string[] } | null;
   fx?: { level: string; reason: string } | null;
   iso3?: string | null;
+  /** Published finance figures for the country, when Tereflow holds them. Used only if present. */
+  finance?: { lending?: { value: number; period: string }; policy?: { value: number; period: string }; lcFee?: { bank: string; value: number } } | null;
 }
 
 export const LANGS: Lang[] = cfg.languages as Lang[];
@@ -65,6 +67,12 @@ export function buildCanvas(g: CanvasInput, lang: Lang): Blocks {
 
   out.cost_structure.push(...T('cost_structure'));
   for (const r of (top?.play.risks ?? []).slice(0, 3)) out.cost_structure.push(D(fill(dl('play_risk', lang), { risk: r })));
+  const f = g.finance;
+  if (f?.lending) {
+    const rates = fill(dl('rate_names', lang), { lend: String(f.lending.value), lp: f.lending.period, pol: f.policy ? String(f.policy.value) : '', pp: f.policy ? f.policy.period : '' });
+    out.cost_structure.push(D(fill(dl('finance_rates', lang), { country: g.inputs.country, rates: f.policy ? rates : rates.split(';')[0] })));
+  }
+  if (f?.lcFee) out.cost_structure.push(D(fill(dl('finance_fee', lang), { bank: f.lcFee.bank, fee: String(f.lcFee.value) })));
   if (g.fx?.reason) out.cost_structure.push(D(fill(dl('fx', lang), { reason: g.fx.reason })));
   if (g.risk?.level) out.cost_structure.push(D(fill(dl('risk', lang), { level: g.risk.level })));
   return out;

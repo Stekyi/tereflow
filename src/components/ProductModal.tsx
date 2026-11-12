@@ -1164,10 +1164,17 @@ const STAGES = [
 function ActionStage({ insight, focusSlug, entitled }: { insight: ProductInsight; focusSlug: string | null; entitled: boolean }) {
   const country = focusSlug ?? '';
   const qs = country ? `?country=${encodeURIComponent(country)}` : '';
+  // Finance pages are keyed by ISO3; the country slug is what the rest of the app uses, so ask the registry once.
+  const [iso, setIso] = useState<string | null>(null);
+  useEffect(() => {
+    if (!focusSlug) { setIso(null); return; }
+    api.countries().then((r) => setIso(r.countries.find((c) => c.slug === focusSlug)?.iso3 ?? null)).catch(() => setIso(null));
+  }, [focusSlug]);
+  const financeTo = iso ? `/finance/${iso}` : '/finance';
   const steps: { to: string; title: string; text: string; premium?: boolean }[] = [
     { to: `/guide${qs}`, title: 'Run the Guide', text: 'Walk from the problem, through the supply chain, to the questions to ask and the plays to try.' },
     { to: entitled ? `/canvas?hs=${insight.hs_code}${country ? `&country=${encodeURIComponent(country)}` : ''}` : '/upgrade', title: 'Build your Business Model Canvas', text: 'The app presets the nine blocks for this product. You model the rest.', premium: true },
-    { to: '/finance', title: 'Check who can finance it', text: 'Banks and lenders by country, with their published figures.' },
+    { to: financeTo, title: 'Check who can finance it', text: 'Banks and lenders with their published figures, rates and trade finance fees.' },
     { to: `/network?q=${encodeURIComponent(insight.name)}`, title: 'Find people to trade with', text: 'Buyers, sellers and suppliers for this product, ready to message.' },
     { to: `/sandbox?${new URLSearchParams({ ...(country ? { primary: country } : {}), hs: insight.hs_code, flow: insight.focus_flow }).toString()}`, title: 'Compare markets in the Sandbox', text: 'Put this product against partner countries, side by side.' },
   ];

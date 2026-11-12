@@ -589,6 +589,17 @@ function Registry({ t, onError }: { t: Toaster; onError: OnError }) {
   );
 }
 
+/** Saves a file the admin API returned, under the name the server chose. */
+async function saveTemplate(get: () => Promise<{ blob: Blob; filename: string }>, fallback: string, onError: OnError) {
+  try {
+    const { blob, filename } = await get();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename || fallback;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  } catch (e) { onError(e); }
+}
+
 /* ---- National data ---- */
 
 function NationalAdmin({ t, onError }: { t: Toaster; onError: OnError }) {
@@ -625,6 +636,10 @@ function NationalAdmin({ t, onError }: { t: Toaster; onError: OnError }) {
       <p className="small dim" style={{ marginTop: 0 }}>
         Monthly or quarterly figures from a country's own statistics office. Register the source first (its update frequency decides which period format is accepted), then upload the filled template as CSV (in Excel: Data sheet, Save As CSV). Template and script: scripts/national and docs/operator-guide.md. Priority countries: {ov.priority.join(', ')}.
       </p>
+      <Panel title="Excel template">
+        <p className="small dim" style={{ marginTop: 0 }}>The template for monthly or quarterly national series, with instructions, the registered sources and an example.</p>
+        <button className="btn" onClick={() => void saveTemplate(api.nationalAdmin.templateBlob, 'tereflow-national-template.xlsx', onError)}>Download National data template (.xlsx)</button>
+      </Panel>
       <Panel title="Register a national source">
         <div style={{ display: 'grid', gap: 8, maxWidth: 440 }}>
           <input placeholder="Country ISO3, e.g. GHA" value={iso} onChange={(e) => setIso(e.target.value)} />
@@ -708,13 +723,19 @@ function FinanceAdmin({ t, onError }: { t: Toaster; onError: OnError }) {
       <p className="small dim" style={{ marginTop: 0 }}>
         Register institutions first, then upload the filled template. In Excel, open the Data sheet and use Save As, CSV. Allowed metrics: {ov.metric_defs.map((d) => d.code).join(', ')}. To load the Excel file itself, use scripts/finance/bank_load.py (see docs/operator-guide.md).
       </p>
+      <Panel title="Excel template">
+        <p className="small dim" style={{ marginTop: 0 }}>
+          The template the upload expects: a Data sheet to fill, plus sheets that list the allowed metrics and units, the institutions already registered, how to fill each column, and an example. It is built from the live settings, so it always matches what the system accepts.
+        </p>
+        <button className="btn" onClick={() => void saveTemplate(api.financeAdmin.templateBlob, 'tereflow-finance-template.xlsx', onError)}>Download Finance template (.xlsx)</button>
+      </Panel>
       <Panel title="Register an institution">
         <div style={{ display: 'grid', gap: 8, maxWidth: 420 }}>
           <input placeholder="Code, e.g. GCB_BANK" value={code} onChange={(e) => setCode(e.target.value)} />
           <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
           <input placeholder="Country ISO3, e.g. GHA" value={iso} onChange={(e) => setIso(e.target.value)} />
           <select value={kind} onChange={(e) => setKind(e.target.value)}>
-            {['bank', 'dfi', 'microfinance', 'insurer', 'other'].map((k) => <option key={k}>{k}</option>)}
+            {['bank', 'dfi', 'microfinance', 'insurer', 'central_bank', 'sector', 'other'].map((k) => <option key={k}>{k}</option>)}
           </select>
           <div><button className="btn" onClick={() => void addInst()}>Save institution</button></div>
         </div>

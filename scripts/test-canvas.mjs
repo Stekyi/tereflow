@@ -52,6 +52,16 @@ const finDe = buildCanvas({ ...g, finance: { lending: { value: 15.94, period: '2
 assert.ok(finDe.cost_structure.some((l) => l.text.includes('Kreditkosten') && l.text.includes('15.94')), 'German line, and no policy rate when none is held');
 assert.ok(!finDe.cost_structure.some((l) => /\{\w+\}/.test(l.text)), 'no placeholder left over');
 assert.equal(buildCanvas({ ...g, finance: null }, 'en').cost_structure.length, buildCanvas(g, 'en').cost_structure.length, 'no finance figures, no extra lines');
+// German text must hold real letters: a literal question mark inside a German string means a character was lost in transit
+const cfgText = JSON.parse((await import('node:fs')).readFileSync('shared/config/canvas.json', 'utf8'));
+const lost = [];
+(function walk(o, path) {
+  if (Array.isArray(o)) o.forEach((v, i) => walk(v, `${path}[${i}]`));
+  else if (o && typeof o === 'object') Object.entries(o).forEach(([k, v]) => walk(v, `${path}/${k}`));
+  else if (typeof o === 'string' && path.includes('/de') && o.includes('?')) lost.push(path);
+})(cfgText, '');
+assert.deepEqual(lost, [], 'German strings must not contain a lost character shown as ?');
+assert.ok(buildCanvas(g, 'de').channels.some((l) => /[\u00e4\u00f6\u00fc\u00df]/.test(JSON.stringify(blockDefs('de')) + l.text)), 'German output carries umlauts');
 // ---- year to date ----
 const m = (p, v) => ({ period: p, value_usd: v });
 assert.deepEqual(ytdGrowth([m('2025-01', 100), m('2025-02', 100), m('2026-01', 150), m('2026-02', 150)]), { pct: 50, through: '2026-02', periods: 2 });

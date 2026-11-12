@@ -322,7 +322,7 @@
     },
     "finance_fee": {
       "en": "Published trade finance fee: {bank} charges {fee}% per quarter for an import letter of credit (sight).",
-      "de": "Ver?ffentlichte Handelsfinanzierungsgeb?hr: {bank} berechnet {fee}% pro Quartal f?r ein Import-Akkreditiv (Sicht)."
+      "de": "Veröffentlichte Handelsfinanzierungsgebühr: {bank} berechnet {fee}% pro Quartal für ein Import-Akkreditiv (Sicht)."
     },
     "rate_names": {
       "en": "average bank lending rate {lend}% ({lp}); policy rate {pol}% ({pp})",

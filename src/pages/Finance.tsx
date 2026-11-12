@@ -6,6 +6,25 @@ import { Empty, Skeletons } from '../components/ui';
 type Fin = Awaited<ReturnType<typeof api.finance>>;
 const fmt = (v: number, unit: string) => (unit === 'percent' ? `${v.toFixed(1)}%` : v >= 1e9 ? `${(v / 1e9).toFixed(1)}bn` : v >= 1e6 ? `${(v / 1e6).toFixed(1)}m` : v.toLocaleString());
 
+/** Finance landing: the countries that have institutions on record. */
+export function FinanceIndex() {
+  const [rows, setRows] = useState<Awaited<ReturnType<typeof api.financeCountries>>['countries'] | null>(null);
+  useEffect(() => { api.financeCountries().then((r) => setRows(r.countries)).catch(() => setRows([])); }, []);
+  if (!rows) return <Skeletons n={3} />;
+  if (rows.length === 0) return <Empty title="No finance data yet" hint="Banks and lenders are added by the Tereflow team from their published reports." />;
+  return (
+    <>
+      <p className="small dim" style={{ marginTop: 0 }}>Banks and lenders by country, with published figures and rate cards. Pick a country to compare institutions.</p>
+      {rows.map((r) => (
+        <a className="list-item" key={r.country_iso3} href={`/finance/${r.country_iso3}`}>
+          <span className="name">{r.country_name}</span>
+          <span className="tiny dim">{r.institutions} institution{r.institutions === 1 ? '' : 's'}</span>
+        </a>
+      ))}
+    </>
+  );
+}
+
 export default function Finance() {
   const { country = '' } = useParams();
   const [data, setData] = useState<Fin | null>(null);

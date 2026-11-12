@@ -24,6 +24,12 @@ const PERIOD = /^\d{4}(-(0[1-9]|1[0-2])|-Q[1-4])?$/;
 
 // ---- public -----------------------------------------------------------------
 
+/** Countries that have institutions on record, for the Finance landing page. */
+finance.get('/', async (c) => {
+  const { results } = await c.env.DB.prepare('SELECT country_iso3, COUNT(*) AS institutions FROM fin_institutions WHERE is_active = 1 GROUP BY country_iso3 ORDER BY country_iso3').all<{ country_iso3: string; institutions: number }>();
+  return json({ countries: (results ?? []).map((r) => ({ ...r, country_name: ISO3_NAME[r.country_iso3] ?? r.country_iso3 })) });
+});
+
 finance.get('/:country', async (c) => {
   const iso3 = c.req.param('country').toUpperCase();
   if (!/^[A-Z]{3}$/.test(iso3)) return bad('country must be an ISO3 code');

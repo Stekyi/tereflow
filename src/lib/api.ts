@@ -1112,6 +1112,7 @@ export const api = {
       }),
   },
 
+  financeCountries: () => req<{ countries: { country_iso3: string; country_name: string; institutions: number }[] }>('/api/finance'),
   finance: (country: string) =>
     req<{
       country: string;

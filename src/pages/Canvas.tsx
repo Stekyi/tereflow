@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { Empty, Skeletons } from '../components/ui';
 
@@ -10,8 +10,9 @@ const TAG = { en: { typical: 'typical', data: 'from data', user: 'yours' }, de: 
 export function CanvasStart() {
   const nav = useNavigate();
   const [list, setList] = useState<Awaited<ReturnType<typeof api.canvas.list>>['canvases']>([]);
-  const [country, setCountry] = useState('');
-  const [hs, setHs] = useState('');
+  const [params] = useSearchParams();
+  const [country, setCountry] = useState(params.get('country') ?? '');
+  const [hs, setHs] = useState(params.get('hs') ?? '');
   const [role, setRole] = useState<'supply' | 'procurement'>('supply');
   const [lang, setLang] = useState<'en' | 'de'>('en');
   const [error, setError] = useState('');

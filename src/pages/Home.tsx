@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type TradeNewsItem } from '../lib/api';
 import { useSession } from '../lib/auth';
@@ -9,6 +9,7 @@ import { useBudget } from '../lib/budget';
 import ProductModal, { ProductCardRow } from '../components/ProductModal';
 import { CONTINENTS, type ProductCard, type ProductSummary } from '../../shared/types';
 import InfoTip from '../components/InfoTip';
+import homeCfg from '../../shared/config/home.json';
 
 type FlowFilter = 'all' | 'export' | 'import';
 
@@ -74,7 +75,17 @@ export default function Home() {
   const [budget, setBudget] = useBudget();
   const [q, setQ] = useState('');
   const [flow, setFlow] = useState<FlowFilter>('all');
-  const [continent, setContinent] = useState<string>('all');
+  const [continent, setContinent] = useState<string>(
+    (CONTINENTS as readonly string[]).includes(homeCfg.default_region) ? homeCfg.default_region : 'all',
+  );
+  // Real photographs only: a hero image an operator uploaded in the admin, if there is one.
+  const [heroPhoto, setHeroPhoto] = useState<{ url: string; alt_text: string } | null>(null);
+  useEffect(() => {
+    fetch('/api/media?category=hero')
+      .then((r) => (r.ok ? r.json() : { images: [] }))
+      .then((r: { images: { url: string; alt_text: string }[] }) => setHeroPhoto(r.images[0] ?? null))
+      .catch(() => setHeroPhoto(null));
+  }, []);
   const [products, setProducts] = useState<ProductCard[]>([]);
   const [summary, setSummary] = useState<ProductSummary | null>(null);
   // Set when the search reached past the words typed: "solar panel" answered
@@ -158,29 +169,49 @@ export default function Home() {
     <div ref={revealRef} className="mm-home">
       <section className="mm-hero" aria-label="Find a product worth trading">
         <div className="mm-hero-copy">
-          <span className="mm-overline">Global trade intelligence</span>
+          <span className="mm-overline">Trade intelligence, Africa first</span>
           <h1>
-            Find a product
-            <em> worth trading</em>
+            {homeCfg.headline_lead}
+            <em> {homeCfg.headline_accent}</em>
           </h1>
-          <p>
-            See who sells it, who buys it, and where the opening is. Ranked by how fast each line is
-            moving, across every market Tereflow has analysed.
-          </p>
+          <p>{homeCfg.subheadline}</p>
           <div className="mm-cta-row">
             <a className="mm-cta" href="#openings">
-              See the openings <span aria-hidden>{'\u2192'}</span>
+              {homeCfg.primary_button} <span aria-hidden>{'\u2192'}</span>
             </a>
+            <Link className="mm-cta ghost" to="/guide">
+              {homeCfg.guide_button}
+            </Link>
             <Link className="mm-cta ghost" to="/sandbox">
               Open Trade Sandbox
-            </Link>
-            <Link className="mm-cta ghost" to="/guide">
-              Problem to supply guide
             </Link>
           </div>
           <p className="mm-sources">Built on UN Comtrade, HMRC and national statistics offices</p>
         </div>
-        <TradeStory className="mm-hero-scene" />
+        {heroPhoto ? (
+          <img className="mm-hero-scene" src={heroPhoto.url} alt={heroPhoto.alt_text} style={{ objectFit: 'cover', borderRadius: 12, width: '100%', maxHeight: 360 }} />
+        ) : (
+          <TradeStory className="mm-hero-scene" />
+        )}
+      </section>
+
+      <section className="mm-block" aria-label="What Tereflow does">
+        <div className="mm-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+          {homeCfg.value_blocks.map((b) => {
+            const to = b.premium && !entitled ? '/upgrade' : b.to;
+            const body = (
+              <>
+                <h3>{b.title}{b.premium && <span className="badge premium" style={{ marginLeft: 8 }}>Premium</span>}</h3>
+                <p>{b.text}</p>
+              </>
+            );
+            return to.startsWith('#') ? (
+              <a className="mm-card" key={b.title} href={to}>{body}</a>
+            ) : (
+              <Link className="mm-card" key={b.title} to={to}>{body}</Link>
+            );
+          })}
+        </div>
       </section>
 
       <div className="typeahead mm-search">
@@ -215,6 +246,9 @@ export default function Home() {
 
       <BudgetBar budget={budget} onChange={setBudget} />
 
+      {continent === homeCfg.default_region && homeCfg.default_region !== 'all' && (
+        <p className="tiny dim" style={{ margin: '0 0 6px' }}>{homeCfg.africa_note}</p>
+      )}
       <div className="mm-section-head" id="openings">
         <h2>{splitHeading(listHeading)}<InfoTip k="product-list" /></h2>
       </div>
@@ -222,6 +256,11 @@ export default function Home() {
       {searchNote && (
         <p className="tiny dim" style={{ margin: '2px 0 0' }}>
           {searchNote}
+        </p>
+      )}
+      {products.length > 0 && (
+        <p className="tiny dim" style={{ margin: '2px 0 0' }}>
+          Latest trade year in this list: {Math.max(...products.map((p) => p.year))}. {homeCfg.vintage_note}
         </p>
       )}
       <p className="tiny dim" style={{ margin: '2px 0 12px' }}>
@@ -290,6 +329,20 @@ export default function Home() {
             </p>
             <span className="mm-cta small">{entitled ? 'Open feed' : 'See premium'} <span aria-hidden>{'\u2192'}</span></span>
           </Link>
+        </div>
+      </section>
+
+      <section className="mm-block" data-reveal>
+        <h2 className="mm-title">
+          How it <em>works</em>
+        </h2>
+        <div className="mm-cards">
+          {homeCfg.how_it_works.map((s, i) => (
+            <div className="mm-card" key={s.title}>
+              <h3>{i + 1}. {s.title}</h3>
+              <p>{s.text}</p>
+            </div>
+          ))}
         </div>
       </section>
 

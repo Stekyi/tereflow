@@ -1,0 +1,23 @@
+{
+  "_about": "Landing page copy and defaults. Edit this file to change the headline, the default region or the how-it-works steps; no code change needed. default_region must be one of the region names used in the filters, or 'all'.",
+  "default_region": "Africa",
+  "headline_lead": "Find product and country openings worth trading,",
+  "headline_accent": "then turn them into action.",
+  "subheadline": "Ranked by momentum. Guided step by step. Focused on African markets and corridors.",
+  "primary_button": "See current openings",
+  "guide_button": "How the Guide works",
+  "africa_note": "Africa first: the openings below start with African markets and corridors. Choose All regions to see the whole world.",
+  "value_blocks": [
+    {"title": "Spot openings that are moving", "text": "Product and country lines ranked by momentum, with the evidence and score behind each one.", "to": "#openings", "premium": false},
+    {"title": "Walk from data to a supply idea", "text": "The Guide takes you from the problem, through the supply chain, to the questions to ask and the plays to try.", "to": "/guide", "premium": false},
+    {"title": "Turn it into a plan", "text": "Premium: a full action plan and a Business Model Canvas for the opening you choose.", "to": "/canvas", "premium": true}
+  ],
+  "how_it_works": [
+    {"title": "Choose an opening", "text": "Pick a product and country that is moving."},
+    {"title": "Run the Guide", "text": "See the chain, where it strains and what to ask."},
+    {"title": "Check the finance", "text": "Look at banks and lenders in that country."},
+    {"title": "Build your canvas", "text": "Premium: a nine-block plan you can edit and export."},
+    {"title": "Find people to trade with", "text": "Message buyers, sellers and suppliers in the Network."}
+  ],
+  "vintage_note": "Annual figures from UN Comtrade and national statistics offices, refreshed by a nightly job when new data is published."
+}

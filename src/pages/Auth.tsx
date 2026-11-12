@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useSession } from '../lib/auth';
@@ -19,7 +19,7 @@ export default function Auth() {
 
   const requestedNext = params.get('next') ?? '';
   // Only a path inside this app; a full URL or a protocol-relative one would be an open redirect.
-  const next = /^\/(?!\/)[^\\]*$/.test(requestedNext) ? requestedNext : '/network';
+  const next = /^\/(?!\/)[^\\]*$/.test(requestedNext) ? requestedNext : '/';
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

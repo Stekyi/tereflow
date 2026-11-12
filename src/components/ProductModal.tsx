@@ -1170,7 +1170,7 @@ export default function ProductModal({
   flow?: 'export' | 'import' | null;
   onClose: () => void;
 }) {
-  const { user } = useSession();
+  const { user, entitled } = useSession();
   const [budget] = useBudget();
   const [hs, setHs] = useState(hsCode);
   const [history, setHistory] = useState<string[]>([]);
@@ -1528,6 +1528,18 @@ export default function ProductModal({
                 <LandedCostBlock key={insight.hs_code} unitValueUsdT={insight.unit_value_usd_t ?? null} />
                 <CompanyLinksBlock name={insight.name ?? null} />
                 {insight.focus_slug && <p className="tiny" style={{ margin: '10px 0 0' }}><Link to={`/feasibility/${insight.focus_slug}/${insight.hs_code}?flow=${insight.focus_flow ?? 'export'}`}>Open the full feasibility report</Link></p>}
+                <div className="card" style={{ marginTop: 12 }}>
+                  <p className="card-title">What to do next</p>
+                  <ul className="small" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+                    <li><Link to={`/guide?country=${encodeURIComponent(insight.focus_slug)}`}>Start the Guide</Link> <span className="dim">(free): from the problem to the questions and plays.</span></li>
+                    <li>
+                      <Link to={entitled ? `/canvas?country=${encodeURIComponent(insight.focus_slug)}&hs=${insight.hs_code}` : '/upgrade'}>Get the full action plan and Business Model Canvas</Link>{' '}
+                      <span className="badge premium">Premium</span>
+                    </li>
+                    <li><Link to="/finance">See banks and lenders</Link> <span className="dim">that could finance it.</span></li>
+                    <li><Link to="/network">Find people to trade with</Link> <span className="dim">in the Network.</span></li>
+                  </ul>
+                </div>
                 <DiscoveryBlock hs={insight.hs_code} />
                   </div>
                 )}

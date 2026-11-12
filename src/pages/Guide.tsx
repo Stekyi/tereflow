@@ -1,5 +1,5 @@
-﻿import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { ProductCard } from '../../shared/types';
 import type { GuideResult } from '../../shared/guide';
@@ -21,7 +21,8 @@ const box = { border: '1px solid var(--line, #cfd4dc)', borderRadius: 8, padding
 
 export default function Guide() {
   const [countries, setCountries] = useState<CountrySummary[]>([]);
-  const [slug, setSlug] = useState('');
+  const [urlParams] = useSearchParams();
+  const [slug, setSlug] = useState(urlParams.get('country') ?? '');
   const [role, setRole] = useState<'supply' | 'procurement'>('supply');
   const [q, setQ] = useState('');
   const [cards, setCards] = useState<ProductCard[]>([]);

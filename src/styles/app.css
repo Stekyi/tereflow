@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   /* Ivory paper rather than stark white. Warmth is most of what separates a
      premium surface from a utilitarian one. */
   --bg: #f7f8fb;
@@ -2208,6 +2208,7 @@ textarea {
 
 .portal-main {
   flex: 1 1 auto;
+  min-height: 85vh;
   min-width: 0;
   display: flex;
   flex-direction: column;

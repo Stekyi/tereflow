@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { Skeletons } from './components/ui';
 import { Logo } from './components/Brand';
 import FeedbackButton from './components/FeedbackButton';
@@ -85,6 +85,25 @@ const NAV: { to: string; label: string; d: string; stroke?: boolean; badge?: 'fe
 
 const ROOTS = new Set(['/', '/countries', '/news', '/network', '/me']);
 
+/**
+ * A new page opens at its top. Without this a link keeps the scroll position of the page it was clicked on,
+ * so the reader lands part-way down an unrelated page. Back and forward (POP) keep the browser's own position.
+ */
+function ScrollToTop() {
+  const { pathname, hash } = useLocation();
+  const type = useNavigationType();
+  useEffect(() => {
+    if (type === 'POP') return;
+    if (hash) {
+      const el = document.getElementById(decodeURIComponent(hash.slice(1)));
+      if (el) { el.scrollIntoView({ block: 'start' }); return; }
+    }
+    window.scrollTo(0, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+  return null;
+}
+
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -147,6 +166,7 @@ export default function App() {
       </header>
 
       <main>
+        <ScrollToTop />
         <Suspense fallback={<Skeletons n={5} />}>
           <Routes>
             <Route path="/" element={<Home />} />

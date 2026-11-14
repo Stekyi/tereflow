@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -90,7 +91,23 @@ const SECTIONS: { id: SectionId; label: string; icon: string }[] = [
 export default function Portal() {
   const [token, setToken] = useState(getAdminToken());
   const [authed, setAuthed] = useState(Boolean(getAdminToken()));
-  const [section, setSection] = useState<SectionId>('overview');
+  // The open section lives in the URL (/admin#finance) so refresh and Back return to it.
+  const [section, setSectionState] = useState<SectionId>(() => {
+    const h = window.location.hash.slice(1) as SectionId;
+    return SECTIONS.some((s) => s.id === h) ? h : 'overview';
+  });
+  const firstSection = useRef(true);
+  function setSection(id: SectionId) {
+    setSectionState(id);
+    window.history.replaceState(window.history.state, '', `#${id}`);
+  }
+  // Every menu click lands at the top of the new panel. Before this the page kept its old scroll offset, which
+  // jumped to the very top when the new panel was shorter and stayed part-way down when it was not.
+  useEffect(() => {
+    if (firstSection.current) { firstSection.current = false; return; }
+    const top = document.querySelector('.portal')?.getBoundingClientRect().top ?? 0;
+    if (top < 0) window.scrollTo(0, window.scrollY + top - 8);
+  }, [section]);
   const t = useToast();
 
   // One error path for every section: an auth failure drops back to the token

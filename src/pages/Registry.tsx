@@ -109,7 +109,7 @@ export default function Registry() {
                 }}
               >
                 <div className="row" style={{ gap: 11 }}>
-                  <span className="flag">{e.iso3 ?? (e.kind === 'country' ? '??' : '◍')}</span>
+                  <span className="flag">{e.iso3 ?? (e.kind === 'country' ? '??' : '-')}</span>
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span className="name" style={{ display: 'block' }}>
                       {e.name}

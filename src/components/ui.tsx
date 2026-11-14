@@ -34,7 +34,7 @@ export function Skeletons({ n = 4 }: { n?: number }) {
 export function Empty({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
   return (
     <div className="empty">
-      <div style={{ fontSize: 34, marginBottom: 10, opacity: 0.4 }}>◍</div>
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden style={{ marginBottom: 10, opacity: 0.4 }}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18" /></svg>
       <div style={{ fontWeight: 650, color: 'var(--muted)' }}>{title}</div>
       {hint && (
         <div className="small" style={{ marginTop: 6, maxWidth: 380, marginInline: 'auto' }}>

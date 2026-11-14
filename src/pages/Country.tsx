@@ -251,7 +251,7 @@ export default function Country() {
           hint={
             hasAnythingElse
               ? 'The trade pipeline has not run for this country. What follows comes from other sources and is complete on its own terms.'
-              : 'Figures appear once the pipeline has fetched this country. That runs on the operator\u2019s machine, not in the cloud, so it fills in over time rather than on demand.'
+              : 'This country is switched on but no trade data has been loaded for it yet. Figures appear after an operator loads its trade files and the analysis runs.'
           }
         />
         {data.market_context && <MarketContextPanel context={data.market_context} />}

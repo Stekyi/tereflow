@@ -8,4 +8,4 @@ for (const line of readFileSync(new URL('../.env', import.meta.url), 'utf8').spl
   if (m) env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
 }
 const run = (cmd) => spawnSync(cmd, { stdio: 'inherit', shell: true, env }).status ?? 1;
-process.exit(run('node scripts/build-toolkits.mjs') || run('npm run build') || run('npx wrangler deploy'));
+process.exit(run('node scripts/check-text.mjs') || run('node scripts/build-toolkits.mjs') || run('npm run build') || run('npx wrangler deploy'));

@@ -143,7 +143,7 @@ Every loader rejects a file with any bad row, naming the row and column, and nev
 | Scripts run from the command line with clear output | Met. |
 | Welcome page states the purpose | Met. |
 | Every major data view offers a next action | Met on the openings list, product detail, Finance, Canvas and Outlook. Not yet on every secondary page. |
-| Business Model Canvas, nine blocks, German and English, editable, exportable | Met. German text is a first draft and needs a native review. |
+| Business Model Canvas, nine blocks, English only, editable, exportable | Met. German text is a first draft and needs a native review. |
 | Free and Premium enforced with visible upgrade paths | Met (Canvas, Outlook, saved runs are 402 for free users; upgrade links shown). |
 | Africa-first defaults without blocking global data | Met. |
 | Documentation for every new script and admin workflow | Met in this guide. |

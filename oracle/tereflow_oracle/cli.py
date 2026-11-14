@@ -284,6 +284,9 @@ def main(argv=None):
     sub.add_parser("export-app-tables")
     ib = sub.add_parser("ingest-inbox", help="load collector CSVs uploaded through the admin inbox")
     ib.add_argument("--dry-run", action="store_true")
+    fl = sub.add_parser("ingest-folder", help="load collector CSVs from a local folder")
+    fl.add_argument("folder")
+    fl.add_argument("--dry-run", action="store_true")
     cp = sub.add_parser("copy-app-data")
     cp.add_argument("--prefix", default="app_")
     sd.add_argument("--force", action="store_true")
@@ -308,6 +311,9 @@ def main(argv=None):
         (ROOT / "shared" / "app-tables.ts").write_text(appschema.export_tables_ts(), encoding="utf-8", newline="\n")
         print("wrote shared/app-tables.ts")
         return
+    elif a.cmd == "ingest-folder":
+        from . import inbox
+        sys.exit(inbox.run_folder(conn, a.folder, dry_run=a.dry_run))
     elif a.cmd == "ingest-inbox":
         from . import inbox
         sys.exit(inbox.run(conn, dry_run=a.dry_run))

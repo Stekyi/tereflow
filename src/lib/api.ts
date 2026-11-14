@@ -793,6 +793,7 @@ export const api = {
         body: JSON.stringify(input),
       }),
     collectorBlob: () => adminBlob('/api/admin/collector/package'),
+    pipelineKitBlob: () => adminBlob('/api/admin/toolkit/pipeline'),
     inbox: () =>
       req<{ pending: InboxFile[]; done: InboxFile[] }>('/api/admin/collector/inbox'),
     inboxUpload: async (file: File) => {

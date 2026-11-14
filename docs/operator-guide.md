@@ -35,7 +35,10 @@ Admin, Pipeline tab, "Download collector (.zip)". See the README inside the zip.
 They are queued in storage. The server then validates each file (six digit codes, numbers, no duplicates), replaces that country, year and flow
 in the database in one transaction, recalculates the country's analysis and refreshes its pages. This happens in the daily refresh (02:00),
 or sooner by running `python -m tereflow_oracle ingest-inbox` in the oracle folder. A file with any problem is refused whole and kept with the reason
-under collector-inbox/rejected/. Operators never receive database credentials. `.partial.csv` files are incomplete and cannot be uploaded.
+under collector-inbox/rejected/. Operators never receive database credentials.
+
+**Pipeline kit (the app does not depend on one PC).** Admin, Pipeline tab, "Pipeline kit" downloads the same Oracle pipeline the owner runs (load collector files, recalculate analysis, finance and national loaders, World Bank). With your own Oracle wallet and .env it runs on any Windows PC: `pipeline.cmd load-folder tereflow-data\data`. It holds no secrets and calls no AI. Rebuilt from the repository on every deploy.
+ `.partial.csv` files are incomplete and cannot be uploaded.
 ## Images (Admin, Images tab)
 
 Real photographs only. Open the admin, choose **Images**, pick a category, add a subject (optional) and a short

@@ -340,7 +340,7 @@ admin.delete('/collector/inbox/:name', async (c) => {
 });
 
 /** Offline toolkits (check and analyse an uploaded template on any PC). No secrets inside. */
-for (const kind of ['finance', 'national'] as const) {
+for (const kind of ['finance', 'national', 'pipeline'] as const) {
   admin.get(`/toolkit/${kind}`, () => {
     const zip = buildZip(TOOLKIT_FILES[kind], `tereflow-${kind}-toolkit`);
     return new Response(zip, {

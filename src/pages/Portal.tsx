@@ -1035,6 +1035,15 @@ function Pipeline({ t, onError }: { t: Toaster; onError: OnError }) {
         <button className="btn" onClick={() => void downloadCollector()}>Download collector (.zip)</button>
       </Panel>
 
+      <Panel title="Pipeline kit (load and analyse without the owner's PC)">
+        <p className="small dim" style={{ marginTop: 0 }}>
+          The same code the app owner runs: load collector files into Oracle, recalculate the analysis, load finance and national data, refresh World Bank figures.
+          It runs on any Windows PC with Python, using your own Oracle wallet and login, so the app does not depend on one machine. It contains no AI and no secrets: every step is a fixed rule, so
+          the same data always gives the same result. Unzip, read README.txt, then run pipeline.cmd.
+        </p>
+        <button className="btn" onClick={() => void saveTemplate(api.admin.pipelineKitBlob, 'tereflow-pipeline-kit.zip', onError)}>Download pipeline kit (.zip)</button>
+      </Panel>
+
       <TradeInbox t={t} onError={onError} />
 
       <Panel title={`Countries (${countries.length})`}>

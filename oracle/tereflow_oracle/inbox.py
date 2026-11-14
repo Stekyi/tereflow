@@ -146,3 +146,43 @@ def run(conn, dry_run: bool = False, log=print) -> int:
             log(f"dashboard {c}: {dashboard.refresh_dashboard(conn, c)} payloads cached")
     log(f"inbox: loaded {ok}, refused {bad}")
     return 0 if not bad else 2
+
+
+def run_folder(conn, folder: str, dry_run: bool = False, log=print) -> int:
+    """Same checks and the same atomic load as the admin inbox, for CSV files already on this machine."""
+    from datetime import date
+    from pathlib import Path
+    files = sorted(p for p in Path(folder).glob("*.csv") if not p.name.endswith(".partial.csv"))
+    if not files:
+        log(f"{folder}: no collector CSV files found")
+        return 1
+    run_id = str(uuid.uuid4())
+    if not dry_run:
+        conn.cursor().execute("INSERT INTO tf_ingest_run (run_id, kind, status, dry_run) VALUES (:1,'comtrade','RUNNING',0)", [run_id])
+        conn.commit()
+    loaded: set[str] = set()
+    ok = bad = total = 0
+    for f in files:
+        iso3, year, flow, rows, problems = parse(f.name, f.read_text(encoding="utf-8", errors="replace"), date.today().year)
+        if problems:
+            bad += 1
+            log(f"{f.name}: REFUSED ({'; '.join(problems[:3])})")
+            continue
+        log(f"{f.name}: {len(rows):,} rows{' (dry run, not loaded)' if dry_run else ''}")
+        if dry_run:
+            continue
+        load(conn, iso3, year, flow, rows, run_id)
+        loaded.add(iso3)
+        ok += 1
+        total += len(rows)
+    if not dry_run:
+        conn.cursor().execute("UPDATE tf_ingest_run SET status=:1, finished_at=SYSTIMESTAMP, detail=:2 WHERE run_id=:3",
+                              ["SUCCESS" if not bad else "PARTIAL", f"folder load: loaded={ok} refused={bad} rows={total}", run_id])
+        conn.commit()
+        for c in sorted(loaded):
+            log(f"metrics {c}: {analytics.refresh_metrics(conn, c):,} products")
+            if c in opportunity.CONFIG:
+                log(f"opportunities {c}: {opportunity.refresh_opportunities(conn, c):,} scored")
+            log(f"dashboard {c}: {dashboard.refresh_dashboard(conn, c)} payloads cached")
+    log(f"loaded {ok}, refused {bad}")
+    return 0 if not bad else 2

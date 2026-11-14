@@ -205,7 +205,7 @@ network.get('/cards', async (c) => {
 
   const ftsTerm = q.replace(/["*()^:-]/g, ' ').trim();
   if (ftsTerm) {
-    // Nothing matched the index, or fts5 rejected the term â€” fall back to LIKE
+    // Nothing matched the index, or fts5 rejected the term — fall back to LIKE
 
     {
       const like = `%${q}%`;

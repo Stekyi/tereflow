@@ -358,7 +358,7 @@ pub.get('/dashboard/:slug', async (c) => {
   );
 });
 
-/** Where the numbers came from ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â shown under every dashboard. */
+/** Where the numbers came from — shown under every dashboard. */
 pub.get('/dashboard/:slug/sources', async (c) => {
   const entity = await getEntityBySlug(c.env.DB, c.req.param('slug'));
   if (!entity) return bad('Not found', 404);
@@ -1693,7 +1693,7 @@ pub.get('/opportunities', async (c) => {
   // dominant legacy commodity (Ghanaian cocoa is always top-5, never a
   // "signal"). What that exclusion does NOT catch is a smaller, growing
   // mining/oil-type category that isn't top-5 yet but is still never
-  // realistically SME-accessible ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â the universal defaults + admin overrides
+  // realistically SME-accessible — the universal defaults + admin overrides
   // below catch that.
   const classificationsByEntity = await loadClassificationsBulk(
     c.env.DB,
@@ -1845,7 +1845,7 @@ pub.get('/market/hs-codes', async (c) => {
 /**
  * Product view: for one HS2 product/service chapter, rank every country by
  * trade volume. Partner detail attached per country is that country's own
- * general trading partners (already computed) ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â never product-specific,
+ * general trading partners (already computed) — never product-specific,
  * because Comtrade's keyless tier never fetches partner x HS-code together.
  */
 pub.get('/market/products', async (c) => {

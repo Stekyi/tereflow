@@ -97,7 +97,7 @@ export default function Auth() {
         </div>
 
         <button className="btn primary block" type="submit" disabled={busy}>
-          {busy ? 'Workingâ€¦' : mode === 'register' ? 'Create free account' : 'Sign in'}
+          {busy ? 'Working…' : mode === 'register' ? 'Create free account' : 'Sign in'}
         </button>
       </form>
 

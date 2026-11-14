@@ -5,7 +5,7 @@ import cfg from './config/canvas.json';
  * shared/config/canvas.json. Nothing is invented: a line is either 'data' (taken from the Guide's own findings) or
  * 'typical' (standard practice from the config, labelled as such so the user knows to check it).
  */
-export type Lang = 'en' | 'de';
+export type Lang = 'en';
 export type BlockKey = (typeof cfg.blocks)[number]['key'];
 export interface Line { text: string; source: 'data' | 'typical' | 'user' }
 export type Blocks = Record<string, Line[]>;
@@ -80,12 +80,12 @@ export function buildCanvas(g: CanvasInput, lang: Lang): Blocks {
 
 export function canvasToText(title: string, blocks: Blocks, lang: Lang, generated: string): string {
   const defs = blockDefs(lang);
-  const lines = [`${title}`, `${lang === 'de' ? 'Business Model Canvas (Osterwalder)' : 'Business Model Canvas (Osterwalder)'}`, generated, ''];
+  const lines = [title, 'Business Model Canvas (Osterwalder)', generated, ''];
   for (const d of defs) {
     lines.push(d.label.toUpperCase());
-    for (const l of blocks[d.key] ?? []) lines.push(`- ${l.text}${l.source === 'typical' ? (lang === 'de' ? ' [üblich]' : ' [typical]') : ''}`);
+    for (const l of blocks[d.key] ?? []) lines.push(`- ${l.text}${l.source === 'typical' ? ' [typical]' : ''}`);
     lines.push('');
   }
-  lines.push(lang === 'de' ? '[üblich] = gängige Praxis aus der Vorlage, bitte prüfen. Alle anderen Zeilen stammen aus den Daten von Tereflow oder von Ihnen.' : '[typical] = standard practice from the template, please check. Every other line comes from Tereflow data or from you.');
+  lines.push('[typical] = standard practice from the template, please check. Every other line comes from Tereflow data or from you.');
   return lines.join('\n');
 }

@@ -4,6 +4,7 @@ import { attachSources, bad, getEntityBySlug, json, slugify, uid } from '../lib/
 import { requireAdmin } from '../lib/auth';
 import { buildZip } from '../lib/zip';
 import { COLLECTOR_FILES } from '../generated/collector-bundle';
+import { TOOLKIT_FILES } from '../generated/toolkit-bundle';
 import { currentUser } from '../lib/session';
 import { discoverCountryConfig, dominanceCandidates } from '../providers/discover';
 import { loadSettings } from '../lib/settings';
@@ -300,6 +301,20 @@ admin.get('/collector/package', () => {
     },
   });
 });
+
+/** Offline toolkits (check and analyse an uploaded template on any PC). No secrets inside. */
+for (const kind of ['finance', 'national'] as const) {
+  admin.get(`/toolkit/${kind}`, () => {
+    const zip = buildZip(TOOLKIT_FILES[kind], `tereflow-${kind}-toolkit`);
+    return new Response(zip, {
+      headers: {
+        'content-type': 'application/zip',
+        'content-disposition': `attachment; filename="tereflow-${kind}-toolkit.zip"`,
+        'cache-control': 'no-store',
+      },
+    });
+  });
+}
 
 admin.delete('/entities/:slug', async (c) => {
   const res = await c.env.DB.prepare('DELETE FROM entities WHERE slug = ? OR id = ?')

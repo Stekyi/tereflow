@@ -639,6 +639,8 @@ function NationalAdmin({ t, onError }: { t: Toaster; onError: OnError }) {
       <Panel title="Excel template">
         <p className="small dim" style={{ marginTop: 0 }}>The template for monthly or quarterly national series, with instructions, the registered sources and an example.</p>
         <button className="btn" onClick={() => void saveTemplate(api.nationalAdmin.templateBlob, 'tereflow-national-template.xlsx', onError)}>Download National data template (.xlsx)</button>
+        <p className="small dim" style={{ marginBottom: 6 }}>Analysis script: check the filled file and run the trend analysis on any Windows PC with Python, without logging in. Unzip, then run national.cmd.</p>
+        <button className="btn" onClick={() => void saveTemplate(api.nationalAdmin.toolkitBlob, 'tereflow-national-toolkit.zip', onError)}>Download National analysis script (.zip)</button>
       </Panel>
       <Panel title="Register a national source">
         <div style={{ display: 'grid', gap: 8, maxWidth: 440 }}>
@@ -728,6 +730,8 @@ function FinanceAdmin({ t, onError }: { t: Toaster; onError: OnError }) {
           The template the upload expects: a Data sheet to fill, plus sheets that list the allowed metrics and units, the institutions already registered, how to fill each column, and an example. It is built from the live settings, so it always matches what the system accepts.
         </p>
         <button className="btn" onClick={() => void saveTemplate(api.financeAdmin.templateBlob, 'tereflow-finance-template.xlsx', onError)}>Download Finance template (.xlsx)</button>
+        <p className="small dim" style={{ marginBottom: 6 }}>Analysis script: check the filled file and run the scorecard, multi-year trends and deposit-rate analysis on any Windows PC with Python, without logging in. Unzip, then run finance.cmd.</p>
+        <button className="btn" onClick={() => void saveTemplate(api.financeAdmin.toolkitBlob, 'tereflow-finance-toolkit.zip', onError)}>Download Finance analysis script (.zip)</button>
       </Panel>
       <Panel title="Register an institution">
         <div style={{ display: 'grid', gap: 8, maxWidth: 420 }}>

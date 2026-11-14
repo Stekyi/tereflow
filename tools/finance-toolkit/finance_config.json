@@ -1,0 +1,313 @@
+{
+  "_about": "Allowed values for the bank Excel template. Edit this file, then run: python scripts/finance/bank_load.py seed-defs. 'better' says whether a higher or lower value ranks first (used for institution rankings).",
+  "columns": [
+    "institution_code",
+    "country_iso3",
+    "period",
+    "metric_code",
+    "value",
+    "unit",
+    "currency",
+    "source_note",
+    "rate_type"
+  ],
+  "required": [
+    "institution_code",
+    "country_iso3",
+    "period",
+    "metric_code",
+    "value",
+    "unit",
+    "source_note"
+  ],
+  "metrics": {
+    "TOTAL_ASSETS": {
+      "label": "Total assets",
+      "units": [
+        "currency"
+      ],
+      "rate": false,
+      "better": "higher"
+    },
+    "TOTAL_LOANS": {
+      "label": "Total loans",
+      "units": [
+        "currency"
+      ],
+      "rate": false,
+      "better": "higher"
+    },
+    "TOTAL_DEPOSITS": {
+      "label": "Total deposits",
+      "units": [
+        "currency"
+      ],
+      "rate": false,
+      "better": "higher"
+    },
+    "NPL_RATIO": {
+      "label": "Non-performing loans ratio",
+      "units": [
+        "percent"
+      ],
+      "rate": false,
+      "better": "lower"
+    },
+    "CAPITAL_ADEQUACY": {
+      "label": "Capital adequacy ratio",
+      "units": [
+        "percent"
+      ],
+      "rate": false,
+      "better": "higher"
+    },
+    "RETURN_ON_ASSETS": {
+      "label": "Return on assets",
+      "units": [
+        "percent"
+      ],
+      "rate": false,
+      "better": "higher"
+    },
+    "BRANCH_COUNT": {
+      "label": "Branches",
+      "units": [
+        "count"
+      ],
+      "rate": false,
+      "better": "higher"
+    },
+    "LENDING_RATE": {
+      "label": "Lending rate",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "lower"
+    },
+    "DEPOSIT_RATE": {
+      "label": "Deposit rate",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "higher"
+    },
+    "TRADE_FINANCE_FEE": {
+      "label": "Trade finance fee",
+      "units": [
+        "percent",
+        "currency"
+      ],
+      "rate": true,
+      "better": "lower"
+    },
+    "PROFIT_AFTER_TAX": {
+      "label": "Profit after tax",
+      "units": [
+        "currency"
+      ],
+      "rate": false,
+      "better": "higher"
+    },
+    "RETURN_ON_EQUITY": {
+      "label": "Return on equity",
+      "units": [
+        "percent"
+      ],
+      "rate": false,
+      "better": "higher"
+    },
+    "COST_TO_INCOME": {
+      "label": "Cost to income ratio",
+      "units": [
+        "percent"
+      ],
+      "rate": false,
+      "better": "lower"
+    },
+    "POLICY_RATE": {
+      "label": "Central bank policy rate",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "none"
+    },
+    "REFERENCE_RATE": {
+      "label": "Reference (base) rate for loan pricing",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "lower"
+    },
+    "FEE_LC_IMPORT_SIGHT": {
+      "label": "Import letter of credit, sight: establishment fee (per quarter)",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "lower"
+    },
+    "FEE_LC_IMPORT_USANCE": {
+      "label": "Import letter of credit, usance: establishment fee (per quarter)",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "lower"
+    },
+    "FEE_LC_EXPORT_NEGOTIATION": {
+      "label": "Export letter of credit: negotiation fee",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "lower"
+    },
+    "FEE_GUARANTEE_PERIODIC": {
+      "label": "Guarantee or bond: periodic charge (per quarter)",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "lower"
+    },
+    "FEE_COLLECTION_EXPORT": {
+      "label": "Export bill for collection: handling commission",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "lower"
+    },
+    "CASH_BALANCE": {
+      "label": "Cash and cash equivalents",
+      "units": [
+        "currency"
+      ],
+      "rate": false,
+      "better": "none"
+    },
+    "INVESTMENT_SECURITIES": {
+      "label": "Investment securities held",
+      "units": [
+        "currency"
+      ],
+      "rate": false,
+      "better": "none"
+    },
+    "TOTAL_EQUITY": {
+      "label": "Total equity (shareholders' funds)",
+      "units": [
+        "currency"
+      ],
+      "rate": false,
+      "better": "none"
+    },
+    "TOTAL_LIABILITIES": {
+      "label": "Total liabilities",
+      "units": [
+        "currency"
+      ],
+      "rate": false,
+      "better": "none"
+    },
+    "OPERATING_INCOME": {
+      "label": "Operating income",
+      "units": [
+        "currency"
+      ],
+      "rate": false,
+      "better": "none"
+    },
+    "PROFIT_BEFORE_TAX": {
+      "label": "Profit before tax",
+      "units": [
+        "currency"
+      ],
+      "rate": false,
+      "better": "none"
+    },
+    "DEPOSIT_RATE_AVG": {
+      "label": "Average interest rate paid on customer deposits",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "higher"
+    },
+    "SAVINGS_RATE": {
+      "label": "Savings account interest rate (standard account, 'up to')",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "higher"
+    },
+    "TERM_SAVINGS_RATE": {
+      "label": "Fixed-term goal savings interest rate ('up to')",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "higher"
+    },
+    "DEMAND_DEPOSIT_RATE": {
+      "label": "Demand deposit rate",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "higher"
+    },
+    "TIME_DEPOSIT_RATE_3M": {
+      "label": "Time deposit rate, 3 months",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "higher"
+    },
+    "TIME_DEPOSIT_RATE_6M": {
+      "label": "Time deposit rate, 6 months",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "higher"
+    },
+    "TBILL_91D": {
+      "label": "Treasury bill yield, 91 days (investment)",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "none"
+    },
+    "TBILL_182D": {
+      "label": "Treasury bill yield, 182 days (investment)",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "none"
+    },
+    "TBILL_364D": {
+      "label": "Treasury bill yield, 364 days (investment)",
+      "units": [
+        "percent"
+      ],
+      "rate": true,
+      "better": "none"
+    }
+  },
+  "rate_types": [
+    "fixed",
+    "variable",
+    "indicative",
+    "policy"
+  ],
+  "period_format": "YYYY, YYYY-MM or YYYY-Qn (for example 2025, 2025-06, 2025-Q2)"
+}

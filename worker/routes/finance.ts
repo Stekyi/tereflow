@@ -162,6 +162,104 @@ finance.get('/:country', async (c) => {
       text: `${sight.name} publishes its import letter of credit fee at ${pct(sight.value)} per quarter for a sight credit. As an example, a US$100,000 sight letter of credit held for one quarter would carry a fee of about US$${(100000 * sight.value / 100).toLocaleString('en-US')}, plus the SWIFT charge the bank lists. Only banks whose tariff we hold are shown, so ask the others for theirs.`,
       evidence: [sight.source_note] });
   }
+  // ---- trends: annual figures per bank, with year-on-year change ----
+  const annual = (instCode: string, metric: string) =>
+    all.filter((r) => r.institution_code === instCode && r.metric_code === metric && /^\d{4}$/.test(r.period)).sort((a, b) => (a.period < b.period ? -1 : 1));
+  const TREND_METRICS = ['TOTAL_ASSETS', 'TOTAL_DEPOSITS', 'TOTAL_LOANS', 'CASH_BALANCE', 'INVESTMENT_SECURITIES', 'TOTAL_LIABILITIES', 'TOTAL_EQUITY', 'OPERATING_INCOME', 'PROFIT_BEFORE_TAX', 'PROFIT_AFTER_TAX'];
+  const trends = TREND_METRICS.map((m) => ({
+    metric_code: m,
+    label: labelOf.get(m) ?? m,
+    banks: banks
+      .map((b) => {
+        const pts = annual(b.code, m);
+        return {
+          code: b.code,
+          name: b.name,
+          points: pts.map((r, i) => ({ period: r.period, value: r.value, change_pct: i > 0 && pts[i - 1].value > 0 ? Math.round((r.value / pts[i - 1].value - 1) * 1000) / 10 : null, source_note: r.source_note })),
+        };
+      })
+      .filter((b) => b.points.length > 0),
+  })).filter((t) => t.banks.length > 0);
+
+  // ---- scorecard: who is doing well, measure by measure, for the latest year the banks have in common ----
+  type Score = { id: string; title: string; better: 'higher' | 'lower'; basis: string; ranked: { code: string; name: string; value: number; display: string }[] };
+  const scorecard: Score[] = [];
+  const scoreYear = yr;
+  if (scoreYear) {
+    const prior = String(Number(scoreYear) - 1);
+    const v = (b: string, m: string, per: string) => get(b, m, per)?.value;
+    const pctTxt = (n: number, d = 1) => `${n.toFixed(d)}%`;
+    const growthPct = (b: string, m: string) => { const a = v(b, m, scoreYear), z = v(b, m, prior); return a != null && z != null && z > 0 ? (a / z - 1) * 100 : undefined; };
+    const measures: { id: string; title: string; better: 'higher' | 'lower'; basis: string; f: (b: string) => number | undefined; fmt: (n: number) => string }[] = [
+      { id: 'deposits', title: 'Deposits held', better: 'higher', basis: 'Total customer deposits at the year end. More deposits means more customers have chosen to keep their money there.', f: (b) => v(b, 'TOTAL_DEPOSITS', scoreYear), fmt: bn },
+      { id: 'deposit_growth', title: 'Deposit growth', better: 'higher', basis: `Change in customer deposits from ${prior} to ${scoreYear}.`, f: (b) => growthPct(b, 'TOTAL_DEPOSITS'), fmt: (n) => pctTxt(n, 0) },
+      { id: 'cash', title: 'Cash on hand', better: 'higher', basis: 'Cash and cash equivalents as a share of total assets. A higher share means more of the bank is immediately available.', f: (b) => { const c = v(b, 'CASH_BALANCE', scoreYear), a = v(b, 'TOTAL_ASSETS', scoreYear); return c != null && a ? (c / a) * 100 : undefined; }, fmt: (n) => pctTxt(n, 0) },
+      { id: 'profit_growth', title: 'Profit growth', better: 'higher', basis: `Change in profit after tax from ${prior} to ${scoreYear}, as declared.`, f: (b) => growthPct(b, 'PROFIT_AFTER_TAX'), fmt: (n) => pctTxt(n, 0) },
+      { id: 'profit_margin', title: 'Profit on each cedi of income', better: 'higher', basis: 'Profit before tax divided by operating income. Shows how much of what the bank earns is left as profit.', f: (b) => { const p2 = v(b, 'PROFIT_BEFORE_TAX', scoreYear), o = v(b, 'OPERATING_INCOME', scoreYear); return p2 != null && o ? (p2 / o) * 100 : undefined; }, fmt: (n) => pctTxt(n, 0) },
+      { id: 'equity_share', title: 'Own money behind the balance sheet', better: 'higher', basis: "Shareholders' funds as a share of total assets. A higher share means more of the bank is funded by its owners than by borrowing.", f: (b) => { const e = v(b, 'TOTAL_EQUITY', scoreYear), a = v(b, 'TOTAL_ASSETS', scoreYear); return e != null && a ? (e / a) * 100 : undefined; }, fmt: (n) => pctTxt(n, 1) },
+      { id: 'capital', title: 'Capital adequacy', better: 'higher', basis: 'The regulator\'s measure of the cushion against losses.', f: (b) => v(b, 'CAPITAL_ADEQUACY', scoreYear), fmt: (n) => pctTxt(n, 2) },
+      { id: 'npl', title: 'Loan quality', better: 'lower', basis: 'Share of loans not being repaid. Lower is better.', f: (b) => v(b, 'NPL_RATIO', scoreYear), fmt: (n) => pctTxt(n, 2) },
+      { id: 'deposit_rate', title: 'Interest paid on deposits', better: 'higher', basis: 'Average interest rate the bank states it paid on customer deposits.', f: (b) => v(b, 'DEPOSIT_RATE_AVG', scoreYear), fmt: (n) => pctTxt(n, 2) },
+    ];
+    for (const m of measures) {
+      const vals = banks.map((b) => ({ b, x: m.f(b.code) })).filter((x) => x.x != null && Number.isFinite(x.x as number)) as { b: (typeof banks)[number]; x: number }[];
+      if (vals.length < 2) continue;
+      vals.sort((p1, p2) => (m.better === 'lower' ? p1.x - p2.x : p2.x - p1.x));
+      scorecard.push({ id: m.id, title: m.title, better: m.better, basis: m.basis, ranked: vals.map((x) => ({ code: x.b.code, name: x.b.name, value: x.x, display: m.fmt(x.x) })) });
+    }
+  }
+  // Who leads on how many measures. Never a recommendation: different banks suit different needs.
+  const tally = new Map<string, string[]>();
+  for (const sc of scorecard) tally.set(sc.ranked[0].code, [...(tally.get(sc.ranked[0].code) ?? []), sc.title.toLowerCase()]);
+  const leaders = [...tally.entries()].sort((a, b) => b[1].length - a[1].length).map(([code, list]) => ({ code, name: nameOf(code), count: list.length, measures: list }));
+  if (scorecard.length) {
+    insights.push({
+      id: 'scorecard', title: `Who is doing well (${scoreYear})`,
+      text: `Across ${scorecard.length} measures taken from published figures, ${leaders.map((l) => `${l.name} leads on ${l.count} (${l.measures.join(', ')})`).join('; ')}. No bank leads on everything, so the right choice depends on what you need from it. The scorecard ranks each measure separately.`,
+      evidence: [...new Set(scorecard.flatMap((sc) => sc.ranked.map((r) => r.name)))].map((n) => `Figures for ${n}: see the Data tab for the source of each.`),
+    });
+  }
+  // trend sentence for the biggest movers
+  const growthLines = (['TOTAL_DEPOSITS', 'PROFIT_AFTER_TAX'] as const).flatMap((m) => (trends.find((t) => t.metric_code === m)?.banks ?? []).filter((b) => b.points.length >= 2).map((b) => {
+    const f = b.points[0], l = b.points[b.points.length - 1];
+    return { m, name: b.name, from: f.period, to: l.period, pct: f.value > 0 ? (l.value / f.value - 1) * 100 : null };
+  })).filter((x) => x.pct != null) as { m: string; name: string; from: string; to: string; pct: number }[];
+  if (growthLines.length) {
+    const dep = growthLines.filter((x) => x.m === 'TOTAL_DEPOSITS').sort((a, b) => b.pct - a.pct);
+    const pat = growthLines.filter((x) => x.m === 'PROFIT_AFTER_TAX').sort((a, b) => b.pct - a.pct);
+    const part = (arr: typeof dep, what: string) => (arr.length ? `${what}: ${arr.map((x) => `${x.name} ${x.pct >= 0 ? 'up' : 'down'} ${Math.abs(x.pct).toFixed(0)}% (${x.from} to ${x.to})`).join('; ')}` : '');
+    insights.push({ id: 'trend', title: 'Trend over the years held', text: [part(dep, 'Customer deposits'), part(pat, 'Profit after tax as declared')].filter(Boolean).join('. ') + '. Profit can be lifted or cut by one-off items such as impairments and tax, so read it with the loan quality and capital figures.', evidence: growthLines.map((x) => `${x.name}, ${x.m === 'TOTAL_DEPOSITS' ? 'deposits' : 'profit after tax'}, ${x.from} to ${x.to}`) });
+  }
+
+  // ---- depositor view: what saving or investing pays, from the published rates ----
+  const depSrc = (code: string, m: string, rt?: string | null) => get(code, m, undefined, rt);
+  const sectorSav = sectorCode ? depSrc(sectorCode, 'SAVINGS_RATE') : undefined;
+  const sector3m = sectorCode ? depSrc(sectorCode, 'DEPOSIT_RATE') : undefined;
+  const sector6m = sectorCode ? depSrc(sectorCode, 'TIME_DEPOSIT_RATE_6M') : undefined;
+  const sectorDem = sectorCode ? depSrc(sectorCode, 'DEMAND_DEPOSIT_RATE') : undefined;
+  const tb = centralCode ? ['TBILL_91D', 'TBILL_182D', 'TBILL_364D'].map((m) => ({ m, r: depSrc(centralCode, m) })).filter((x) => x.r) : [];
+  const bankRates = banks.flatMap((b) => ['DEPOSIT_RATE_AVG', 'SAVINGS_RATE', 'TERM_SAVINGS_RATE'].map((m) => ({ b, m, r: get(b.code, m) })).filter((x) => x.r));
+  const depositor = {
+    period: sector3m?.period ?? null,
+    sector: [
+      sectorDem && { label: 'Demand deposits (sector average)', value: sectorDem.value, period: sectorDem.period, source_note: sectorDem.source_note },
+      sectorSav && { label: 'Savings deposits (sector average)', value: sectorSav.value, period: sectorSav.period, source_note: sectorSav.source_note },
+      sector3m && { label: '3-month time deposits (sector average)', value: sector3m.value, period: sector3m.period, source_note: sector3m.source_note },
+      sector6m && { label: '6-month time deposits (sector average)', value: sector6m.value, period: sector6m.period, source_note: sector6m.source_note },
+    ].filter(Boolean) as { label: string; value: number; period: string; source_note: string }[],
+    investment: tb.map((x) => ({ label: `${labelOf.get(x.m) ?? x.m}`, value: x.r!.value, period: x.r!.period, source_note: x.r!.source_note })),
+    banks: bankRates.map((x) => ({ bank: x.b.name, label: labelOf.get(x.m) ?? x.m, value: x.r!.value, period: x.r!.period, source_note: x.r!.source_note })),
+  };
+  if (depositor.sector.length || depositor.investment.length) {
+    const t91 = tb.find((x) => x.m === 'TBILL_91D')?.r, t364 = tb.find((x) => x.m === 'TBILL_364D')?.r;
+    const bits: string[] = [];
+    if (sectorSav) bits.push(`savings accounts paid about ${pct(sectorSav.value, 2)} on average`);
+    if (sector3m) bits.push(`3-month time deposits about ${pct(sector3m.value, 2)}`);
+    if (t91) bits.push(`the 91-day Treasury bill yielded ${pct(t91.value, 2)}`);
+    if (t364) bits.push(`the 364-day bill ${pct(t364.value, 2)}`);
+    insights.push({ id: 'savings', title: 'What saving and investing pays', text: `In ${sector3m?.period ?? sectorSav?.period ?? 'the latest period'}, ${bits.join('; ')}. Rates have fallen with the policy rate, so compare a deposit's rate against the Treasury bill yield before locking in a term.${bankRates.length ? ' Individual banks that publish a rate are listed in the Data tab.' : ' Most banks do not publish their deposit rates in their annual reports, so ask your bank for its current rate card.'}`, evidence: [sectorSav?.source_note, sector3m?.source_note, t91?.source_note].filter(Boolean) as string[] });
+  }
+
   const lastPeriod = all.reduce((m, r) => (r.period > m ? r.period : m), '');
   const byInst = new Map<string, MetricRow[]>();
   for (const r of latest.values()) (byInst.get(r.institution_code) ?? byInst.set(r.institution_code, []).get(r.institution_code)!).push(r);
@@ -177,6 +275,9 @@ finance.get('/:country', async (c) => {
     metric_defs: defs.results ?? [],
     rankings,
     insights,
+    trends,
+    scorecard,
+    depositor,
     fees,
     sources: [...new Set(all.map((r) => r.source_note.replace(/:.*$/, '')))],
   });

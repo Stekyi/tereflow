@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSession } from '../lib/auth';
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useStageScroll } from '../lib/useStageScroll';
 import { api } from '../lib/api';
 import { Empty, Skeletons } from '../components/ui';
@@ -13,7 +14,30 @@ const STAGES = [
   { key: 'action', label: 'Action', sub: 'What to do next' },
 ] as const;
 /** The figures shown for each bank, in this order. Anything a bank has not published is simply not shown. */
-const BANK_ROWS = ['TOTAL_ASSETS', 'TOTAL_LOANS', 'TOTAL_DEPOSITS', 'PROFIT_AFTER_TAX', 'CAPITAL_ADEQUACY', 'NPL_RATIO', 'RETURN_ON_EQUITY', 'RETURN_ON_ASSETS', 'COST_TO_INCOME', 'BRANCH_COUNT', 'REFERENCE_RATE'];
+const BANK_ROWS = ['TOTAL_ASSETS', 'CASH_BALANCE', 'INVESTMENT_SECURITIES', 'TOTAL_LOANS', 'TOTAL_DEPOSITS', 'TOTAL_LIABILITIES', 'TOTAL_EQUITY', 'OPERATING_INCOME', 'PROFIT_BEFORE_TAX', 'PROFIT_AFTER_TAX', 'CAPITAL_ADEQUACY', 'NPL_RATIO', 'RETURN_ON_EQUITY', 'RETURN_ON_ASSETS', 'COST_TO_INCOME', 'BRANCH_COUNT', 'DEPOSIT_RATE_AVG', 'SAVINGS_RATE', 'TERM_SAVINGS_RATE', 'REFERENCE_RATE'];
+const LINE_COLOURS = ['#0f9d58', '#6d3fd1', '#e8710a', '#1a73e8', '#c5221f'];
+const trendLabel = new Set(['TOTAL_DEPOSITS', 'PROFIT_AFTER_TAX', 'CASH_BALANCE', 'TOTAL_ASSETS']);
+
+/** A trend chart for one measure: one line per bank across the years held. */
+function TrendChart({ t }: { t: NonNullable<Fin>['trends'][number] }) {
+  const years = [...new Set(t.banks.flatMap((b) => b.points.map((p) => p.period)))].sort();
+  const rows = years.map((y) => ({ year: y, ...Object.fromEntries(t.banks.map((b) => [b.name.replace(/ (PLC|Limited|Ltd)$/i, ''), (b.points.find((p) => p.period === y)?.value ?? null) as number | null])) }));
+  const names = t.banks.map((b) => b.name.replace(/ (PLC|Limited|Ltd)$/i, ''));
+  return (
+    <div style={{ width: '100%', height: 240 }}>
+      <ResponsiveContainer>
+        <LineChart data={rows} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e6e9f0" />
+          <XAxis dataKey="year" tick={{ fontSize: 12 }} />
+          <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => (v >= 1e9 ? `${(v / 1e9).toFixed(0)}bn` : `${(v / 1e6).toFixed(0)}m`)} width={52} />
+          <Tooltip formatter={(v: number) => fmt(v, 'currency', 'GHS')} />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          {names.map((n, i) => <Line key={n} type="monotone" dataKey={n} stroke={LINE_COLOURS[i % LINE_COLOURS.length]} strokeWidth={2} connectNulls dot />)}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 /** Finance landing: the countries that have institutions on record. */
 export function FinanceIndex() {
@@ -109,6 +133,22 @@ export default function Finance() {
               </div>
             </>
           )}
+          {(data.depositor.sector.length > 0 || data.depositor.investment.length > 0) && (
+            <>
+              <h3 style={{ marginBottom: 6 }}>Deposit and investment rates</h3>
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead><tr><th>Rate</th><th className="align-right">Value</th></tr></thead>
+                  <tbody>
+                    {[...data.depositor.sector, ...data.depositor.investment].map((r) => (
+                      <tr key={r.label}><td>{r.label}</td><td className="align-right" title={r.source_note}>{fmt(r.value, 'percent')} <span className="tiny dim">{r.period}</span></td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="tiny dim">Sector averages and Treasury bill yields are published by the Bank of Ghana. Rates a single bank has published are in the bank table above. Banks that have not published a rate show "not held".</p>
+            </>
+          )}
           {data.central_bank && val(data.central_bank.metrics, 'POLICY_RATE') && (
             <p className="small">
               {data.central_bank.name} policy rate: <strong>{fmt(val(data.central_bank.metrics, 'POLICY_RATE')!.value, 'percent')}</strong> ({val(data.central_bank.metrics, 'POLICY_RATE')!.period}).
@@ -120,6 +160,47 @@ export default function Finance() {
 
       {stage === 'insight' && (
         <>
+          {data.scorecard.length > 0 && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <p className="card-title">Scorecard: who is doing well, measure by measure ({data.year})</p>
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead><tr><th>Measure</th><th>Best</th><th>Next</th><th>Next</th></tr></thead>
+                  <tbody>
+                    {data.scorecard.map((sc) => (
+                      <tr key={sc.id} title={sc.basis}>
+                        <td>{sc.title}</td>
+                        {[0, 1, 2].map((k) => <td key={k}>{sc.ranked[k] ? <>{sc.ranked[k].name.replace(/ (PLC|Limited|Ltd)$/i, '')} <strong>{sc.ranked[k].display}</strong></> : ''}</td>)}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="tiny dim" style={{ marginBottom: 0 }}>Hover a measure to see what it means. Figures are as each bank declared them; some banks publish group figures and others bank-only. This is information, not advice: each bank suits different needs.</p>
+            </div>
+          )}
+          {data.trends.filter((t) => trendLabel.has(t.metric_code)).map((t) => (
+            <div className="card" key={t.metric_code} style={{ marginBottom: 12 }}>
+              <p className="card-title">Trend: {t.label}</p>
+              <TrendChart t={t} />
+              <div className="table-wrap" style={{ marginTop: 8 }}>
+                <table className="data-table">
+                  <thead><tr><th>Bank</th>{[...new Set(t.banks.flatMap((b) => b.points.map((p) => p.period)))].sort().map((y) => <th key={y} className="align-right">{y}</th>)}</tr></thead>
+                  <tbody>
+                    {t.banks.map((b) => (
+                      <tr key={b.code}>
+                        <td>{b.name.replace(/ (PLC|Limited|Ltd)$/i, '')}</td>
+                        {[...new Set(t.banks.flatMap((x) => x.points.map((p) => p.period)))].sort().map((y) => {
+                          const p = b.points.find((q) => q.period === y);
+                          return <td key={y} className="align-right" title={p?.source_note}>{p ? <>{fmt(p.value, 'currency', 'GHS')}{p.change_pct != null && <span className={p.change_pct >= 0 ? 'tiny' : 'tiny down'} style={{ marginLeft: 6 }}>{p.change_pct >= 0 ? '+' : ''}{p.change_pct}%</span>}</> : <span className="dim">not held</span>}</td>;
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
           {data.insights.map((i) => (
             <div className="card" key={i.id} style={{ marginBottom: 12 }}>
               <p className="card-title">{i.title}</p>

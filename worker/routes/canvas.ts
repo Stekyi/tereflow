@@ -4,7 +4,7 @@ import { bad, json, uid } from '../lib/db';
 import { currentUser, isEntitled } from '../lib/session';
 import { clientKey, rateLimit, tooMany } from '../lib/ratelimit';
 import { buildGuide } from './guide';
-import { buildCanvas, canvasToText, blockDefs, LANGS, type Blocks, type CanvasInput, type Lang, type Line } from '../../shared/canvas';
+import { buildCanvas, canvasToText, blockDefs, type Blocks, type CanvasInput, type Lang, type Line } from '../../shared/canvas';
 
 /**
  * Business Model Canvas. Premium. Generated from the Guide for one product in one country by rules, then editable by the
@@ -44,7 +44,7 @@ async function owner(c: { req: { raw: Request }; env: Env }) {
   return user && isEntitled(user) ? user : null;
 }
 
-const lang = (v: unknown): Lang => (LANGS.includes(v as Lang) ? (v as Lang) : 'en');
+const lang = (_v?: unknown): Lang => 'en';
 
 /** Keeps only known blocks, trimmed lines and the three allowed sources, so a stored canvas is always well formed. */
 function clean(input: unknown): Blocks | null {
@@ -118,29 +118,6 @@ canvas.put('/:id', async (c) => {
     .bind(JSON.stringify(blocks), b?.title?.trim().slice(0, 300) || null, c.req.param('id'), u.id).run();
   if (!res.meta.changes) return bad('Canvas not found', 404);
   return json({ ok: true });
-});
-
-/** Switch the labels and typical lines to the other language, keeping every line the user wrote or edited. */
-canvas.post('/:id/regenerate', async (c) => {
-  const u = await owner(c);
-  if (!u) return bad('The Business Model Canvas is a premium feature', 402);
-  const b = (await c.req.json().catch(() => null)) as { lang?: string } | null;
-  const row = await c.env.DB.prepare('SELECT country_slug, hs_code, role, blocks_json FROM canvases WHERE id = ? AND user_id = ?').bind(c.req.param('id'), u.id)
-    .first<{ country_slug: string; hs_code: string; role: 'supply' | 'procurement'; blocks_json: string }>();
-  if (!row) return bad('Canvas not found', 404);
-  const lg = lang(b?.lang);
-  const built = await buildGuide(c.env, row.country_slug, row.hs_code, row.role, null, null);
-  if ('response' in built && built.response) return built.response;
-  const body = (built as { body: Record<string, unknown> & { available: boolean } }).body;
-  if (!body.available) return bad('Trade data is not available to rebuild this canvas', 422);
-  const input = body as unknown as CanvasInput;
-  input.finance = input.inputs.iso3 ? await financeFor(c.env, input.inputs.iso3) : null;
-  const fresh = buildCanvas(input, lg);
-  const old = JSON.parse(row.blocks_json) as Blocks;
-  const merged: Blocks = {};
-  for (const k of Object.keys(fresh)) merged[k] = [...(old[k] ?? []).filter((l) => l.source === 'user'), ...fresh[k]];
-  await c.env.DB.prepare("UPDATE canvases SET blocks_json = ?, lang = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?").bind(JSON.stringify(merged), lg, c.req.param('id'), u.id).run();
-  return json({ ok: true, lang: lg });
 });
 
 canvas.get('/:id/export', async (c) => {

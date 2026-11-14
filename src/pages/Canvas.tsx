@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 import { Empty, Skeletons } from '../components/ui';
 
 type Canvas = Awaited<ReturnType<typeof api.canvas.get>>;
-const TAG = { en: { typical: 'typical', data: 'from data', user: 'yours' }, de: { typical: 'üblich', data: 'aus Daten', user: 'von Ihnen' } } as const;
+const TAG = { typical: 'typical', data: 'from data', user: 'yours' } as const;
 
 /** Start page: pick a product and country, build a canvas. Also lists saved canvases. */
 export function CanvasStart() {
@@ -14,13 +14,12 @@ export function CanvasStart() {
   const [country, setCountry] = useState(params.get('country') ?? '');
   const [hs, setHs] = useState(params.get('hs') ?? '');
   const [role, setRole] = useState<'supply' | 'procurement'>('supply');
-  const [lang, setLang] = useState<'en' | 'de'>('en');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => { api.canvas.list().then((r) => setList(r.canvases)).catch((e: Error) => setError(e.message)); }, []);
   async function create() {
     setBusy(true); setError('');
-    try { const r = await api.canvas.create({ country, hs: hs.replace(/\D/g, ''), role, lang }); nav(`/canvas/${r.id}`); }
+    try { const r = await api.canvas.create({ country, hs: hs.replace(/\D/g, ''), role, lang: 'en' }); nav(`/canvas/${r.id}`); }
     catch (e) { setError(e instanceof Error ? e.message : 'Could not build the canvas'); } finally { setBusy(false); }
   }
   return (
@@ -30,7 +29,6 @@ export function CanvasStart() {
         <input placeholder="Country (e.g. ghana)" value={country} onChange={(e) => setCountry(e.target.value)} />
         <input placeholder="6-digit HS code (e.g. 180100)" value={hs} onChange={(e) => setHs(e.target.value)} />
         <select value={role} onChange={(e) => setRole(e.target.value as 'supply' | 'procurement')}><option value="supply">I want to sell (supply)</option><option value="procurement">I want to buy (procurement)</option></select>
-        <select value={lang} onChange={(e) => setLang(e.target.value as 'en' | 'de')}><option value="en">English</option><option value="de">Deutsch</option></select>
         <div><button className="btn" disabled={busy || !country || hs.replace(/\D/g, '').length !== 6} onClick={() => void create()}>{busy ? 'Building...' : 'Build canvas'}</button></div>
         {error && <div className="small down">{error}</div>}
       </div>
@@ -55,7 +53,7 @@ export default function CanvasPage() {
 
   if (error) return <Empty title={error} hint="Premium members can build and keep canvases." />;
   if (!cv) return <Skeletons n={4} />;
-  const tag = TAG[cv.lang];
+  const tag = TAG;
 
   const edit = (key: string, i: number, text: string) => {
     setCv({ ...cv, blocks: { ...cv.blocks, [key]: cv.blocks[key].map((l, j) => (j === i ? { text, source: l.source === 'user' ? 'user' : l.source } : l)) } });
@@ -75,11 +73,6 @@ export default function CanvasPage() {
     const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
     const a = document.createElement('a'); a.href = url; a.download = `canvas-${id}.txt`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   }
-  async function switchLang(l: 'en' | 'de') {
-    if (dirty && !window.confirm('Unsaved edits will be lost. Save first, or continue?')) return;
-    await api.canvas.regenerate(id, l).catch((e: Error) => setMsg(e.message)); load();
-  }
-
   const cell = (key: string) => {
     const d = cv.defs.find((x) => x.key === key)!;
     return (
@@ -103,10 +96,9 @@ export default function CanvasPage() {
     <>
       <style>{'@media print { .no-print, nav, header, footer { display: none !important; } textarea { border: none; resize: none; } }'}</style>
       <h2 style={{ marginTop: 0 }}>{cv.title}</h2>
-      <p className="tiny dim">{cv.lang === 'de' ? 'Zeilen mit „üblich“ sind gängige Praxis aus der Vorlage: bitte prüfen.' : 'Lines marked "typical" are standard practice from the template: please check them.'} Last saved {cv.updated_at}.</p>
+      <p className="tiny dim">{'Lines marked "typical" are standard practice from the template: please check them.'} Last saved {cv.updated_at}.</p>
       <div className="no-print" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <button className="btn" disabled={!dirty} onClick={() => void save()}>Save</button>
-        <button className="btn" onClick={() => void switchLang(cv.lang === 'en' ? 'de' : 'en')}>{cv.lang === 'en' ? 'Deutsch' : 'English'}</button>
         <button className="btn" onClick={() => void exportTxt()}>Export text</button>
         <button className="btn" onClick={() => window.print()}>Print or save as PDF</button>
         <button className="btn" onClick={() => { if (window.confirm('Delete this canvas?')) void api.canvas.remove(id).then(() => nav('/canvas')); }}>Delete</button>

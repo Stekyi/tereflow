@@ -122,6 +122,74 @@ for per, v in sec.items():
     add("GH_BANKING_SECTOR", per, "REFERENCE_RATE", v["ref"], "percent", s3 + " (Ghana Reference Rate, base rate for pricing loans)", rate_type="indicative")
     add("GH_BANKING_SECTOR", per, "DEPOSIT_RATE", v["dep3m"], "percent", s3 + " (3-month time deposits)", rate_type="indicative")
 
+# ======================================================================================================================
+# Added 13 Nov 2026: three-year trend (2023 comparatives from the 2024 reports), balance sheet and income items, deposit and
+# investment rates. Same rule: every figure is as printed, in the document named, nothing estimated.
+# ======================================================================================================================
+SC24 = "Standard Chartered Bank Ghana PLC, Annual Report 2024 (https://av.sc.com/gh/content/docs/gh-scb-ghana-annual-report-2024.pdf)"
+AB24 = "Absa Bank Ghana Ltd, Annual Report 2024 (https://www.absa.com.gh/content/dam/ghana/absa/pdf/annual-reports/integrated-report-2024.pdf)"
+GC24 = "GCB Bank PLC, Summary consolidated and separate financial statements, year ended 31 Dec 2024 (https://www.gcbbank.com.gh/group-results-and-reporting/433-2024-audited-financial-statements/file)"
+
+ITEMS = ["CASH_BALANCE", "INVESTMENT_SECURITIES", "TOTAL_EQUITY", "TOTAL_LIABILITIES", "OPERATING_INCOME", "PROFIT_BEFORE_TAX"]
+LABEL = {"CASH_BALANCE": "cash and cash equivalents", "INVESTMENT_SECURITIES": "investment securities", "TOTAL_EQUITY": "total shareholders' funds",
+         "TOTAL_LIABILITIES": "total liabilities", "OPERATING_INCOME": "operating income", "PROFIT_BEFORE_TAX": "profit before tax"}
+
+def items(inst, period, values, doc, where):
+    for metric, thousands in zip(ITEMS, values):
+        money(inst, period, metric, thousands, f"{doc}: {where}, FY{period} ({LABEL[metric]})")
+
+# Standard Chartered Bank Ghana, Group columns. 2023 is the restated comparative printed in the 2024 report.
+items("STANCHART_GH", "2025", (6106101, 4049948, 2829945, 13676087, 1842835, 1034437), SC25, "statements of financial position and profit or loss, Group column")
+items("STANCHART_GH", "2024", (4593873, 3680729, 2052749, 12250714, 1807200, 1022155), SC25, "statements of financial position and profit or loss, Group column")
+s23 = f"{SC24}: statement of financial position and statement of profit or loss, Group column, 2023 (restated) comparative"
+money("STANCHART_GH", "2023", "TOTAL_ASSETS", 13837635, s23 + " (total assets)")
+money("STANCHART_GH", "2023", "TOTAL_LOANS", 1965894, s23 + " (loans and advances to customers)")
+money("STANCHART_GH", "2023", "TOTAL_DEPOSITS", 10818779, s23 + " (deposits from customers)")
+money("STANCHART_GH", "2023", "PROFIT_AFTER_TAX", 819727, s23 + " (profit for the year)")
+items("STANCHART_GH", "2023", (4316795, 6694890, 1841683, 11995952, 1643565, 1282069), SC24, "statements of financial position and profit or loss, Group column, 2023 (restated) comparative")
+
+# Absa Bank Ghana, bank statements.
+items("ABSA_GH", "2025", (9701763, 6406293, 5973084, 25556763, 4385100, 2742101), AB25, "statement of financial position p.69 and statement of comprehensive income")
+items("ABSA_GH", "2024", (9847398, 4648938, 4178030, 23163726, 3449351, 1872781), AB25, "statement of financial position and statement of comprehensive income (2024 comparative)")
+a23 = f"{AB24}: statement of financial position p.53 and statement of comprehensive income, 2023 comparative"
+money("ABSA_GH", "2023", "TOTAL_ASSETS", 21490932, a23 + " (total assets)")
+money("ABSA_GH", "2023", "TOTAL_LOANS", 6344791, a23 + " (loans and advances to customers)")
+money("ABSA_GH", "2023", "PROFIT_AFTER_TAX", 1136695, a23 + " (profit for the year)")
+items("ABSA_GH", "2023", (8438363, 3714843, 2975311, 18515621, 3024528, 1805033), AB24, "statement of financial position p.53 and statement of comprehensive income, 2023 comparative")
+add("ABSA_GH", "2024", "RETURN_ON_EQUITY", 33.78, "percent", f"{AB24}: Managing Director's report, 'Return on Equity (ROE) was at 33.78% in 2024'")
+add("ABSA_GH", "2025", "DEPOSIT_RATE_AVG", 5.98, "percent", f"{AB25}: notes to the financial statements, deposits from customers, 'The average interest rate for customer deposits was 5.98% (2024: 5.8%)'", rate_type="indicative")
+add("ABSA_GH", "2024", "DEPOSIT_RATE_AVG", 5.8, "percent", f"{AB24}: notes to the financial statements, 'The average interest rate for customer deposits was 5.8% (2023: 5.0%)'", rate_type="indicative")
+add("ABSA_GH", "2023", "DEPOSIT_RATE_AVG", 5.0, "percent", f"{AB24}: notes to the financial statements, 'The average interest rate for customer deposits was 5.8% (2023: 5.0%)'", rate_type="indicative")
+
+# GCB Bank, Group columns.
+items("GCB_BANK", "2025", (14451219, 16473724, 6230130, 46403361, 6308890, 3185205), GC25, "statements of financial position and profit or loss, Group column")
+items("GCB_BANK", "2024", (14443976, 13473412, 4342338, 38453734, 4476729, 1906758), GC24, "statements of financial position and profit or loss, Group column")
+g23 = f"{GC24}: statements of financial position and profit or loss, Group column, 2023 comparative"
+money("GCB_BANK", "2023", "TOTAL_ASSETS", 27155660, g23 + " (total assets)")
+money("GCB_BANK", "2023", "TOTAL_LOANS", 6692514, g23 + " (loans and advances to customers)")
+money("GCB_BANK", "2023", "TOTAL_DEPOSITS", 21437093, g23 + " (deposits from customers)")
+money("GCB_BANK", "2023", "PROFIT_AFTER_TAX", 1009722, g23 + " (profit for the year)")
+items("GCB_BANK", "2023", (5653778, 11873153, 3080096, 24075564, 3784175, 1547382), GC24, "statements of financial position and profit or loss, Group column, 2023 comparative")
+add("GCB_BANK", "2023", "CAPITAL_ADEQUACY", 19.20, "percent", f"{GC24}: Quantitative Disclosures (capital adequacy ratio, CRD basis), 2023 comparative")
+add("GCB_BANK", "2023", "NPL_RATIO", 20.20, "percent", f"{GC24}: Quantitative Disclosures (non-performing loans ratio), 2023 comparative")
+
+# Fidelity Bank Ghana: published savings rates in its tariff guide. These are "up to" rates, so they are the ceiling, not a promise.
+fbs = "Fidelity Bank Ghana, Tariff Guide August 2026 (https://fidelitybank.com.gh/wp-content/uploads/2026/08/FB_Tariff_Guide_August_2026.pdf)"
+add("FIDELITY_GH", "2026-08", "SAVINGS_RATE", 2.5, "percent", f"{fbs}: Savings Accounts, Reserve Account, 'Up to 2.5% per annum (Tiered)', minimum balance to earn interest GH\u00a2500", rate_type="indicative")
+add("FIDELITY_GH", "2026-08", "TERM_SAVINGS_RATE", 7.0, "percent", f"{fbs}: Inclusive Banking, SMART Goal Account, 'Up to 7% per annum (Tiered)'; 3% p.a. applies if withdrawn before the 12-month tenor", rate_type="indicative")
+
+# Bank of Ghana: deposit rates and the Treasury bill yields (the main investment alternative to a bank deposit).
+for per, v in {"2026-08": dict(dd=1.62, sv=4.10, m6=9.72, t91=5.38, t182=7.28, t364=12.16),
+               "2025-12": dict(dd=1.13, sv=5.00, m6=10.50, t91=11.08, t182=12.50, t364=12.92)}.items():
+    s3 = f"{BOG}: 3a. Interest Rates, column {per[:4]}:{per[5:]}"
+    add("GH_BANKING_SECTOR", per, "DEMAND_DEPOSIT_RATE", v["dd"], "percent", s3 + " (demand deposits)", rate_type="indicative")
+    add("GH_BANKING_SECTOR", per, "SAVINGS_RATE", v["sv"], "percent", s3 + " (savings deposits, sector average)", rate_type="indicative")
+    add("GH_BANKING_SECTOR", per, "TIME_DEPOSIT_RATE_6M", v["m6"], "percent", s3 + " (time deposits, 6 months)", rate_type="indicative")
+    add("BANK_OF_GHANA", per, "TBILL_91D", v["t91"], "percent", s3 + " (91-day bill, interest equivalent)", rate_type="indicative")
+    add("BANK_OF_GHANA", per, "TBILL_182D", v["t182"], "percent", s3 + " (182-day bill, interest equivalent)", rate_type="indicative")
+    add("BANK_OF_GHANA", per, "TBILL_364D", v["t364"], "percent", s3 + " (364-day bill, interest equivalent)", rate_type="indicative")
+
+
 wb = Workbook()
 ws = wb.active
 ws.title = "Data"

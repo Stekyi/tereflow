@@ -1139,6 +1139,7 @@ export const api = {
     },
     revert: (id: string) => req<{ ok: true }>(`/api/admin/national/uploads/${id}`, { method: 'DELETE' }),
     templateBlob: () => adminBlob('/api/admin/national/template'),
+    toolkitBlob: () => adminBlob('/api/admin/toolkit/national'),
   },
   financeCountries: () => req<{ countries: { country_iso3: string; country_name: string; institutions: number }[] }>('/api/finance'),
   finance: (country: string) =>
@@ -1155,6 +1156,14 @@ export const api = {
       rankings: { metric_code: string; label: string; better: string; ranked: { rank: number; institution_code: string; value: number; unit: string; period: string; rate_type: string | null }[] }[];
       insights: { id: string; title: string; text: string; evidence: string[] }[];
       fees: { metric_code: string; label: string; rows: { institution_code: string; name: string; value: number; period: string; source_note: string }[] }[];
+      trends: { metric_code: string; label: string; banks: { code: string; name: string; points: { period: string; value: number; change_pct: number | null; source_note: string }[] }[] }[];
+      scorecard: { id: string; title: string; better: 'higher' | 'lower'; basis: string; ranked: { code: string; name: string; value: number; display: string }[] }[];
+      depositor: {
+        period: string | null;
+        sector: { label: string; value: number; period: string; source_note: string }[];
+        investment: { label: string; value: number; period: string; source_note: string }[];
+        banks: { bank: string; label: string; value: number; period: string; source_note: string }[];
+      };
       sources: string[];
     }>(`/api/finance/${encodeURIComponent(country)}`),
   financeAdmin: {
@@ -1175,6 +1184,7 @@ export const api = {
     },
     revert: (id: string) => req<{ ok: true }>(`/api/admin/finance/uploads/${id}`, { method: 'DELETE' }),
     templateBlob: () => adminBlob('/api/admin/finance/template'),
+    toolkitBlob: () => adminBlob('/api/admin/toolkit/finance'),
   },
   media: {
     list: () =>
@@ -1198,18 +1208,18 @@ export const api = {
   },
   canvas: {
     list: () => req<{ canvases: { id: string; title: string; country_slug: string; hs_code: string; role: string; lang: string; updated_at: string }[] }>('/api/canvas'),
-    create: (input: { country: string; hs: string; role: 'supply' | 'procurement'; lang: 'en' | 'de'; budget?: number }) =>
+    create: (input: { country: string; hs: string; role: 'supply' | 'procurement'; lang: 'en'; budget?: number }) =>
       req<{ id: string; title: string }>('/api/canvas', { method: 'POST', body: JSON.stringify(input) }),
     get: (id: string) =>
       req<{
-        id: string; title: string; country_slug: string; hs_code: string; role: string; lang: 'en' | 'de'; updated_at: string;
+        id: string; title: string; country_slug: string; hs_code: string; role: string; lang: 'en'; updated_at: string;
         blocks: Record<string, { text: string; source: 'data' | 'typical' | 'user' }[]>;
         defs: { key: string; label: string; help: string }[];
         next: { guide: string; finance: string };
       }>(`/api/canvas/${encodeURIComponent(id)}`),
     save: (id: string, blocks: Record<string, { text: string; source: string }[]>) =>
       req<{ ok: true }>(`/api/canvas/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ blocks }) }),
-    regenerate: (id: string, lang: 'en' | 'de') =>
+    regenerate: (id: string, lang: 'en') =>
       req<{ ok: true }>(`/api/canvas/${encodeURIComponent(id)}/regenerate`, { method: 'POST', body: JSON.stringify({ lang }) }),
     exportText: (id: string) => adminBlobPlain(`/api/canvas/${encodeURIComponent(id)}/export`),
     remove: (id: string) => req<{ deleted: true }>(`/api/canvas/${encodeURIComponent(id)}`, { method: 'DELETE' }),

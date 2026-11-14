@@ -9,7 +9,7 @@
     "dev:worker": "wrangler dev",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "deploy": "node scripts/build-toolkits.mjs && npm run build && wrangler deploy",
+    "deploy": "node scripts/deploy.mjs",
     "typecheck": "tsc -b --noEmit",
     "snapshots": "node scripts/build-snapshots.mjs",
     "collector:build": "node scripts/build-collector.mjs",

@@ -178,6 +178,7 @@ async function adminText(path: string): Promise<string> {
 // here restates a type the backend already owns.
 
 export type ManualImportMode = 'append_period' | 'replace_period';
+export interface InboxFile { name: string; bytes: number; uploaded: string }
 
 export interface ManualDatasetDef {
   code: DatasetCode;
@@ -792,6 +793,19 @@ export const api = {
         body: JSON.stringify(input),
       }),
     collectorBlob: () => adminBlob('/api/admin/collector/package'),
+    inbox: () =>
+      req<{ pending: InboxFile[]; done: InboxFile[] }>('/api/admin/collector/inbox'),
+    inboxUpload: async (file: File) => {
+      const headers = new Headers({ 'content-type': 'text/csv' });
+      const token = getAdminToken();
+      if (token) headers.set('authorization', `Bearer ${token}`);
+      const res = await fetch(`/api/admin/collector/inbox/${encodeURIComponent(file.name)}`, { method: 'PUT', headers, body: file, credentials: 'same-origin' });
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(body.error ?? `Upload failed (${res.status})`);
+      return body;
+    },
+    inboxRemove: (name: string) =>
+      req<{ ok: true }>(`/api/admin/collector/inbox/${encodeURIComponent(name)}`, { method: 'DELETE' }),
     setActive: (slug: string, is_active: boolean) =>
       req<{ slug: string; is_active: boolean }>(`/api/admin/entities/${slug}/activation`, {
         method: 'PATCH',

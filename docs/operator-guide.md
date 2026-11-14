@@ -29,6 +29,13 @@ Edit that file to add or drop an indicator. Only codes that exist in the indicat
 ## Trade collection on any PC
 
 Admin, Pipeline tab, "Download collector (.zip)". See the README inside the zip.
+
+**Getting collected data into the app.** The collector never touches the database. After it has run, go to Admin, Pipeline tab,
+"Send collected data to the app" and upload the CSV files from the collector's `data` folder (names like ETH_2024_X.csv; select several at once).
+They are queued in storage. The server then validates each file (six digit codes, numbers, no duplicates), replaces that country, year and flow
+in the database in one transaction, recalculates the country's analysis and refreshes its pages. This happens in the daily refresh (02:00),
+or sooner by running `python -m tereflow_oracle ingest-inbox` in the oracle folder. A file with any problem is refused whole and kept with the reason
+under collector-inbox/rejected/. Operators never receive database credentials. `.partial.csv` files are incomplete and cannot be uploaded.
 ## Images (Admin, Images tab)
 
 Real photographs only. Open the admin, choose **Images**, pick a category, add a subject (optional) and a short
@@ -62,6 +69,10 @@ and only a file with zero problems is loaded.
    - **Script, straight from the Excel file:** `python scripts/finance/bank_load.py load FILE.xlsx [--dry-run] [--replace]`
 4. A wrong load can be undone: Admin, Finance, Upload history, Revert removes every row from that upload.
 
+The Finance template now carries 35 metrics, including deposit, savings and investment rates (record only rates a bank or the central bank has published; leave the rest out and the page shows "not held"). The Insight step shows a bank scorecard and 2023 onward trends. Each bank's figures need at least two years to draw a trend.
+
+**Offline check and analysis scripts.** Admin, Finance and National tabs each offer an analysis script (.zip). Unzip, then drop the filled file on finance.cmd (or run national.cmd with --frequency). It validates the file with the same rules as the upload, then writes scorecard, trends and a short report next to it. It has no secrets and does not upload anything.
+
 Rankings on `/finance/<ISO3>` use each institution's latest period per metric. Whether higher or lower ranks first is the
 `better` field of each metric in `templates/finance_config.json` (re-run `seed-defs` after editing it).
 
@@ -75,10 +86,9 @@ Rankings on `/finance/<ISO3>` use each institution's latest period per metric. W
 ## Business Model Canvas (premium)
 
 A premium user builds a canvas at `/canvas` (no menu link yet): pick a country, a 6-digit HS code, supply or procurement,
-and English or German. The nine Osterwalder blocks are filled by rules from the Guide for that product and country:
+(English only). The nine Osterwalder blocks are filled by rules from the Guide for that product and country:
 lines tagged "from data" come from Tereflow's own trade data, lines tagged "typical" are standard trade practice from
-the template and should be checked. The user can edit, add or remove any line, save, switch language (their own lines are
-kept), export as text, or print to PDF. Every canvas is stored against the user, country and HS code.
+the template and should be checked. The user can edit, add or remove any line, save, export as text, or print to PDF. Every canvas is stored against the user, country and HS code.
 
 To change labels, helper text or typical lines, edit `shared/config/canvas.json` (no code change). The German text is a
 first draft and should be reviewed by a native speaker.

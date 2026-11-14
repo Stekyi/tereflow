@@ -7,6 +7,8 @@ cd oracle
 set PYTHONPATH=.
 REM Keep Oracle's active-country list in step with the admin tick boxes, or the sandbox rejects a country the app shows as active.
 python -m tereflow_oracle sync-countries >> "..\%LOG%" 2>&1
+REM Collector files an operator uploaded in the admin inbox are loaded first, so the incremental run sees them as done.
+python -u -m tereflow_oracle ingest-inbox >> "..\%LOG%" 2>&1
 REM Monthly first (cheap: World totals only), yearly after. A quota stop in one does not block the other.
 python -u -m tereflow_oracle ingest-monthly >> "..\%LOG%" 2>&1
 python -m tereflow_oracle ingest --incremental >> "..\%LOG%" 2>&1

@@ -302,6 +302,43 @@ admin.get('/collector/package', () => {
   });
 });
 
+/**
+ * Trade data inbox. An operator uploads the collector's data CSVs here; the server side (which holds the
+ * database credentials) loads them with `ingest-inbox`. The Worker only stores the bytes: parsing tens of
+ * thousands of rows does not fit the free-plan CPU limit, and the operator never receives database access.
+ */
+const INBOX_NAME = /^[A-Z]{3}_\d{4}_[XM]\.csv$/;
+const INBOX_MAX_BYTES = 90 * 1024 * 1024;
+
+admin.get('/collector/inbox', async (c) => {
+  const list = async (prefix: string) =>
+    (await c.env.MEDIA.list({ prefix, limit: 500 })).objects.map((o) => ({
+      name: o.key.slice(prefix.length),
+      bytes: o.size,
+      uploaded: o.uploaded.toISOString(),
+    }));
+  const [pending, done] = await Promise.all([list('collector-inbox/pending/'), list('collector-inbox/done/')]);
+  done.sort((a, b) => b.uploaded.localeCompare(a.uploaded));
+  return json({ pending, done: done.slice(0, 50) });
+});
+
+admin.put('/collector/inbox/:name', async (c) => {
+  const name = c.req.param('name');
+  if (!INBOX_NAME.test(name)) return bad('File name must look like ETH_2024_X.csv (country ISO3, year, X or M), as the collector writes it');
+  const len = Number(c.req.header('content-length') ?? 0);
+  if (!len) return bad('Empty file');
+  if (len > INBOX_MAX_BYTES) return bad('File is over 90 MB; split it or contact the administrator');
+  await c.env.MEDIA.put(`collector-inbox/pending/${name}`, c.req.raw.body, { httpMetadata: { contentType: 'text/csv' } });
+  return json({ ok: true, name, bytes: len }, 201);
+});
+
+admin.delete('/collector/inbox/:name', async (c) => {
+  const name = c.req.param('name');
+  if (!INBOX_NAME.test(name)) return bad('Bad file name');
+  await c.env.MEDIA.delete(`collector-inbox/pending/${name}`);
+  return json({ ok: true });
+});
+
 /** Offline toolkits (check and analyse an uploaded template on any PC). No secrets inside. */
 for (const kind of ['finance', 'national'] as const) {
   admin.get(`/toolkit/${kind}`, () => {

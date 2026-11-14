@@ -875,6 +875,54 @@ function Media({ t, onError }: { t: Toaster; onError: OnError }) {
 
 /* ---- Pipeline ---- */
 
+function TradeInbox({ t, onError }: { t: Toaster; onError: OnError }) {
+  type Inbox = Awaited<ReturnType<typeof api.admin.inbox>>;
+  const [box, setBox] = useState<Inbox | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => { api.admin.inbox().then(setBox).catch(onError); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function send(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setBusy(true);
+    let ok = 0;
+    for (const f of Array.from(files)) {
+      try { await api.admin.inboxUpload(f); ok++; } catch (e) { onError(e); }
+    }
+    setBusy(false);
+    if (ok) t.ok(`${ok} file${ok === 1 ? '' : 's'} queued`);
+    load();
+  }
+  const mb = (n: number) => `${(n / 1048576).toFixed(1)} MB`;
+  return (
+    <Panel title="Send collected data to the app">
+      <p className="small dim" style={{ marginTop: 0 }}>
+        After you run the collector, upload the files from its <strong>data</strong> folder here (names like ETH_2024_X.csv). They are queued, then the
+        server loads them into the database, recalculates that country's analysis and refreshes its page. A year already in the database is replaced by the file.
+        Files named .partial.csv are incomplete and are refused. The load runs on the server schedule (every morning), or sooner on request.
+      </p>
+      <input type="file" multiple accept=".csv,text/csv" disabled={busy} onChange={(e) => { void send(e.target.files); e.target.value = ''; }} />
+      {box && (
+        <>
+          <p className="small" style={{ marginBottom: 4 }}><strong>Waiting to be loaded ({box.pending.length})</strong></p>
+          {box.pending.length === 0 ? <p className="small dim" style={{ margin: 0 }}>Nothing waiting.</p> : (
+            <ul className="small">{box.pending.map((f) => (
+              <li key={f.name}>{f.name} ({mb(f.bytes)}) <button className="btn" onClick={() => void api.admin.inboxRemove(f.name).then(load).catch(onError)}>Remove</button></li>
+            ))}</ul>
+          )}
+          <p className="small" style={{ marginBottom: 4 }}><strong>Loaded recently ({box.done.length})</strong></p>
+          {box.done.length === 0 ? <p className="small dim" style={{ margin: 0 }}>None yet.</p> : (
+            <ul className="small">{box.done.slice(0, 12).map((f) => <li key={f.name + f.uploaded}>{f.name}, {f.uploaded.slice(0, 16).replace('T', ' ')}</li>)}</ul>
+          )}
+        </>
+      )}
+    </Panel>
+  );
+}
+
+/* ---- Pipeline ---- */
+
 function Pipeline({ t, onError }: { t: Toaster; onError: OnError }) {
   async function setSwitch(c: PortalCountryRow, next: boolean) {
     setCountries((prev) => prev.map((x) => (x.slug === c.slug ? { ...x, is_active: next ? 1 : 0 } : x)));
@@ -986,6 +1034,8 @@ function Pipeline({ t, onError }: { t: Toaster; onError: OnError }) {
         </p>
         <button className="btn" onClick={() => void downloadCollector()}>Download collector (.zip)</button>
       </Panel>
+
+      <TradeInbox t={t} onError={onError} />
 
       <Panel title={`Countries (${countries.length})`}>
         <div className="table-wrap">

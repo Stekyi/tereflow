@@ -38,6 +38,7 @@ import {
 import type { TradeSandboxResponse, TradeSandboxProduct, TradeSandboxPartner, TradeSandboxProductTotal } from '../../shared/trade-sandbox';
 import type {
   CountryDashboard,
+  FamilyBreakdown,
   CountrySummary,
   Entity,
   ExploreOpportunity,
@@ -315,6 +316,9 @@ pub.get('/dashboard/:slug', async (c) => {
     recs = regenerated;
   }
 
+  const tagFamilies = (b: FamilyBreakdown | null): FamilyBreakdown | null =>
+    b ? { ...b, families: b.families.map((f) => ({ ...f, category: classify(f.code, classifications, dominant) })) } : b;
+
   const tagProducts = (items: RankedItem[]) =>
     items.map((r) => ({ ...r, category: classify(r.code, classifications, dominant) }));
 
@@ -334,8 +338,8 @@ pub.get('/dashboard/:slug', async (c) => {
     blue_ocean_visibility: blueOceans.visibility,
     blue_ocean_withheld_reason: blueOceans.withheld_reason,
     market_context: marketContext,
-    families_import: familiesImport,
-    families_export: familiesExport,
+    families_import: tagFamilies(familiesImport),
+    families_export: tagFamilies(familiesExport),
     computed_at: oracleComputedAt ?? computed?.at ?? null,
     ...(oracleProvenance?.length ? { provenance: oracleProvenance } : {}),
   };

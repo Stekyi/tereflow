@@ -866,6 +866,8 @@ export interface FamilyMember {
 
 export interface ProductFamily {
   code: string;
+  /** Set by the dashboard route from the admin classification; drives the traditional-trade toggle. */
+  category?: 'traditional' | 'non_traditional';
   /** Derived from what the members' descriptions share, not from a lookup. */
   name: string;
   sector: string;

@@ -379,7 +379,7 @@ export default function Country() {
           onChange={(e) => setShowMajor(e.target.checked)}
           style={{ width: 'auto' }}
         />
-        Include major traditional trade (gold, oil, and similar) in the imports chart
+        Include major traditional trade (gold, oil, and similar) in the imports and exports charts
       </label>
 
       {data.families_import && (
@@ -397,7 +397,7 @@ export default function Country() {
       {grouped && data.families_import ? (
         <FamilyChart
           title="Top imports by product family"
-          breakdown={data.families_import}
+          breakdown={visibleFamilies(data.families_import, showMajor)}
           flow="import"
           onProductClick={openProduct}
         />
@@ -418,7 +418,7 @@ export default function Country() {
       {grouped && data.families_export ? (
         <FamilyChart
           title="Top exports by product family"
-          breakdown={data.families_export}
+          breakdown={visibleFamilies(data.families_export, showMajor)}
           flow="export"
           onProductClick={openProduct}
         />
@@ -750,6 +750,11 @@ interface FollowWiring {
 /** Drops traditional/gated products unless explicitly revealed, then
  *  renumbers so the visible list reads as a clean 1..N ranking rather than
  *  showing gaps where a hidden item used to sit. */
+function visibleFamilies(b: FamilyBreakdown, showMajor: boolean): FamilyBreakdown {
+  if (showMajor) return b;
+  return { ...b, families: b.families.filter((f) => f.category !== 'traditional') };
+}
+
 function reRank(items: RankedItem[], showMajor: boolean): RankedItem[] {
   const visible = showMajor ? items : items.filter((i) => i.category !== 'traditional');
   return visible.map((i, idx) => ({ ...i, rank: idx + 1 }));

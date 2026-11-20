@@ -38,7 +38,8 @@ const Feed = lazy(() => import('./pages/Feed'));
 const Playbooks = lazy(() => import('./pages/Playbooks'));
 const Outlook = lazy(() => import('./pages/Outlook'));
 const Finance = lazy(() => import('./pages/Finance'));
-const FinanceIndex = lazy(() => import('./pages/Finance').then((m) => ({ default: m.FinanceIndex })));
+const FinanceIndex = lazy(() => import('./pages/Credit').then((m) => ({ default: m.CreditIndex })));
+const CreditCountry = lazy(() => import('./pages/Credit'));
 const DataSources = lazy(() => import('./pages/DataSources'));
 const CanvasPage = lazy(() => import('./pages/Canvas'));
 const CanvasStart = lazy(() => import('./pages/Canvas').then((m) => ({ default: m.CanvasStart })));
@@ -198,7 +199,8 @@ export default function App() {
             <Route path="/playbooks" element={<Playbooks />} />
             <Route path="/outlook/:country" element={<Outlook />} />
             <Route path="/finance" element={<FinanceIndex />} />
-            <Route path="/finance/:country" element={<Finance />} />
+            <Route path="/finance/:country" element={<CreditCountry />} />
+            <Route path="/finance/:country/banks" element={<Finance />} />
             <Route path="/data-sources" element={<DataSources />} />
             <Route path="/canvas" element={<CanvasStart />} />
             <Route path="/canvas/:id" element={<CanvasPage />} />

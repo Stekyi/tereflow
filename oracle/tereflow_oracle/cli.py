@@ -282,6 +282,15 @@ def main(argv=None):
     cs.add_argument("--prefix", default="app_")
     cs.add_argument("--drop", action="store_true")
     sub.add_parser("export-app-tables")
+    cr = sub.add_parser("ingest-credit", help="fetch, store, analyse sectoral credit (Bank of Ghana and IMF); safe to re-run")
+    cr.add_argument("--country", nargs="*", default=[], help="ISO3 codes (default: every active country)")
+    cr.add_argument("--source", choices=["all", "bog", "imf"], default="all")
+    cr.add_argument("--backfill", action="store_true", help="also keep a fresh raw copy of every response")
+    cr.add_argument("--series", default=None, help="only this series id or mnemonic")
+    cr.add_argument("--analyse-only", action="store_true", help="recalculate from stored observations, no fetching")
+    cr.add_argument("--trigger", choices=["schedule", "manual", "admin"], default="manual")
+    ci = sub.add_parser("credit-init", help="create the credit tables and register the configured series")
+    ci.add_argument("--reseed", action="store_true")
     ib = sub.add_parser("ingest-inbox", help="load collector CSVs uploaded through the admin inbox")
     ib.add_argument("--dry-run", action="store_true")
     fl = sub.add_parser("ingest-folder", help="load collector CSVs from a local folder")
@@ -311,6 +320,15 @@ def main(argv=None):
         (ROOT / "shared" / "app-tables.ts").write_text(appschema.export_tables_ts(), encoding="utf-8", newline="\n")
         print("wrote shared/app-tables.ts")
         return
+    elif a.cmd == "credit-init":
+        from . import credit, credit_db
+        credit_db.create_tables(conn)
+        credit_db.seed(conn, credit.load_config(), reseed=a.reseed)
+        return
+    elif a.cmd == "ingest-credit":
+        from . import credit, credit_db
+        r = credit_db.run(conn, credit.load_config(), a.country, a.source, a.backfill, a.trigger, a.series, a.analyse_only)
+        sys.exit(0 if r["status"] in ("success", "partial") else 2)
     elif a.cmd == "ingest-folder":
         from . import inbox
         sys.exit(inbox.run_folder(conn, a.folder, dry_run=a.dry_run))

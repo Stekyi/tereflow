@@ -3271,3 +3271,49 @@ html, body { overflow-x: clip; }
 @media (max-width: 640px) { .stage-step small { display: none; } .stage-step { padding: 8px; } .pipeline-strip li { min-width: 0; flex: 1; } }
 
 .stage-steps { scroll-margin-top: 72px; }
+
+/* ---------- sectoral credit intelligence ---------- */
+.cr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+.cr-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 13px;
+}
+.cr-line:last-child {
+  border-bottom: none;
+}
+.cr-tip {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  box-shadow: var(--card-shadow);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.cr-diagram {
+  overflow-x: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  background: var(--surface);
+  padding: 6px;
+}
+.cr-diagram svg g[role='button']:focus {
+  outline: none;
+}
+.cr-diagram svg g[role='button']:focus-visible rect:nth-of-type(1) {
+  stroke: var(--brand);
+  stroke-width: 3;
+}
+.cr-section {
+  scroll-margin-top: 112px;
+}

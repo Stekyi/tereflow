@@ -18,6 +18,8 @@ python -m tereflow_oracle analytics >> "..\%LOG%" 2>&1
 if errorlevel 1 (echo analytics failed, retrying once >> "..\%LOG%" & python -m tereflow_oracle analytics >> "..\%LOG%" 2>&1)
 REM World Bank indicators are annual; refreshing nightly is cheap and keeps new countries filled in.
 python -m tereflow_oracle worldbank >> "..\%LOG%" 2>&1
+REM Sectoral credit: Bank of Ghana and IMF. Also completes any run an admin requested from the dashboard.
+python -u -m tereflow_oracle ingest-credit --trigger schedule >> "..\%LOG%" 2>&1
 cd ..
 python scripts\national\national_load.py freshness >> "%LOG%" 2>&1
 call npm run snapshots >> "%LOG%" 2>&1

@@ -19,6 +19,8 @@ Everyday use
   pipeline.cmd comtrade --country ETH --years 2023 2024     fetch straight from UN Comtrade into Oracle
   pipeline.cmd finance-check BANKS.xlsx   then   pipeline.cmd finance load BANKS.xlsx
   pipeline.cmd national check FILE.xlsx / national load FILE.xlsx
+  pipeline.cmd credit                              sectoral credit for every active country (also completes runs requested in the admin)
+  pipeline.cmd credit --country GHA --backfill     one country, with a fresh raw copy of every response
   pipeline.cmd worldbank
   pipeline.cmd status
 

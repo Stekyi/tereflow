@@ -37,6 +37,7 @@ import type { Severity, ValidationReport } from '../../shared/csv/validate';
 import type { DatasetCode } from '../../shared/csv/schema';
 import type { TradeSandboxResponse } from '../../shared/trade-sandbox';
 import type { CountryCoverage } from '../../shared/coverage';
+import type { CreditAdminOverview, CreditCountry, CreditCountryRow, CreditHistory } from './credit-types';
 
 const ADMIN_TOKEN_KEY = 'tf_admin_token';
 
@@ -1155,6 +1156,18 @@ export const api = {
     revert: (id: string) => req<{ ok: true }>(`/api/admin/national/uploads/${id}`, { method: 'DELETE' }),
     templateBlob: () => adminBlob('/api/admin/national/template'),
     toolkitBlob: () => adminBlob('/api/admin/toolkit/national'),
+  },
+  credit: {
+    countries: () => req<{ countries: CreditCountryRow[] }>('/api/credit'),
+    country: (iso3: string) => req<CreditCountry>(`/api/credit/${encodeURIComponent(iso3.toUpperCase())}`),
+    history: (iso3: string, seriesId: string) => req<CreditHistory>(`/api/credit/${encodeURIComponent(iso3.toUpperCase())}/history?series=${encodeURIComponent(seriesId)}`),
+  },
+  creditAdmin: {
+    overview: () => req<CreditAdminOverview>('/api/admin/credit'),
+    saveSeries: (body: Record<string, unknown>) => req<{ id: string; note?: string }>('/api/admin/credit/series', { method: 'POST', body: JSON.stringify(body) }),
+    saveCountry: (body: { country_iso3: string; preferred_source?: string; is_active?: boolean; currency?: string }) => req<{ ok: true; note?: string }>('/api/admin/credit/country', { method: 'POST', body: JSON.stringify(body) }),
+    saveMap: (body: Record<string, unknown>) => req<{ ok: true }>('/api/admin/credit/sector-map', { method: 'POST', body: JSON.stringify(body) }),
+    requestRun: (body: { countries?: string[]; backfill?: boolean }) => req<{ ok: true; id: string; already?: boolean; note?: string }>('/api/admin/credit/run', { method: 'POST', body: JSON.stringify(body) }),
   },
   financeCountries: () => req<{ countries: { country_iso3: string; country_name: string; institutions: number }[] }>('/api/finance'),
   finance: (country: string) =>

@@ -79,6 +79,27 @@ The Finance template now carries 35 metrics, including deposit, savings and inve
 Rankings on `/finance/<ISO3>` use each institution's latest period per metric. Whether higher or lower ranks first is the
 `better` field of each metric in `templates/finance_config.json` (re-run `seed-defs` after editing it).
 
+## Sectoral credit intelligence (the Finance page)
+
+The Finance page now reports where the banking system's credit is outstanding across sectors of the economy, how each sector's balance changes over time, and how that connects to trade. The earlier bank-by-bank view is still available at `/finance/GHA/banks` and in Admin, Banks.
+
+**Sources.** Ghana: the Bank of Ghana DataWarehousePro guest API (`https://app.datawarehousepro.com/guest/getMnemonicData/bog/MON/{MNEMONIC}`): a total (`GHA_SAC_0`) and 12 sectors (`GHA_SAC_1` to `GHA_SAC_12`), monthly since January 1999. Other countries: the IMF Monetary and Financial Statistics, Other Depository Corporations (SDMX), which gives broad borrower sectors only (private sector, public non-financial corporations, other financial corporations), not industries. A country with neither is shown as unavailable. National and IMF series are never merged.
+
+**What the numbers mean.** The series are balances (stocks) of outstanding credit. The change between two dates is the net change in outstanding credit, not gross lending or repayments, and a balance is not the money supply. The Bank of Ghana metadata does not say whether its series are stocks, so they are marked "inferred stock" (the sectors add up to the total and the balances carry forward). Confirm with the Bank of Ghana, then set the kind in Admin, Sector credit, which marks it confirmed. The IMF series are balance-sheet asset positions by the IMF's own definition.
+
+**Run it.**
+- Scheduled: the daily refresh (`run-refresh.cmd`) runs `python -m tereflow_oracle ingest-credit --trigger schedule`.
+- By hand, anywhere with the Oracle wallet: `pipeline.cmd credit` (Pipeline kit). Options: `--country GHA SLE`, `--source bog|imf`, `--backfill`, `--series GHA_SAC_3`, `--analyse-only`.
+- From the dashboard: Admin, Sector credit, "Request update" or "Request full backfill". The website cannot run the fetch itself (free plan CPU limit), so this records a request that the next pipeline run picks up and completes. Running again is always safe: nothing is duplicated, revised values are kept in `app_cr_revisions`, and a new raw copy is stored only when the data changed.
+- First time on a new database: `python -m tereflow_oracle credit-init` creates the tables and registers the configured series.
+
+**Add a Bank of Ghana mnemonic.** Admin, Sector credit, Series, "Add a Bank of Ghana mnemonic": country, mnemonic (for example `GHA_SAC_13`), a lowercase sector key and the sector name. Then request a full backfill. The unit and frequency are read from the response. Add the sector's trade link in the Sector to trade map (or leave it as none). IMF series are discovered automatically and are never typed in.
+
+**Add a country.** Admin, Sector credit, Countries: add the ISO3 code. The next run asks the IMF what exists for it and registers only the configured credit categories that really exist. Add or change categories in `templates/credit_config.json`.
+
+**Sector to trade map.** Admin, Sector credit, Sector to trade map: which HS codes (2 to 6 digit prefixes) relate to each credit sector, and whether the link is direct or indicative. A sector with no defensible link shows credit alone.
+
+**Data checks.** A missing value is never read as zero. A long non-zero history followed by zeros is flagged (Ghana's Cocoa marketing has reported zero since January 2025). Large jumps and gaps are flagged. Sector shares and the total are shown only where the sectors add up to the reported total.
 ## Other config files (no code change needed)
 
 - `shared/config/sectors.json`: sector choices.

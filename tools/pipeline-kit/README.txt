@@ -20,6 +20,9 @@ Everyday use
   pipeline.cmd finance-check BANKS.xlsx   then   pipeline.cmd finance load BANKS.xlsx
   pipeline.cmd national check FILE.xlsx / national load FILE.xlsx
   pipeline.cmd credit                              sectoral credit for every active country (also completes runs requested in the admin)
+  pipeline.cmd credit-template                     write the empty workbook for adding a country whose central bank has no feed
+  pipeline.cmd credit-check KENYA.xlsx             check a filled workbook (no database, no wallet needed)
+  pipeline.cmd credit --file KENYA.xlsx            load it and recalculate that country (add --dry-run to only check)
   pipeline.cmd credit --country GHA --backfill     one country, with a fresh raw copy of every response
   pipeline.cmd worldbank
   pipeline.cmd status

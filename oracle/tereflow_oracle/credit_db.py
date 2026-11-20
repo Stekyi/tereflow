@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import uuid
 
 from . import credit as C
@@ -104,11 +105,11 @@ def seed(conn, cfg: dict, reseed: bool = False, log=print) -> None:
 # Runs
 # ---------------------------------------------------------------------------------------------------------------
 
-def begin_run(conn, trigger: str, countries: list[str], backfill: bool) -> tuple[str, list[str], bool]:
+def begin_run(conn, trigger: str, countries: list[str], backfill: bool, adopt: bool = True) -> tuple[str, list[str], bool]:
     """Adopt a run an admin requested from the dashboard, or start a new one. Returns (run_id, countries, backfill)."""
     cur = conn.cursor()
     cur.execute("SELECT id, countries, backfill FROM app_cr_runs WHERE status = 'requested' ORDER BY requested_at")
-    rows = cur.fetchall()
+    rows = cur.fetchall() if adopt else []
     run_id = str(uuid.uuid4())
     if rows:
         run_id = rows[0][0]
@@ -206,6 +207,31 @@ def _load_existing(conn, sid: str) -> dict[str, str | None]:
     return {r[0]: r[1] for r in cur}
 
 
+def store_observations(conn, sid: str, obs: list, mult: float, run_id: str, backfill: bool, raw_text: str, url: str) -> dict:
+    """Upsert one series' observations. The raw copy is kept when the data changed, revisions are recorded, and re-running changes nothing.
+    Shared by the live feeds and the spreadsheet route so both follow identical rules. The caller commits."""
+    cur = conn.cursor()
+    digest = C.checksum(obs)  # of the observations, so a changed timestamp in the response header does not create a new raw copy
+    cur.execute("SELECT checksum FROM app_cr_raw WHERE series_id=:1 ORDER BY fetched_at DESC, id DESC FETCH FIRST 1 ROWS ONLY", [sid])
+    last = cur.fetchone()
+    if backfill or not last or last[0] != digest:
+        cur.execute("INSERT INTO app_cr_raw (series_id, fetched_at, checksum, obs_count, url, payload) VALUES (:1,:2,:3,:4,:5,:6)",
+                    [sid, C.now_utc(), digest, len(obs), url[:600], raw_text])
+    existing = _load_existing(conn, sid)
+    new, revised, same = C.diff_obs(existing, obs)
+    now = C.now_utc()
+    ins = [(sid, o.period, C.period_end(o.period), o.raw_label, o.raw_value,
+            None if o.value is None else float(o.value) * mult,
+            "missing in source" if o.value is None else None, now, now) for o in new]
+    for i in range(0, len(ins), 5000):
+        cur.executemany("""INSERT INTO app_cr_obs (series_id, period, period_end, raw_label, raw_value, value, flag, first_seen_at, updated_at)
+                           VALUES (:1,:2,:3,:4,:5,:6,:7,:8,:9)""", ins[i:i + 5000])
+    for o, old in revised:
+        cur.execute("INSERT INTO app_cr_revisions (series_id, period, old_raw, new_raw, changed_at, run_id) VALUES (:1,:2,:3,:4,:5,:6)", [sid, o.period, old, o.raw_value, now, run_id])
+        cur.execute("UPDATE app_cr_obs SET raw_value=:1, value=:2, flag=:3, updated_at=:4 WHERE series_id=:5 AND period=:6",
+                    [o.raw_value, None if o.value is None else float(o.value) * mult, "revised by source" if o.value is not None else "missing in source", now, sid, o.period])
+    return {"new": len(new), "revised": len(revised), "same": same}
+
 def fetch_store(conn, cfg: dict, row: dict, run_id: str, backfill: bool, log=print) -> dict:
     """Fetch one series completely, keep the raw response if it changed, upsert observations, record revisions. Safe to re-run."""
     sid = row["id"]
@@ -226,26 +252,8 @@ def fetch_store(conn, cfg: dict, row: dict, run_id: str, backfill: bool, log=pri
         obs = C.dedupe(parsed.obs)
         stats["missing"] = parsed.missing
         mult = float(row["unit_multiplier"] if row["unit_multiplier"] is not None else 1)
-        digest = C.checksum(obs)  # of the observations, so a changed timestamp in the response header does not create a new raw copy
-        cur.execute("SELECT checksum FROM app_cr_raw WHERE series_id=:1 ORDER BY fetched_at DESC, id DESC FETCH FIRST 1 ROWS ONLY", [sid])
-        last = cur.fetchone()
-        if backfill or not last or last[0] != digest:
-            cur.execute("INSERT INTO app_cr_raw (series_id, fetched_at, checksum, obs_count, url, payload) VALUES (:1,:2,:3,:4,:5,:6)",
-                        [sid, C.now_utc(), digest, len(obs), url[:600], text])
-        existing = _load_existing(conn, sid)
-        new, revised, same = C.diff_obs(existing, obs)
         now = C.now_utc()
-        ins = [(sid, o.period, C.period_end(o.period), o.raw_label, o.raw_value,
-                None if o.value is None else float(o.value) * mult,
-                "missing in source" if o.value is None else None, now, now) for o in new]
-        for i in range(0, len(ins), 5000):
-            cur.executemany("""INSERT INTO app_cr_obs (series_id, period, period_end, raw_label, raw_value, value, flag, first_seen_at, updated_at)
-                               VALUES (:1,:2,:3,:4,:5,:6,:7,:8,:9)""", ins[i:i + 5000])
-        for o, old in revised:
-            cur.execute("INSERT INTO app_cr_revisions (series_id, period, old_raw, new_raw, changed_at, run_id) VALUES (:1,:2,:3,:4,:5,:6)", [sid, o.period, old, o.raw_value, now, run_id])
-            cur.execute("UPDATE app_cr_obs SET raw_value=:1, value=:2, flag=:3, updated_at=:4 WHERE series_id=:5 AND period=:6",
-                        [o.raw_value, None if o.value is None else float(o.value) * mult, "revised by source" if o.value is not None else "missing in source", now, sid, o.period])
-        stats.update(new=len(new), revised=len(revised), same=same)
+        stats.update(store_observations(conn, sid, obs, mult, run_id, backfill, text, url))
         first, latest = obs[0].period, obs[-1].period
         f = parsed.meta["frequency"]
         if row["source_key"] == "BOG":
@@ -306,14 +314,17 @@ def analyse_source(conn, cfg: dict, country: str, source_key: str, log=print) ->
     series = [s for s in series if s["obs"]]
     cur = conn.cursor()
     # Classification. IMF series are balance-sheet asset positions by definition. The Bank of Ghana does not say, so this is inferred.
-    if source_key == "BOG":
+    if source_key in ("BOG", "FILE"):
         total = next((s for s in series if s["role"] == "total"), None)
         comps = [s for s in series if s["role"] == "sector"]
-        if total is not None and total["kind_basis"] != "admin":
-            ev = C.stock_evidence([v for _, v in total["obs"]])
-            kind, note = C.classify_stock(ev, float(th.get("stock_evidence_min_match_pct", 90)))
-            total["kind"], total["kind_basis"] = kind, "inferred"
-            cur.execute("UPDATE app_cr_series SET measure_kind=:1, kind_basis='inferred', definition_notes=:2 WHERE id=:3", [kind, note[:2900], total["id"]])
+        if total is not None:
+            if total["kind_basis"] == "admin":
+                kind = total["kind"]  # stated by an administrator or in the spreadsheet: respected, not re-inferred
+            else:
+                ev = C.stock_evidence([v for _, v in total["obs"]])
+                kind, note = C.classify_stock(ev, float(th.get("stock_evidence_min_match_pct", 90)))
+                total["kind"], total["kind_basis"] = kind, "inferred"
+                cur.execute("UPDATE app_cr_series SET measure_kind=:1, kind_basis='inferred', definition_notes=:2 WHERE id=:3", [kind, note[:2900], total["id"]])
             add = C.additivity(total["obs"], [c["obs"] for c in comps], float(th.get("share_tolerance_pct", 0.5)))
             ck, cnote = C.classify_family(kind, add)
             for c in comps:
@@ -321,6 +332,13 @@ def analyse_source(conn, cfg: dict, country: str, source_key: str, log=print) ->
                     continue
                 c["kind"], c["kind_basis"] = ck, "inferred"
                 cur.execute("UPDATE app_cr_series SET measure_kind=:1, kind_basis='inferred', definition_notes=:2 WHERE id=:3", [ck, cnote[:2900], c["id"]])
+        else:
+            for c in comps:
+                if c["kind_basis"] != "admin":
+                    ev = C.stock_evidence([v for _, v in c["obs"]])
+                    ck, cnote = C.classify_stock(ev, float(th.get("stock_evidence_min_match_pct", 90)))
+                    c["kind"], c["kind_basis"] = ck, "inferred"
+                    cur.execute("UPDATE app_cr_series SET measure_kind=:1, kind_basis='inferred', definition_notes=:2 WHERE id=:3", [ck, cnote[:2900], c["id"]])
         conn.commit()
     derived = C.derive([{"id": s["id"], "role": s["role"], "kind": s["kind"], "freq": s["freq"], "obs": s["obs"]} for s in series], th)
     for s in series:
@@ -342,8 +360,16 @@ def analyse_source(conn, cfg: dict, country: str, source_key: str, log=print) ->
         for (p,) in cur.fetchall():
             cur.execute("INSERT INTO app_cr_flags (series_id, flag_code, since_period, message, created_at) VALUES (:1,'missing',:2,:3,:4)",
                         [s["id"], p, "The source gave no value for this period. It is not treated as zero.", C.now_utc()])
-    ccy = next((c.get("currency") for c in cfg["countries"] if c["iso3"] == country), None) or "local currency"
-    unit = f"{ccy} million" if source_key == "BOG" else f"{ccy} million (converted from whole units as published)"
+    cur.execute("SELECT currency FROM app_cr_country_sources WHERE country_iso3 = :1", [country])
+    dbc = cur.fetchone()
+    ccy = next((c.get("currency") for c in cfg["countries"] if c["iso3"] == country), None) or (dbc[0] if dbc and dbc[0] else None) or "local currency"
+    converted = any(abs(float(s.get("unit_multiplier") or 1) - 1.0) > 1e-12 for s in series)
+    if source_key == "IMF":
+        unit = f"{ccy} million (converted from whole units as published)"
+    elif source_key == "FILE" and converted:
+        unit = f"{ccy} million (converted to millions from the unit in the spreadsheet)"
+    else:
+        unit = f"{ccy} million"
     summary = C.build_summary(country, {"source_key": source_key, "source_name": series[0]["source_name"], "unit": unit}, series, derived, th, C.now_utc())
     cur.execute("DELETE FROM app_cr_summary WHERE country_iso3=:1 AND source_key=:2", [country, source_key])
     cur.execute("INSERT INTO app_cr_summary (country_iso3, source_key, payload, computed_at) VALUES (:1,:2,:3,:4)", [country, source_key, json.dumps(summary, separators=(",", ":")), summary["generated_at"]])
@@ -361,17 +387,20 @@ def update_country_status(conn, cfg: dict, country: str, imf_info: dict | None, 
     def have(sk):
         cur.execute("SELECT COUNT(*) FROM app_cr_summary WHERE country_iso3=:1 AND source_key=:2", [country, sk])
         return cur.fetchone()[0] > 0
-    nat, imf = have("BOG"), have("IMF")
+    nat_key = "BOG" if have("BOG") else ("FILE" if have("FILE") else None)
+    nat, imf = nat_key is not None, have("IMF")
+    via_file = nat_key == "FILE"
+    nat_what = ("Sector data loaded from a spreadsheet prepared from the central bank's published tables" if via_file else "National sector data")
     if pref == "imf":
         in_use = "IMF" if imf else None
     elif pref == "national":
-        in_use = "BOG" if nat else None
+        in_use = nat_key
     else:
-        in_use = "BOG" if nat else ("IMF" if imf else None)
+        in_use = nat_key or ("IMF" if imf else None)
     if nat and imf:
-        status, note = "both", "National sector data and IMF borrower-sector data are both available. The national data gives the industry detail; the IMF figures are kept as a separate series."
+        status, note = "both", f"{nat_what} and IMF borrower-sector data are both available. The national data gives the industry detail; the IMF figures are kept as a separate series."
     elif nat:
-        status, note = "national", "National sector data is available. The IMF did not provide borrower-sector series for this country."
+        status, note = "national", f"{nat_what} is available. No IMF borrower-sector series are stored for this country."
     elif imf:
         status, note = "imf", ("No national sector breakdown is configured for this country. The IMF figures show broad borrower categories only "
                                "(private sector, public non-financial corporations, other financial corporations), not industries.")
@@ -407,6 +436,14 @@ def run(conn, cfg: dict, countries: list[str] | None = None, source: str = "all"
     imf_info: dict[str, dict] = {}
     try:
         codelist = imf_codelist(cfg, log) if source in ("all", "imf") and not analyse_only else {}
+        if source in ("all", "file") and not analyse_only:
+            q_loaded, q_ok, q_bad, q_notes = process_upload_queue(conn, cfg, run_id, backfill, log)
+            stats["series_ok"] += q_ok
+            stats["series_failed"] += q_bad
+            notes.extend(q_notes)
+            for c in sorted(q_loaded):
+                if c not in countries:
+                    countries.append(c)
         for country in countries:
             if not analyse_only:
                 if source in ("all", "bog"):
@@ -440,8 +477,8 @@ def run(conn, cfg: dict, countries: list[str] | None = None, source: str = "all"
                         else:
                             stats["series_failed"] += 1
                             notes.append(f"{row['id']}: {res['error']}")
-            for sk in ("BOG", "IMF"):
-                if (sk == "BOG" and source in ("all", "bog")) or (sk == "IMF" and source in ("all", "imf")):
+            for sk in ("BOG", "IMF", "FILE"):
+                if (sk == "BOG" and source in ("all", "bog")) or (sk == "IMF" and source in ("all", "imf")) or (sk == "FILE" and source in ("all", "file")):
                     s = analyse_source(conn, cfg, country, sk, log)
                     if s:
                         log(f"{country} {sk}: {s['sector_count']} sectors, common period {s['common_period']}, total valid: {s['total'].get('valid')}")
@@ -452,4 +489,150 @@ def run(conn, cfg: dict, countries: list[str] | None = None, source: str = "all"
         log(f"run stopped: {e}")
     status = finish_run(conn, run_id, stats, notes)
     log(f"credit run {run_id}: {status} ok={stats['series_ok']} failed={stats['series_failed']} new={stats['obs_new']} revised={stats['obs_revised']}")
+    return {"run_id": run_id, "status": status, **stats}
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Spreadsheet route (source "FILE")
+# ---------------------------------------------------------------------------------------------------------------
+
+def _file_payload(fp) -> str:
+    return json.dumps({"filename": fp.filename, "sha256": fp.sha256, "country": fp.country, "currency": fp.currency, "source": fp.source_name,
+                       "frequency": fp.frequency, "series": [{"mnemonic": s.mnemonic, "obs": [[o.period, o.raw_value] for o in s.obs]} for s in fp.series]},
+                      separators=(",", ":"))
+
+
+def load_file(conn, cfg: dict, fp, run_id: str, backfill: bool = False, log=print) -> dict:
+    """Store one checked workbook as its own source. Same upsert, revision and raw-copy rules as a live feed; safe to re-run."""
+    if not fp.ok:
+        raise ValueError("the file has problems and must not be loaded")
+    cur = conn.cursor()
+    iso = fp.country
+    cur.execute("SELECT 1 FROM app_cr_country_sources WHERE country_iso3 = :1", [iso])
+    if cur.fetchone() is None:
+        cur.execute("INSERT INTO app_cr_country_sources (country_iso3, preferred_source, currency) VALUES (:1,'auto',:2)", [iso, fp.currency])
+    else:
+        cur.execute("UPDATE app_cr_country_sources SET currency = :1 WHERE country_iso3 = :2", [fp.currency, iso])
+    now = C.now_utc()
+    url = f"file:{fp.filename}#{fp.sha256[:12]}"
+    totals = {"new": 0, "revised": 0, "same": 0}
+    for order, s in enumerate(fp.series):
+        sid = f"{iso}:FILE:{s.mnemonic}"
+        obs = C.dedupe(s.obs)
+        cur.execute("SELECT measure_kind, kind_basis, definition_notes FROM app_cr_series WHERE id = :1", [sid])
+        ex = cur.fetchone()
+        note = s.notes or None
+        if ex is None:
+            kind, basis = (s.measure_kind, "admin") if s.measure_kind else ("unverified", None)
+            cur.execute("""INSERT INTO app_cr_series (id, country_iso3, source_key, source_name, databank, mnemonic, series_name, data_family, sector_key, sector_name, series_role,
+                           currency, unit_label, unit_multiplier, unit_verified, frequency, measure_kind, kind_basis, definition_notes, endpoint_url, sort_order, is_active)
+                           VALUES (:1,:2,'FILE',:3,'FILE',:4,:5,:6,:7,:8,:9,:10,:11,:12,1,:13,:14,:15,:16,:17,:18,1)""",
+                        [sid, iso, fp.source_name, s.mnemonic, s.sector_name, "Sectoral credit (loaded from a spreadsheet)", s.sector_key, s.sector_name, s.role,
+                         fp.currency, s.unit_label, s.multiplier, fp.frequency, kind, basis, note, fp.source_url or None, order])
+        else:
+            sets = ["source_name=:1", "series_name=:2", "sector_key=:3", "sector_name=:4", "series_role=:5", "currency=:6", "unit_label=:7", "unit_multiplier=:8", "unit_verified=1",
+                    "frequency=:9", "endpoint_url=:10", "sort_order=:11", "is_active=1"]
+            vals = [fp.source_name, s.sector_name, s.sector_key, s.sector_name, s.role, fp.currency, s.unit_label, s.multiplier, fp.frequency, fp.source_url or None, order]
+            if s.measure_kind:
+                sets += ["measure_kind=:12", "kind_basis='admin'"]
+                vals.append(s.measure_kind)
+            if note:
+                sets.append(f"definition_notes=:{len(vals) + 1}")
+                vals.append(note)
+            vals.append(sid)
+            cur.execute(f"UPDATE app_cr_series SET {', '.join(sets)} WHERE id=:{len(vals)}", vals)
+        raw = json.dumps({"filename": fp.filename, "sha256": fp.sha256, "mnemonic": s.mnemonic, "obs": [[o.period, o.raw_value] for o in obs]}, separators=(",", ":"))
+        st = store_observations(conn, sid, obs, s.multiplier, run_id, backfill, raw, url)
+        for k in totals:
+            totals[k] += st[k]
+        cur.execute("""UPDATE app_cr_series SET first_obs=:1, latest_obs=:2, obs_count=:3, last_fetch_at=:4, fetch_status='ok', fetch_error=NULL, updated_at=:5 WHERE id=:6""",
+                    [obs[0].period, obs[-1].period, len(obs), now, now, sid])
+        # every sector gets a trade-map row so an administrator can link it; the default is no link
+        cur.execute("SELECT 1 FROM app_cr_sector_map WHERE sector_key = :1", [s.sector_key])
+        if cur.fetchone() is None and s.role != "total":
+            cur.execute("INSERT INTO app_cr_sector_map (sector_key, trade_scope, trade_flow, confidence, note) VALUES (:1,'none','both','none',:2)",
+                        [s.sector_key, "No trade link has been set for this sector yet. An administrator can add one in Admin, Sector credit."])
+        conn.commit()
+    log(f"{iso}: loaded {len(fp.series)} series from {fp.filename}: +{totals['new']} new, {totals['revised']} revised, {totals['same']} unchanged")
+    return {"country": iso, **totals}
+
+
+def process_upload_queue(conn, cfg: dict, run_id: str, backfill: bool, log=print) -> tuple[set[str], int, int, list[str]]:
+    """Workbooks uploaded in the admin wait in storage (the website cannot read Excel inside its CPU limit). Check and load each one.
+    Returns (countries loaded, files loaded, files refused, notes)."""
+    import io
+
+    from . import credit_file
+    from .inbox import _s3
+
+    loaded: set[str] = set()
+    ok = bad = 0
+    notes: list[str] = []
+    try:
+        s3 = _s3()
+        bucket = os.environ.get("S3_BUCKET", "tereflow-media")
+        pend, done, rej = "credit-inbox/pending/", "credit-inbox/done/", "credit-inbox/rejected/"
+        keys = [o["Key"] for o in s3.list_objects_v2(Bucket=bucket, Prefix=pend).get("Contents", []) if o["Key"] != pend]
+    except Exception as e:
+        log(f"credit upload queue not read ({str(e)[:80]}); skipped")
+        return loaded, 0, 0, notes
+    for key in sorted(keys):
+        name = key[len(pend):]
+        data = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
+        fp = credit_file.parse_workbook(io.BytesIO(data), name)
+        if not fp.ok:
+            bad += 1
+            msg = "; ".join(fp.problems[:3])
+            notes.append(f"{name}: refused ({msg})")
+            log(f"queue {name}: REFUSED ({msg})")
+            s3.put_object(Bucket=bucket, Key=rej + name + ".reason.txt", Body="\n".join(fp.problems).encode("utf-8"))
+            s3.copy_object(Bucket=bucket, CopySource={"Bucket": bucket, "Key": key}, Key=rej + name)
+            s3.delete_object(Bucket=bucket, Key=key)
+            continue
+        load_file(conn, cfg, fp, run_id, backfill, log)
+        s3.copy_object(Bucket=bucket, CopySource={"Bucket": bucket, "Key": key}, Key=done + name)
+        s3.delete_object(Bucket=bucket, Key=key)
+        loaded.add(fp.country)
+        ok += 1
+    return loaded, ok, bad, notes
+
+
+def run_files(conn, cfg: dict, paths: list[str], backfill: bool = False, trigger: str = "manual", log=print) -> dict:
+    """Load one or more workbooks given on the command line, then recalculate those countries. Any bad file stops everything before a single write."""
+    from . import credit_file
+
+    parsed = [credit_file.parse_workbook(p) for p in paths]
+    refused = [fp for fp in parsed if not fp.ok]
+    for fp in parsed:
+        for w in fp.warnings:
+            log(f"{fp.filename}: note: {w}")
+    if refused:
+        for fp in refused:
+            log(f"{fp.filename}: REFUSED, nothing was loaded")
+            for pr in fp.problems:
+                log(f"  {pr}")
+        return {"status": "refused", "series_ok": 0, "series_failed": len(refused), "obs_new": 0, "obs_revised": 0}
+    create_tables(conn, lambda *_: None)
+    seed(conn, cfg, log=lambda *_: None)
+    countries = sorted({fp.country for fp in parsed})
+    run_id, _c, backfill = begin_run(conn, trigger, countries, backfill, adopt=False)
+    stats = {"series_ok": 0, "series_failed": 0, "obs_new": 0, "obs_revised": 0}
+    notes: list[str] = []
+    try:
+        for fp in parsed:
+            r = load_file(conn, cfg, fp, run_id, backfill, log)
+            stats["series_ok"] += len(fp.series)
+            stats["obs_new"] += r["new"]
+            stats["obs_revised"] += r["revised"]
+        for c in countries:
+            s = analyse_source(conn, cfg, c, "FILE", log)
+            if s:
+                log(f"{c} FILE: {s['sector_count']} sectors, common period {s['common_period']}, total valid: {s['total'].get('valid')}")
+            update_country_status(conn, cfg, c, None, log)
+    except Exception as e:
+        stats["series_failed"] += 1
+        notes.append(f"stopped: {str(e)[:500]}")
+        log(f"stopped: {e}")
+    status = finish_run(conn, run_id, stats, notes)
+    log(f"credit run {run_id}: {status} series={stats['series_ok']} new={stats['obs_new']} revised={stats['obs_revised']}")
     return {"run_id": run_id, "status": status, **stats}

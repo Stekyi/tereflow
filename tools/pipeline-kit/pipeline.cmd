@@ -23,6 +23,8 @@ if /i "%~1"=="analytics"    %PY% -u -m tereflow_oracle analytics %2 %3 %4 %5 %6 
 if /i "%~1"=="comtrade"     %PY% -u -m tereflow_oracle ingest %2 %3 %4 %5 %6 %7 %8 %9 & goto :eof
 if /i "%~1"=="credit"       %PY% -u -m tereflow_oracle ingest-credit %2 %3 %4 %5 %6 %7 %8 %9 & goto :eof
 if /i "%~1"=="credit-init"  %PY% -m tereflow_oracle credit-init %2 & goto :eof
+if /i "%~1"=="credit-template" %PY% -m tereflow_oracle credit-template %2 %3 & goto :eof
+if /i "%~1"=="credit-check" %PY% -m tereflow_oracle credit-check %2 %3 %4 %5 %6 %7 %8 %9 & goto :eof
 if /i "%~1"=="worldbank"    %PY% -u -m tereflow_oracle worldbank %2 %3 %4 & goto :eof
 if /i "%~1"=="finance"      %PY% scripts\finance\bank_load.py %2 %3 %4 %5 %6 & goto :eof
 if /i "%~1"=="finance-check" %PY% scripts\finance\bank_template.py check %2 %3 %4 & goto :eof
@@ -38,6 +40,9 @@ echo   load-inbox                  load the files uploaded in the admin "Send co
 echo   analytics [--country ISO3]  recalculate the analysis for countries already loaded
 echo   comtrade --country ISO3 --years 2023 2024   fetch from UN Comtrade straight into Oracle (needs COMTRADE_API_KEY)
 echo   credit [--country GHA SLE] [--backfill]   sectoral credit: fetch Bank of Ghana and IMF data, calculate, and finish any run requested in the admin
+echo   credit --file FILE.xlsx     load a country's sector credit from a filled workbook (add --dry-run to only check it)
+echo   credit-template [--out F]   write the empty Excel workbook for a new country
+echo   credit-check FILE.xlsx      check a filled workbook, no database needed
 echo   credit-init                 create the credit tables and register the configured series (once)
 echo   worldbank                   refresh World Bank indicators
 echo   finance-check FILE.xlsx     check a bank workbook;  finance load FILE.xlsx [--dry-run] [--replace] loads it

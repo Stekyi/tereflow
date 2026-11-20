@@ -37,7 +37,7 @@ import type { Severity, ValidationReport } from '../../shared/csv/validate';
 import type { DatasetCode } from '../../shared/csv/schema';
 import type { TradeSandboxResponse } from '../../shared/trade-sandbox';
 import type { CountryCoverage } from '../../shared/coverage';
-import type { CreditAdminOverview, CreditCountry, CreditCountryRow, CreditHistory } from './credit-types';
+import type { CreditAdminOverview, CreditCountry, CreditCountryRow, CreditHistory, CreditQueueFile } from './credit-types';
 
 const ADMIN_TOKEN_KEY = 'tf_admin_token';
 
@@ -1167,6 +1167,18 @@ export const api = {
     saveSeries: (body: Record<string, unknown>) => req<{ id: string; note?: string }>('/api/admin/credit/series', { method: 'POST', body: JSON.stringify(body) }),
     saveCountry: (body: { country_iso3: string; preferred_source?: string; is_active?: boolean; currency?: string }) => req<{ ok: true; note?: string }>('/api/admin/credit/country', { method: 'POST', body: JSON.stringify(body) }),
     saveMap: (body: Record<string, unknown>) => req<{ ok: true }>('/api/admin/credit/sector-map', { method: 'POST', body: JSON.stringify(body) }),
+    templateBlob: () => adminBlob('/api/admin/credit/template'),
+    queue: () => req<{ pending: CreditQueueFile[]; done: CreditQueueFile[]; rejected: (CreditQueueFile & { reason: string | null })[] }>('/api/admin/credit/queue'),
+    queueUpload: async (file: File) => {
+      const headers = new Headers({ 'content-type': 'application/octet-stream' });
+      const token = getAdminToken();
+      if (token) headers.set('authorization', `Bearer ${token}`);
+      const res = await fetch(`/api/admin/credit/queue/${encodeURIComponent(file.name)}`, { method: 'PUT', headers, body: file, credentials: 'same-origin' });
+      const out = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; note?: string };
+      if (!res.ok) throw new Error(out.error ?? `Upload failed (${res.status})`);
+      return out;
+    },
+    queueRemove: (name: string) => req<{ ok: true }>(`/api/admin/credit/queue/${encodeURIComponent(name)}`, { method: 'DELETE' }),
     requestRun: (body: { countries?: string[]; backfill?: boolean }) => req<{ ok: true; id: string; already?: boolean; note?: string }>('/api/admin/credit/run', { method: 'POST', body: JSON.stringify(body) }),
   },
   financeCountries: () => req<{ countries: { country_iso3: string; country_name: string; institutions: number }[] }>('/api/finance'),

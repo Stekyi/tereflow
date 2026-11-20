@@ -52,6 +52,43 @@
     { "iso3": "TZA", "preferred_source": "auto" },
     { "iso3": "TGO", "preferred_source": "auto" }
   ],
+  "file_format": {
+    "about": "The spreadsheet route for countries whose central bank has no feed we can call. The website's template download and the pipeline's credit-template command both read this block.",
+    "source_fields": [
+      ["country_iso3", "Three capital letters, for example KEN."],
+      ["currency", "Three letter currency code of the figures, for example KES."],
+      ["source_name", "Who published the figures and which table, for example Central Bank of Kenya, Monthly Economic Indicators, table: sectoral distribution of private sector credit."],
+      ["source_url", "Optional. Where the table can be found."],
+      ["frequency", "M for monthly, Q for quarterly, A for annual. Every series in one workbook must have the same frequency."]
+    ],
+    "series_columns": [
+      ["mnemonic", "A short code you choose, no spaces, for example KEN_SAC_1. It must be the heading of this series' column on the Data sheet."],
+      ["sector_key", "Lowercase letters, digits and underscores, unique in this workbook, for example agriculture. Use the same keys as other countries where the sector is the same (agriculture, manufacturing, mining, construction, transport_comms, utilities, commerce_finance, services, export_trade, import_trade) so the trade link works."],
+      ["sector_name", "The name shown to readers, as the central bank calls it."],
+      ["role", "total for the all-sectors line, sector for each sector. At most one total."],
+      ["unit_label", "The unit as published, for example KES Million."],
+      ["multiplier_to_millions", "Leave blank if the unit is already millions. Otherwise: 1000 for billions, 0.001 for thousands, 0.000001 for whole units."],
+      ["measure_kind", "stock if the central bank says the figures are outstanding balances, flow if they are new lending in the period, unverified if unclear. Leave blank to let the pipeline infer it (it will say so on the page)."],
+      ["definition_notes", "How the central bank defines the series, in its words if possible, with the table or page."]
+    ],
+    "period_help": "One row per period, oldest first. Monthly: 2026-09 or Sep-26 or a real date. Quarterly: 2026-Q3. Annual: 2026. Periods that have not ended yet are refused.",
+    "rules": [
+      "Copy only what the central bank published. Do not estimate, round or fill gaps: leave a blank cell.",
+      "Paste numbers as values, not formulas, with no commas or currency symbols.",
+      "Balances are outstanding credit at the end of each period. A balance cannot be negative.",
+      "If any cell is wrong the whole file is refused and every problem is listed by sheet and row, so nothing is half loaded.",
+      "Loading the same file twice changes nothing. A later file with corrected or new months updates those months and keeps the old values as a revision record.",
+      "The country shows this data as its own source, labelled as loaded from a spreadsheet. It is never merged with the IMF figures or any other source.",
+      "The Example sheet is ignored. A Source, Series or Data sheet that still contains the word EXAMPLE is refused."
+    ],
+    "example": {
+      "source": [["country_iso3", "XXX"], ["currency", "XXX"], ["source_name", "EXAMPLE ONLY central bank, table 5"], ["frequency", "M"]],
+      "series_header": ["mnemonic", "sector_key", "sector_name", "role", "unit_label", "multiplier_to_millions", "measure_kind"],
+      "series": [["XXX_TOTAL", "total", "All sectors", "total", "XXX Million", null, "stock"], ["XXX_AGR", "agriculture", "Agriculture", "sector", "XXX Million", null, "stock"], ["XXX_MAN", "manufacturing", "Manufacturing", "sector", "XXX Million", null, "stock"]],
+      "data_header": ["XXX_TOTAL", "XXX_AGR", "XXX_MAN"],
+      "data": [["2026-07", 1000, 400, 600], ["2026-08", 1040, 410, 630], ["2026-09", 1075, 425, 650]]
+    }
+  },
   "thresholds": {
     "jump_pct": { "M": 50, "Q": 75, "A": 150 },
     "share_tolerance_pct": 0.5,

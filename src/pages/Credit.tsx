@@ -211,13 +211,14 @@ export default function CreditCountryPage() {
 }
 
 function SourceBanner({ data, src, setSrc }: { data: CreditCountry; src: CreditSourceKey | null; setSrc: (s: CreditSourceKey) => void }) {
-  const both = Boolean(data.summaries.BOG && data.summaries.IMF);
+  const nat: CreditSourceKey | null = data.summaries.BOG ? 'BOG' : data.summaries.FILE ? 'FILE' : null;
+  const both = Boolean(nat && data.summaries.IMF);
   const s = data.source;
   return (
     <div style={{ marginBottom: 12 }}>
       {both && (
         <div className="chips" role="tablist" aria-label="Data source" style={{ marginBottom: 8 }}>
-          <button type="button" className={`chip${src === 'BOG' ? ' active' : ''}`} onClick={() => setSrc('BOG')}>National source: by industry</button>
+          <button type="button" className={`chip${src === nat ? ' active' : ''}`} onClick={() => nat && setSrc(nat)}>{nat === 'FILE' ? 'Central bank figures from a spreadsheet: by industry' : 'National source: by industry'}</button>
           <button type="button" className={`chip${src === 'IMF' ? ' active' : ''}`} onClick={() => setSrc('IMF')}>IMF: borrower sectors only</button>
         </div>
       )}
@@ -821,6 +822,7 @@ function Method({ data, s, src, hist, hasBanks }: { data: CreditCountry; s: Cred
         <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
           {data.flags.filter((f) => series.some((x) => x.id === f.series_id) && f.flag_code === 'zero_run').map((f, i) => <li key={i}>{series.find((x) => x.id === f.series_id)?.sector_name}: {f.message}</li>)}
           {s.sectors.filter((r) => !r.at_common_period).map((r) => <li key={r.series_id}>{r.sector_name} last reported {periodLabel(r.latest_own_period)}, earlier than the common period, so its figures are at {periodLabel(r.period)}.</li>)}
+          {src === 'FILE' && <li><strong>Loaded from a spreadsheet.</strong> These figures were copied from the central bank's published tables into Tereflow's workbook by a person, checked by the pipeline (numbers only, no gaps read as zero, sectors reconciled to the total) and stored as their own source. The source table and each series' definition are listed above. Where the workbook did not say whether a series is a stock or a flow, the pipeline inferred it and says so.</li>}
           {src === 'BOG' && <li>The Bank of Ghana does not state in the series metadata whether these are stocks. They are treated as stocks because the sectors add up to the total and the balances carry forward. Confirm with the Bank of Ghana before relying on net changes for decisions.</li>}
           {hist && hist.revisions > 0 && <li>The source revised {hist.revisions} past value{hist.revisions === 1 ? '' : 's'} of the series shown in the sector detail. Revisions are stored, not overwritten.</li>}
           <li>Source figures can be revised. Each run stores a new copy only when the data changed.</li>

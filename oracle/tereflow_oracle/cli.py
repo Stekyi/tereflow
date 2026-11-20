@@ -284,11 +284,17 @@ def main(argv=None):
     sub.add_parser("export-app-tables")
     cr = sub.add_parser("ingest-credit", help="fetch, store, analyse sectoral credit (Bank of Ghana and IMF); safe to re-run")
     cr.add_argument("--country", nargs="*", default=[], help="ISO3 codes (default: every active country)")
-    cr.add_argument("--source", choices=["all", "bog", "imf"], default="all")
+    cr.add_argument("--source", choices=["all", "bog", "imf", "file"], default="all")
+    cr.add_argument("--file", nargs="+", default=[], metavar="XLSX", help="load a country's sector credit from a filled Tereflow workbook (see credit-template); the whole file is refused if any cell is wrong")
+    cr.add_argument("--dry-run", action="store_true", help="with --file: check the workbook and report, without touching the database")
     cr.add_argument("--backfill", action="store_true", help="also keep a fresh raw copy of every response")
     cr.add_argument("--series", default=None, help="only this series id or mnemonic")
     cr.add_argument("--analyse-only", action="store_true", help="recalculate from stored observations, no fetching")
     cr.add_argument("--trigger", choices=["schedule", "manual", "admin"], default="manual")
+    ct = sub.add_parser("credit-template", help="write the empty Excel workbook for adding a country's sector credit")
+    ct.add_argument("--out", default="tereflow-credit-template.xlsx")
+    cc = sub.add_parser("credit-check", help="check a filled workbook without touching the database")
+    cc.add_argument("files", nargs="+")
     ci = sub.add_parser("credit-init", help="create the credit tables and register the configured series")
     ci.add_argument("--reseed", action="store_true")
     ib = sub.add_parser("ingest-inbox", help="load collector CSVs uploaded through the admin inbox")
@@ -301,6 +307,28 @@ def main(argv=None):
     sd.add_argument("--force", action="store_true")
     sd.add_argument("--max-writes", type=int, default=20000, help="refuse to write more than about this many D1 rows")
     a = p.parse_args(argv)
+    if a.cmd == "credit-template":
+        from . import credit, credit_file
+        print("wrote", credit_file.write_template(a.out, credit.load_config()))
+        return
+    if a.cmd == "credit-check" or (a.cmd == "ingest-credit" and a.file and a.dry_run):
+        from . import credit_file
+        bad = 0
+        for f in (a.files if a.cmd == "credit-check" else a.file):
+            fp = credit_file.parse_workbook(f)
+            if fp.ok:
+                n = sum(len([o for o in s.obs if o.value is not None]) for s in fp.series)
+                first = min(o.period for s in fp.series for o in s.obs)
+                last = max(o.period for s in fp.series for o in s.obs)
+                print(f"{fp.filename}: VALID. {fp.country}, {fp.currency}, {fp.frequency}, {len(fp.series)} series, {n:,} values, {first} to {last}")
+            else:
+                bad += 1
+                print(f"{fp.filename}: REFUSED, {len(fp.problems)} problem(s)")
+                for pr in fp.problems:
+                    print("  " + pr)
+            for w in fp.warnings:
+                print("  note: " + w)
+        sys.exit(1 if bad else 0)
     conn = db.connect(app=a.app)
     if a.cmd == "migrate":
         print("applied:", db.migrate(conn) or "nothing new")
@@ -327,6 +355,9 @@ def main(argv=None):
         return
     elif a.cmd == "ingest-credit":
         from . import credit, credit_db
+        if a.file:
+            r = credit_db.run_files(conn, credit.load_config(), a.file, a.backfill, a.trigger)
+            sys.exit(0 if r["status"] in ("success", "partial") else 2)
         r = credit_db.run(conn, credit.load_config(), a.country, a.source, a.backfill, a.trigger, a.series, a.analyse_only)
         sys.exit(0 if r["status"] in ("success", "partial") else 2)
     elif a.cmd == "ingest-folder":

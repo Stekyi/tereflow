@@ -1,6 +1,6 @@
 /** Shapes returned by /api/credit. Every number is a stored observation or a calculation from stored observations. */
 
-export type CreditSourceKey = 'BOG' | 'IMF';
+export type CreditSourceKey = 'BOG' | 'IMF' | 'FILE';
 export type MeasureKind = 'stock' | 'flow' | 'unverified';
 
 export interface CreditCountryRow {
@@ -167,3 +167,5 @@ export interface CreditAdminOverview {
   runs: CreditRun[];
   sector_map: (CreditSectorMap & { is_active: number })[];
 }
+
+export interface CreditQueueFile { name: string; bytes: number; uploaded: string }

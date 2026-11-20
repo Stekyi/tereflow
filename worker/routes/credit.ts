@@ -3,6 +3,8 @@ import type { Env } from '../lib/db';
 import { bad, json, uid } from '../lib/db';
 import { requireAdmin } from '../lib/auth';
 import { ISO3_NAME } from '../../shared/country-names';
+import { buildXlsx, type Sheet } from '../lib/xlsx';
+import cfg from '../../templates/credit_config.json';
 
 /**
  * Sectoral credit intelligence: where bank credit is outstanding across the economy and how that stock changes.
@@ -195,4 +197,93 @@ creditAdmin.post('/run', async (c) => {
   await c.env.DB.prepare("INSERT INTO cr_runs (id, run_kind, trigger, requested_by, status, backfill, countries, requested_at) VALUES (?, 'ingest', 'admin', 'admin', 'requested', ?, ?, TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS'))")
     .bind(id, b?.backfill ? 1 : 0, countries.join(',') || null).run();
   return json({ ok: true, id, note: 'Requested. It starts the next time the pipeline runs (the daily schedule, or `pipeline.cmd credit` on any PC with the Oracle wallet).' }, 201);
+});
+
+// ---- spreadsheet route ------------------------------------------------------------------------------------------
+
+type Cell = string | number | null;
+interface FileFormat { source_fields: [string, string][]; series_columns: [string, string][]; period_help: string; rules: string[]; example: { source: [string, string][]; series_header: string[]; series: Cell[][]; data_header: string[]; data: Cell[][] } }
+
+/** The same workbook the pipeline's `credit-template` command writes, from the same block of credit_config.json. */
+function templateSheets(ff: FileFormat): Sheet[] {
+  const pad = (r: Cell[], n: number): Cell[] => [...r, ...Array(Math.max(0, n - r.length)).fill(null)];
+  const ex = ff.example;
+  return [
+    { name: 'Source', widths: [20, 60], rows: [['field', 'value'], ...ff.source_fields.map(([k]) => [k, null] as Cell[])] },
+    { name: 'Series', widths: [18, 20, 36, 10, 20, 22, 14, 60], rows: [ff.series_columns.map(([k]) => k)] },
+    { name: 'Data', widths: [12], rows: [['period']] },
+    {
+      name: 'How to fill',
+      widths: [26, 120],
+      rows: [
+        ['Sheet / column', 'What to enter'],
+        ...ff.source_fields.map(([k, v]) => [`Source: ${k}`, v] as Cell[]),
+        [null, null],
+        ...ff.series_columns.map(([k, v]) => [`Series: ${k}`, v] as Cell[]),
+        [null, null],
+        ['Data: period', ff.period_help],
+        ['Data: other columns', 'One column per mnemonic from the Series sheet, headed with exactly the same mnemonic. Paste plain numbers. A blank cell means the central bank published nothing for that period (it is never read as zero).'],
+        [null, null],
+        ...ff.rules.map((r) => ['Rule', r] as Cell[]),
+      ],
+    },
+    {
+      name: 'Example',
+      widths: [20, 20, 36, 10, 20, 22, 14],
+      rows: [
+        pad(['EXAMPLE ONLY: do not load. Layout of a filled workbook.'], 7),
+        pad(['Source sheet'], 7),
+        ...ex.source.map(([k, v]) => pad([k, v], 7)),
+        pad([], 7),
+        pad(['Series sheet'], 7),
+        pad(ex.series_header, 7),
+        ...ex.series.map((r) => pad(r, 7)),
+        pad([], 7),
+        pad(['Data sheet'], 7),
+        pad(['period', ...ex.data_header], 7),
+        ...ex.data.map((r) => pad(r, 7)),
+      ],
+    },
+  ];
+}
+
+creditAdmin.get('/template', () => {
+  const xlsx = buildXlsx(templateSheets((cfg as unknown as { file_format: FileFormat }).file_format));
+  return new Response(xlsx, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="tereflow-credit-template.xlsx"', 'cache-control': 'no-store' } });
+});
+
+/**
+ * Uploaded workbooks wait in storage. The website cannot read Excel inside the free plan's CPU limit, so the pipeline opens them,
+ * checks every cell, and loads or refuses each file (with the reasons kept next to it).
+ */
+const QUEUE_NAME = /^[A-Za-z0-9][A-Za-z0-9._ -]{1,90}\.xlsx$/;
+const QUEUE_MAX = 5 * 1024 * 1024;
+
+creditAdmin.get('/queue', async (c) => {
+  const list = async (prefix: string) => (await c.env.MEDIA.list({ prefix, limit: 100 })).objects.filter((o) => !o.key.endsWith('.reason.txt')).map((o) => ({ name: o.key.slice(prefix.length), bytes: o.size, uploaded: o.uploaded.toISOString() }));
+  const [pending, done, rejected] = await Promise.all([list('credit-inbox/pending/'), list('credit-inbox/done/'), list('credit-inbox/rejected/')]);
+  const reasons = await Promise.all(rejected.slice(0, 8).map(async (r) => ({ ...r, reason: (await (await c.env.MEDIA.get(`credit-inbox/rejected/${r.name}.reason.txt`))?.text())?.slice(0, 1500) ?? null })));
+  done.sort((a, b) => b.uploaded.localeCompare(a.uploaded));
+  rejected.sort((a, b) => b.uploaded.localeCompare(a.uploaded));
+  return json({ pending, done: done.slice(0, 20), rejected: reasons.sort((a, b) => b.uploaded.localeCompare(a.uploaded)) });
+});
+
+creditAdmin.put('/queue/:name', async (c) => {
+  const name = decodeURIComponent(c.req.param('name'));
+  if (!QUEUE_NAME.test(name)) return bad('The file must be an .xlsx workbook with a simple name (letters, digits, spaces, dots, dashes)');
+  const len = Number(c.req.header('content-length') ?? 0);
+  if (!len) return bad('Empty file');
+  if (len > QUEUE_MAX) return bad('The workbook is over 5 MB; it should hold numbers only');
+  const body = await c.req.arrayBuffer();
+  const head = new Uint8Array(body.slice(0, 2));
+  if (head[0] !== 0x50 || head[1] !== 0x4b) return bad('That is not an Excel .xlsx workbook');
+  await c.env.MEDIA.put(`credit-inbox/pending/${name}`, body, { httpMetadata: { contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } });
+  return json({ ok: true, name, bytes: body.byteLength, note: 'Queued. The pipeline checks and loads it at its next run (daily, or `pipeline.cmd credit` on any PC with the Oracle wallet). If any cell is wrong the whole file is refused and the reasons appear here.' }, 201);
+});
+
+creditAdmin.delete('/queue/:name', async (c) => {
+  const name = decodeURIComponent(c.req.param('name'));
+  if (!QUEUE_NAME.test(name)) return bad('Bad file name');
+  await c.env.MEDIA.delete(`credit-inbox/pending/${name}`);
+  return json({ ok: true });
 });

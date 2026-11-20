@@ -135,6 +135,8 @@ export function CreditAdmin({ t, onError }: Props) {
         <p className="tiny dim">After registering, request a full backfill. The unit and frequency are read from the source's response.</p>
       </div>
 
+      <SpreadsheetCountry t={t} onError={onError} reload={load} />
+
       <SectorMap rows={ov.sector_map} onSave={async (b) => { try { await api.creditAdmin.saveMap(b); t.ok('Saved'); load(); } catch (e) { onError(e); } }} />
     </>
   );
@@ -171,6 +173,69 @@ function SectorMap({ rows, onSave }: { rows: MapRow[]; onSave: (b: Record<string
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function SpreadsheetCountry({ t, onError, reload }: { t: Props['t']; onError: Props['onError']; reload: () => void }) {
+  type Q = Awaited<ReturnType<typeof api.creditAdmin.queue>>;
+  const [q, setQ] = useState<Q | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => { api.creditAdmin.queue().then(setQ).catch(onError); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function download() {
+    try {
+      const { blob, filename } = await api.creditAdmin.templateBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename || 'tereflow-credit-template.xlsx';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    } catch (e) { onError(e); }
+  }
+  async function send(files: FileList | null) {
+    if (!files || !files.length) return;
+    setBusy(true);
+    let ok = 0;
+    for (const f of Array.from(files)) { try { await api.creditAdmin.queueUpload(f); ok++; } catch (e) { onError(e); } }
+    setBusy(false);
+    if (ok) t.ok(`${ok} workbook${ok === 1 ? '' : 's'} queued`);
+    load(); reload();
+  }
+  const kb = (n: number) => `${Math.max(1, Math.round(n / 1024))} KB`;
+  return (
+    <div className="card">
+      <p className="card-title">Add a country from a spreadsheet</p>
+      <p className="small dim" style={{ marginTop: 0 }}>
+        For a country whose central bank publishes sector credit but has no feed we can call. Copy its published table into the workbook in the same shape as the Bank of Ghana series (one column per sector, one row per period),
+        then upload it here or pass it to the pipeline: <code>pipeline.cmd credit --file kenya.xlsx</code>. Check a file first with <code>pipeline.cmd credit-check kenya.xlsx</code>, or <code>--dry-run</code>.
+        Every cell is checked by the same rules as a live feed. If anything is wrong the whole file is refused with the row and reason, and nothing is half loaded. The country then shows these figures as their own source and they are never merged with the IMF data.
+      </p>
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button className="btn" onClick={() => void download()}>Download the workbook template (.xlsx)</button>
+        <input type="file" accept=".xlsx" multiple disabled={busy} onChange={(e) => { void send(e.target.files); e.target.value = ''; }} aria-label="Upload a filled workbook" />
+      </div>
+      {q && (
+        <>
+          <p className="small" style={{ marginBottom: 4, marginTop: 12 }}><strong>Waiting for the pipeline ({q.pending.length})</strong></p>
+          {q.pending.length === 0 ? <p className="small dim" style={{ margin: 0 }}>Nothing waiting.</p> : (
+            <ul className="small">{q.pending.map((f) => <li key={f.name}>{f.name} ({kb(f.bytes)}) <button className="btn sm" onClick={() => void api.creditAdmin.queueRemove(f.name).then(load).catch(onError)}>Remove</button></li>)}</ul>
+          )}
+          {q.rejected.length > 0 && (
+            <>
+              <p className="small" style={{ marginBottom: 4 }}><strong>Refused (nothing was loaded)</strong></p>
+              {q.rejected.map((f) => (
+                <div className="callout bad" key={f.name + f.uploaded} style={{ marginBottom: 6 }}>
+                  <span className="callout-title">{f.name}</span> <span className="tiny">{f.uploaded.slice(0, 16).replace('T', ' ')}</span>
+                  <pre style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap', fontSize: 12 }}>{f.reason ?? 'No reason was recorded.'}</pre>
+                </div>
+              ))}
+            </>
+          )}
+          {q.done.length > 0 && <p className="tiny dim">Loaded recently: {q.done.slice(0, 6).map((f) => `${f.name} (${f.uploaded.slice(0, 10)})`).join(', ')}</p>}
+        </>
+      )}
     </div>
   );
 }

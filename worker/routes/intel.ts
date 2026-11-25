@@ -52,7 +52,7 @@ intel.get('/io/:country/:industry', async (c) => {
   const industry = c.req.param('industry');
   if (!/^[A-Z_]{2,8}$/.test(country) || !/^[A-Z0-9_-]{1,10}$/.test(industry)) return bad('Give a region code and an industry code');
   const [row, meta] = await c.env.DB.batch([
-    c.env.DB.prepare("SELECT payload, year FROM pi_io WHERE country = ? AND industry = ? ORDER BY year DESC FETCH FIRST 1 ROWS ONLY").bind(country, industry),
+    c.env.DB.prepare("SELECT payload, year FROM pi_io WHERE source = 'ESTAT_FIGARO_II' AND country = ? AND industry = ? ORDER BY year DESC FETCH FIRST 1 ROWS ONLY").bind(country, industry),
     c.env.DB.prepare("SELECT k, v FROM pi_io_meta WHERE k LIKE 'ESTAT%' ORDER BY k DESC FETCH FIRST 1 ROWS ONLY"),
   ]);
   const r = (row.results ?? [])[0] as { payload: string; year: number } | undefined;

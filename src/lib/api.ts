@@ -37,7 +37,7 @@ import type { Severity, ValidationReport } from '../../shared/csv/validate';
 import type { DatasetCode } from '../../shared/csv/schema';
 import type { TradeSandboxResponse } from '../../shared/trade-sandbox';
 import type { CountryCoverage } from '../../shared/coverage';
-import type { IntelGravity, IntelIo, IntelListRow, IntelMapping, IntelRegion, ProductIntel } from './intel-types';
+import type { IntelAdminIcio, IntelGravity, IntelIo, IntelListRow, IntelMapping, IntelRegion, ProductIntel } from './intel-types';
 import type { CreditAdminOverview, CreditCountry, CreditCountryRow, CreditHistory, CreditQueueFile } from './credit-types';
 
 const ADMIN_TOKEN_KEY = 'tf_admin_token';
@@ -1158,7 +1158,26 @@ export const api = {
     templateBlob: () => adminBlob('/api/admin/national/template'),
     toolkitBlob: () => adminBlob('/api/admin/toolkit/national'),
   },
-  intel: {
+  intelAdmin: {
+    icio: () => req<IntelAdminIcio>('/api/admin/intel/icio'),
+    icioUpload: (file: File, onProgress: (pct: number) => void) => new Promise<{ ok: boolean; note?: string }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', `/api/admin/intel/icio/${encodeURIComponent(file.name)}`);
+      xhr.setRequestHeader('content-type', 'application/octet-stream');
+      const token = getAdminToken();
+      if (token) xhr.setRequestHeader('authorization', `Bearer ${token}`);
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((100 * e.loaded) / e.total)); };
+      xhr.onerror = () => reject(new Error('The upload could not be sent'));
+      xhr.onload = () => {
+        let out: { ok?: boolean; error?: string; note?: string } = {};
+        try { out = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
+        if (xhr.status >= 200 && xhr.status < 300) resolve({ ok: true, note: out.note });
+        else reject(new Error(out.error ?? `Upload failed (${xhr.status})`));
+      };
+      xhr.send(file);
+    }),
+    icioRemove: (name: string) => req<{ ok: true }>(`/api/admin/intel/icio/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  },  intel: {
     list: (hs = '') => req<{ products: IntelListRow[] }>(`/api/intel${hs ? `?hs=${encodeURIComponent(hs)}` : ''}`),
     product: (hs6: string) => req<ProductIntel>(`/api/intel/${encodeURIComponent(hs6)}`),
     mapping: (hs6: string) => req<IntelMapping>(`/api/intel/${encodeURIComponent(hs6)}/mapping`),

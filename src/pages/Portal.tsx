@@ -36,6 +36,7 @@ import {
 import { Chips, Empty, Skeletons, Toggle, useToast } from '../components/ui';
 import { CountryOnboarding } from '../components/CountryOnboarding';
 import { CreditAdmin } from './CreditAdmin';
+import { IntelAdmin } from './IntelAdmin';
 import {
   EXPORT_CATEGORY_LABEL,
   KIND_LABEL,
@@ -65,6 +66,7 @@ type SectionId =
   | 'content'
   | 'media'
   | 'credit'
+  | 'intel'
   | 'finance'
   | 'national'
   | 'feedback'
@@ -85,6 +87,7 @@ const SECTIONS: { id: SectionId; label: string; icon: string }[] = [
   { id: 'content', label: 'Content', icon: 'M6 4h9l3 3v13H6zM9 9h6M9 13h6' },
   { id: 'media', label: 'Images', icon: 'M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9h.01' },
   { id: 'credit', label: 'Sector credit', icon: 'M4 20h16M7 20V12M12 20V6M17 20v-5' },
+  { id: 'intel', label: 'Product intelligence', icon: 'M4 4h16v16H4zM8 15l3-3 2 2 3-4' },
   { id: 'finance', label: 'Banks', icon: 'M4 20h16M6 20V10M12 20V4M18 20v-7' },
   { id: 'national', label: 'National data', icon: 'M4 19 10 13l4 3 6-8' },
   { id: 'feedback', label: 'Feedback', icon: 'M4 5h16v11H9l-5 4z' },
@@ -200,6 +203,7 @@ export default function Portal() {
           {section === 'content' && <Content onError={onError} />}
           {section === 'media' && <Media t={t} onError={onError} />}
           {section === 'credit' && <CreditAdmin t={t} onError={onError} />}
+          {section === 'intel' && <IntelAdmin t={t} onError={onError} />}
           {section === 'finance' && <FinanceAdmin t={t} onError={onError} />}
           {section === 'national' && <NationalAdmin t={t} onError={onError} />}
           {section === 'feedback' && <Feedback t={t} onError={onError} />}

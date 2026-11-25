@@ -307,6 +307,8 @@ def main(argv=None):
     io.add_argument("--concordance", action="store_true", help="download the UN correspondence tables and map every HS6 product")
     io.add_argument("--mrio", action="store_true", help="download FIGARO, compute direct and total requirements, store them")
     io.add_argument("--year", type=int, help="FIGARO year (default: latest)")
+    io.add_argument("--icio", action="store_true", help="check and load OECD ICIO files uploaded in Admin (Product intelligence)")
+    io.add_argument("--icio-file", help="check and load one OECD ICIO .zip or .csv from this PC (add --dry-run to only check it)")
     io.add_argument("--dry-run", action="store_true")
     ig.add_argument("--geo", help="path to dist_cepii.xls: load distances into app_pi_geo")
     ig.add_argument("--chapter", action="append", help="only this HS2 chapter (repeatable)")
@@ -373,6 +375,18 @@ def main(argv=None):
         if a.concordance:
             concordance.load_sources(conn)
             concordance.build_map(conn, write=not a.dry_run)
+        if a.icio or a.icio_file:
+            from . import icio
+            if a.icio_file:
+                import os
+                try:
+                    rep = icio.run_file(conn, a.icio_file, os.path.basename(a.icio_file), write=not a.dry_run)
+                    print(json.dumps({"loaded_columns": rep["columns"], "year": rep["meta"]["year"], "balance": rep["meta"]["balance_check"], "validation": rep["meta"]["validation"]}, indent=1))
+                except icio.IcioRefused as e:
+                    print(f"REFUSED: {e}")
+                    sys.exit(2)
+            else:
+                sys.exit(icio.process_queue(conn, dry_run=a.dry_run))
         if a.mrio:
             r = mrio.run(conn, year=a.year, write=not a.dry_run)
             print(json.dumps(r["meta"]["validation"], indent=1))

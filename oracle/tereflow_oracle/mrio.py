@@ -251,13 +251,14 @@ def _label(i: int, regions, industries) -> tuple:
 
 
 def column_payload(j: int, Z, x, A, L, regions=REGIONS, industries=INDUSTRIES, names=None, year=None,
-                   top: int = 15, top_groups: int = 12) -> dict:
+                   top: int = 15, top_groups: int = 12, iso3=None) -> dict:
     """Payload for one using column j = (country, industry)."""
     names = names or {}
+    iso_map = ISO3 if iso3 is None else iso3
     ni, nr = len(industries), len(regions)
     c, k = _label(j, regions, industries)
     xj = float(x[j])
-    base = {"source": SOURCE, "dataset": DATASET_ID, "year": year, "country": c, "country_iso3": ISO3.get(c), "industry": k,
+    base = {"source": SOURCE, "dataset": DATASET_ID, "year": year, "country": c, "country_iso3": iso_map.get(c), "industry": k,
             "industry_name": names.get(k), "unit": UNIT, "price_basis": PRICE_BASIS, "output_meur": round(xj, 3)}
     if not xj > 0:
         base.update({"flag": "output_le_0", "note": "No output in this cell; coefficients are not defined.",
@@ -272,7 +273,7 @@ def column_payload(j: int, Z, x, A, L, regions=REGIONS, industries=INDUSTRIES, n
 
     def ent(i):
         rc, ik = _label(i, regions, industries)
-        return {"country": rc, "iso3": ISO3.get(rc), "industry": ik, "industry_name": names.get(ik)}
+        return {"country": rc, "iso3": iso_map.get(rc), "industry": ik, "industry_name": names.get(ik)}
 
     direct_top = []
     for i in np.argsort(-a, kind="stable")[:top]:
@@ -294,7 +295,7 @@ def column_payload(j: int, Z, x, A, L, regions=REGIONS, industries=INDUSTRIES, n
         total_top.append(e)
     a3 = a.reshape(nr, ni)
     r3 = req.reshape(nr, ni)
-    bc = [{"country": regions[r], "iso3": ISO3.get(regions[r]), "direct": round(float(a3[r].sum()), 6), "total": round(float(r3[r].sum()), 6)}
+    bc = [{"country": regions[r], "iso3": iso_map.get(regions[r]), "direct": round(float(a3[r].sum()), 6), "total": round(float(r3[r].sum()), 6)}
           for r in range(nr)]
     bc.sort(key=lambda e: -e["total"])
     bi = [{"industry": industries[i], "industry_name": names.get(industries[i]), "direct": round(float(a3[:, i].sum()), 6),

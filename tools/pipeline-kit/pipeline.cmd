@@ -48,6 +48,7 @@ echo   credit-template [--out F]   write the empty Excel workbook for a new coun
 echo   credit-check FILE.xlsx      check a filled workbook, no database needed
 echo   credit-init                 create the credit tables and register the configured series (once)
 echo   intel [--hs 090111] [--dry-run]   product intelligence: demand, supply, concentration, competitiveness, pressure and market screening for every HS6 product (about 6 minutes)
+echo   intel-io --icio             check and load OECD ICIO files uploaded in Admin; or --icio-file FILE.zip [--dry-run] to check one from this PC
 echo   intel-io --init --concordance --mrio   HS to industry bridge (UN tables) and the FIGARO production network (about 3 minutes plus downloads); run when Eurostat publishes a new year
 echo   intel-gravity [--geo dist_cepii.xls]   gravity model per HS chapter (slow: tens of minutes); run after a new trade year
 echo   worldbank                   refresh World Bank indicators

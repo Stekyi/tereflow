@@ -100,3 +100,9 @@ export interface IntelGravity {
     kind: string; note: string;
   };
 }
+export interface IntelAdminFile { name: string; bytes: number; uploaded: string }
+export interface IntelAdminIcio {
+  pending: IntelAdminFile[]; done: IntelAdminFile[]; rejected: (IntelAdminFile & { reason: string | null })[];
+  loaded: { key: string; updated_at: string; year?: number; file?: string; countries?: number; balance?: { column_balance_max_rel?: number | null }; licence_state?: string }[];
+  max_bytes: number;
+}

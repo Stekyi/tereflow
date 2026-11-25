@@ -22,6 +22,8 @@ REM Sectoral credit: Bank of Ghana and IMF. Also completes any run an admin requ
 python -u -m tereflow_oracle ingest-credit --trigger schedule >> "..\%LOG%" 2>&1
 REM Product intelligence (demand, supply, concentration, competitiveness, pressure per HS6). About 5 minutes; rebuilt from the stored trade facts.
 python -u -m tereflow_oracle product-intel >> "..\%LOG%" 2>&1
+REM OECD ICIO files an operator uploaded in Admin (Product intelligence) are checked and loaded; a file that does not balance is refused with reasons.
+python -u -m tereflow_oracle intel-io --icio >> "..\%LOG%" 2>&1
 cd ..
 python scripts\national\national_load.py freshness >> "%LOG%" 2>&1
 call npm run snapshots >> "%LOG%" 2>&1

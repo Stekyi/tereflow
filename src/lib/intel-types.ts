@@ -50,7 +50,7 @@ export interface IntelRun {
 }
 
 export interface ProductIntel { product: IntelProduct; computed_at: string; methods: IntelMethods | null; run: IntelRun | null }
-export interface IntelListRow { hs6: string; demand_usd: number; latest_year: number }
+export interface IntelListRow { hs6: string; name: string | null; demand_usd: number; latest_year: number }
 
 export interface IntelCandidate {
   iso3: string; share_in_market_pct: number; global_sales_usd: number; global_growth_pct: number | null; rca: number | null; unit_value: number | null;

@@ -25,18 +25,23 @@ function parse(payload: unknown): unknown {
   try { return JSON.parse(payload); } catch { return null; }
 }
 
-/** The products with the largest reported imports, or those under an HS prefix. */
+/** Products by name or code: the largest by reported imports, or those matching a word (in the name) or the start of an HS code. */
 intel.get('/', async (c) => {
-  const prefix = (c.req.query('hs') ?? '').replace(/\D/g, '').slice(0, 6);
-  const stmt = prefix
-    ? c.env.DB.prepare('SELECT hs6, demand_usd, latest_year FROM pi_product WHERE hs6 LIKE ? ORDER BY demand_usd DESC FETCH FIRST 100 ROWS ONLY').bind(`${prefix}%`)
-    : c.env.DB.prepare('SELECT hs6, demand_usd, latest_year FROM pi_product ORDER BY demand_usd DESC FETCH FIRST 100 ROWS ONLY');
+  const raw = (c.req.query('q') ?? c.req.query('hs') ?? '').trim().slice(0, 60);
+  const digits = raw.replace(/\D/g, '');
+  const isCode = raw !== '' && /^[\d\s.]+$/.test(raw);
+  const words = raw.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((w) => w.length > 1).slice(0, 4);
+  const cols = 'hs6, name, demand_usd, latest_year';
+  let stmt;
+  if (!raw) stmt = c.env.DB.prepare(`SELECT ${cols} FROM pi_product ORDER BY demand_usd DESC NULLS LAST FETCH FIRST 100 ROWS ONLY`);
+  else if (isCode) stmt = c.env.DB.prepare(`SELECT ${cols} FROM pi_product WHERE hs6 LIKE ? ORDER BY demand_usd DESC NULLS LAST FETCH FIRST 100 ROWS ONLY`).bind(`${digits}%`);
+  else if (words.length === 0) stmt = c.env.DB.prepare(`SELECT ${cols} FROM pi_product ORDER BY demand_usd DESC NULLS LAST FETCH FIRST 100 ROWS ONLY`);
+  else stmt = c.env.DB.prepare(`SELECT ${cols} FROM pi_product WHERE ${words.map(() => 'LOWER(name) LIKE ?').join(' AND ')} ORDER BY demand_usd DESC NULLS LAST FETCH FIRST 100 ROWS ONLY`).bind(...words.map((w) => `%${w}%`));
   const meta = c.env.DB.prepare("SELECT k, v, updated_at FROM pi_meta WHERE k = 'run'");
   const [rows, m] = await c.env.DB.batch([stmt, meta]);
   const run = parse(((m.results ?? [])[0] as { v?: string } | undefined)?.v);
   return json({ products: rows.results ?? [], run }, 200, { 'cache-control': 'public, max-age=600' });
 });
-
 /** One product's calculated intelligence, plus the methods and coverage it rests on. */
 intel.get('/io/regions', async (c) => {
   const [r, m] = await c.env.DB.batch([

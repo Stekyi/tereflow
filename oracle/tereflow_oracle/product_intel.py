@@ -30,7 +30,7 @@ MIN_IMPORTERS = 8                # a year counts as the latest year only if at l
 
 DDL = [
     """CREATE TABLE app_pi_product (hs6 VARCHAR2(6) PRIMARY KEY, method_version VARCHAR2(12), base_year NUMBER, latest_year NUMBER,
-       demand_usd NUMBER, computed_at VARCHAR2(30), payload CLOB)""",
+       demand_usd NUMBER, computed_at VARCHAR2(30), payload CLOB, name VARCHAR2(300))""",
     """CREATE TABLE app_pi_meta (k VARCHAR2(40) PRIMARY KEY, v CLOB, updated_at VARCHAR2(30))""",
 ]
 TABLES = ["pi_product", "pi_meta"]
@@ -401,14 +401,14 @@ def run(conn, prefix=None, exact=None, write=True, log=print, limit=None) -> dic
 def write_results(conn, results: dict, inds: dict, cuts: dict, ctx: dict, full: bool) -> None:
     cur = conn.cursor()
     now = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-    rows = [(hs6, tm.METHOD_VERSION, ctx["base"], ctx["latest"], inds[hs6].get("demand_usd"), now, json.dumps(p, separators=(",", ":")))
+    rows = [(hs6, tm.METHOD_VERSION, ctx["base"], ctx["latest"], inds[hs6].get("demand_usd"), now, json.dumps(p, separators=(",", ":")), (p.get("description") or "")[:300])
             for hs6, p in results.items()]
     if full:
         cur.execute("DELETE FROM app_pi_product")
     else:
         cur.executemany("DELETE FROM app_pi_product WHERE hs6 = :1", [(r[0],) for r in rows])
-    cur.setinputsizes(None, None, None, None, None, None, __import__("oracledb").DB_TYPE_CLOB)
-    cur.executemany("INSERT INTO app_pi_product (hs6, method_version, base_year, latest_year, demand_usd, computed_at, payload) VALUES (:1, :2, :3, :4, :5, :6, :7)", rows)
+    cur.setinputsizes(None, None, None, None, None, None, __import__("oracledb").DB_TYPE_CLOB, None)
+    cur.executemany("INSERT INTO app_pi_product (hs6, method_version, base_year, latest_year, demand_usd, computed_at, payload, name) VALUES (:1, :2, :3, :4, :5, :6, :7, :8)", rows)
     meta = {"methods": METHODS, "cuts": cuts if full else None,
             "run": {"products": len(results), "base": ctx["base"], "latest": ctx["latest"], "importers": sorted(ctx["universe"]),
                     "excluded_reporters": ctx["excluded_reporters"], "year_counts": ctx["year_counts"], "computed_at": now, "full": full}}

@@ -1178,7 +1178,7 @@ export const api = {
     }),
     icioRemove: (name: string) => req<{ ok: true }>(`/api/admin/intel/icio/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   },  intel: {
-    list: (hs = '') => req<{ products: IntelListRow[] }>(`/api/intel${hs ? `?hs=${encodeURIComponent(hs)}` : ''}`),
+    list: (q = '') => req<{ products: IntelListRow[] }>(`/api/intel${q ? `?q=${encodeURIComponent(q)}` : ''}`),
     product: (hs6: string) => req<ProductIntel>(`/api/intel/${encodeURIComponent(hs6)}`),
     mapping: (hs6: string) => req<IntelMapping>(`/api/intel/${encodeURIComponent(hs6)}/mapping`),
     gravity: (hs6: string) => req<IntelGravity>(`/api/intel/${encodeURIComponent(hs6)}/gravity`),

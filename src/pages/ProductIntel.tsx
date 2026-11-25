@@ -28,29 +28,33 @@ const STATE_TEXT: Record<string, string> = {
 
 export function IntelIndex() {
   const nav = useNavigate();
-  const [hs, setHs] = useState('');
+  const [q, setQ] = useState('');
+  const [debounced, setDebounced] = useState('');
   const [rows, setRows] = useState<IntelListRow[] | null>(null);
   const [err, setErr] = useState('');
+  useEffect(() => { const h = setTimeout(() => setDebounced(q.trim()), 250); return () => clearTimeout(h); }, [q]);
   useEffect(() => {
-    setRows(null);
-    api.intel.list(hs).then((r) => setRows(r.products)).catch((e) => setErr(String(e?.message ?? e)));
-  }, [hs]);
+    setRows(null); setErr('');
+    api.intel.list(debounced).then((r) => setRows(r.products)).catch((e) => setErr(String(e?.message ?? e)));
+  }, [debounced]);
   return (
     <>
       <p className="small dim" style={{ marginTop: 0 }}>
-        Pick a product by its six-digit HS code to see its calculated demand, supply, concentration, competitiveness and market-pressure indicators. Everything is computed from reported trade and shows its method and coverage.
+        Find a product by name (for example coffee or tractor parts) or by HS code, to see its calculated demand, supply, concentration, competitiveness, market-pressure, industry and production-network indicators. Everything is computed from reported trade and shows its method and coverage.
       </p>
-      <form onSubmit={(e) => { e.preventDefault(); if (/^\d{6}$/.test(hs)) nav(`/intel/${hs}`); }} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <input value={hs} onChange={(e) => setHs(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="HS code or start of one, for example 0901" aria-label="HS code" style={{ flex: 1, maxWidth: 360 }} />
-        <button className="mm-cta" type="submit" disabled={!/^\d{6}$/.test(hs)}>Open</button>
+      <form onSubmit={(e) => { e.preventDefault(); if (/^\d{6}$/.test(q.trim())) nav(`/intel/${q.trim()}`); else if (rows && rows.length > 0) nav(`/intel/${rows[0].hs6}`); }} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <input value={q} onChange={(e) => setQ(e.target.value.slice(0, 60))} placeholder="Product name or HS code, for example coffee or 0901" aria-label="Product name or HS code" style={{ flex: 1, maxWidth: 420 }} />
+        <button className="mm-cta" type="submit" disabled={!rows || rows.length === 0}>Open</button>
       </form>
-      {err ? <Empty title="Could not load products" hint={err} /> : !rows ? <Skeletons n={3} /> : rows.length === 0 ? <Empty title="No products found" hint="No calculated product starts with that code." /> : (
+      {err ? <Empty title="Could not load products" hint={err} /> : !rows ? <Skeletons n={3} /> : rows.length === 0 ? <Empty title="No products found" hint="No calculated product matches that name or code. Try one word, or the start of the HS code." /> : (
         <>
-          <p className="tiny dim">{hs ? `Products starting with ${hs}` : 'Largest products by reported imports'}, latest year.</p>
+          <p className="tiny dim">{debounced ? `Products matching "${debounced}"` : 'Largest products by reported imports'}, latest year{rows.length === 100 ? ' (first 100)' : ''}.</p>
           {rows.map((r) => (
             <Link className="list-item" key={r.hs6} to={`/intel/${r.hs6}`}>
-              <span className="name">HS {r.hs6}</span>
-              <span className="tiny dim">{usd(r.demand_usd)} imported, {r.latest_year}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span className="name" style={{ display: 'block' }}>{r.name ?? `HS ${r.hs6}`}</span>
+                <span className="tiny dim" style={{ display: 'block' }}>HS {r.hs6}, {usd(r.demand_usd)} imported in {r.latest_year}</span>
+              </span>
             </Link>
           ))}
         </>
@@ -58,7 +62,6 @@ export function IntelIndex() {
     </>
   );
 }
-
 export default function ProductIntelPage() {
   const { hs6 = '' } = useParams();
   const [data, setData] = useState<ProductIntel | null>(null);

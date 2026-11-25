@@ -82,6 +82,7 @@ const NAV: { to: string; label: string; d: string; stroke?: boolean; badge?: 'fe
   { to: '/guide', label: 'Guide', d: 'M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3zM9.5 20h5M10 17v3', stroke: true },
   { to: '/countries', label: 'Countries', d: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 0v20M2 12h20M12 2c3 3 3 17 0 20M12 2C9 5 9 19 12 22', stroke: true },
   { to: '/finance', label: 'Finance', d: 'M4 20h16M6 20V10M12 20V4M18 20v-7', stroke: true },
+  { to: '/intel', label: 'Intel', d: 'M4 4h16v16H4zM8 15l3-3 2 2 3-4', stroke: true },
   { to: '/network', label: 'Network', d: 'M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 13a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm0 1.5c-3 0-6 1.5-6 3.5v2h12v-2c0-2-3-3.5-6-3.5zm8-1c-.9 0-1.8.14-2.6.4 1.6.9 2.6 2.2 2.6 3.6v2h6v-2c0-2-3-4-6-4z' },
   { to: '/sandbox', label: 'Sandbox', d: 'M4 4h16v16H4zM8 8h8M8 12h8M8 16h5', stroke: true },
   { to: '/me', label: 'Me', d: 'M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm0 2c-4 0-8 2-8 5v2h16v-2c0-3-4-5-8-5z' },
@@ -248,6 +249,7 @@ export default function App() {
               <NavLink to="/guide">Guide</NavLink>
               <NavLink to="/countries">Countries</NavLink>
               <NavLink to="/finance">Finance</NavLink>
+              <NavLink to="/intel">Product intelligence</NavLink>
               <NavLink to="/sandbox">Sandbox</NavLink>
               <NavLink to="/data-sources">Data sources</NavLink>
             </div>

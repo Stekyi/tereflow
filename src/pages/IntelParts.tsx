@@ -31,7 +31,7 @@ export function Opportunities({ d }: { d: ProductIntel }) {
             <div key={m.iso3} style={{ marginBottom: 14 }}>
               <strong>{nm(m.iso3)}</strong> <span className="tiny dim">imports {usd(m.value_usd)}, {pct(m.growth_pct)} since {p.period.base}, {m.supplier_count} suppliers{m.effective_suppliers != null ? `, about ${m.effective_suppliers} effective suppliers` : ''}{m.top3_share_pct != null ? `, top three hold ${m.top3_share_pct.toFixed(0)}%` : ''}</span>
               {m.candidates.length === 0 ? <div className="tiny dim">No supplier passes two tests here.</div> : (
-                <table className="data-table">
+                <div style={{ overflowX: 'auto' }}><table className="data-table">
                   <thead><tr><th>Candidate supplier</th><th>Share here</th><th>Global sales</th><th>Global growth</th><th>RCA</th><th>Value per kg</th><th>Distance</th><th>Why it is listed</th></tr></thead>
                   <tbody>
                     {m.candidates.map((c) => (
@@ -40,7 +40,7 @@ export function Opportunities({ d }: { d: ProductIntel }) {
                         <td className="tiny">{c.flags.map((f) => FLAG_TEXT[f] ?? f).join('; ')}</td></tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               )}
             </div>
           ))}
@@ -55,7 +55,7 @@ export function Opportunities({ d }: { d: ProductIntel }) {
             About {a.effective_suppliers ?? 'n/a'} effective suppliers. Value per kg varies across the leading suppliers by a coefficient of variation of {a.unit_value_dispersion_cv ?? 'n/a'}.
             {a.rank_corr_unit_value_change_vs_share_change != null ? ` Suppliers whose value per kg rose relative to the market ${a.rank_corr_unit_value_change_vs_share_change > 0 ? 'tended to gain' : 'tended to lose'} share (rank correlation ${a.rank_corr_unit_value_change_vs_share_change.toFixed(2)}).` : ''}
           </p>
-          <table className="data-table">
+          <div style={{ overflowX: 'auto' }}><table className="data-table">
             <thead><tr><th>Supplier</th><th>Value per kg</th><th>Against market</th><th>Relative change since {p.period.base}</th><th>Share change</th></tr></thead>
             <tbody>
               {a.suppliers.map((s) => (
@@ -64,7 +64,7 @@ export function Opportunities({ d }: { d: ProductIntel }) {
                   <td style={{ color: tone(s.share_change_pp) }}>{s.share_change_pp == null ? 'n/a' : `${s.share_change_pp > 0 ? '+' : ''}${s.share_change_pp.toFixed(2)} pts`}</td></tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           <p className="tiny dim">{a.note}</p>
         </>
       )}
@@ -95,12 +95,12 @@ function Gravity({ g, hs6, latest }: { g: IntelGravity | null; hs6: string; late
         Distance elasticity {c.ln_distance?.coef.toFixed(2)} (s.e. {c.ln_distance?.se.toFixed(2)}); contiguity {c.contiguity?.coef.toFixed(2)}; common language {c.common_language?.coef.toFixed(2)}; colonial tie {c.colonial_tie?.coef.toFixed(2)}. Pseudo R squared {m.pseudo_r2 ?? 'n/a'}.
       </p>
       {rows.length > 0 && (
-        <table className="data-table">
+        <div style={{ overflowX: 'auto' }}><table className="data-table">
           <thead><tr><th>Importer</th><th>Exporter</th><th>Observed imports (whole chapter)</th><th>Model-expected</th><th>Observed over expected</th><th>Distance</th></tr></thead>
           <tbody>
             {rows.map((r) => <tr key={`${r.imp}-${r.exporter}`}><td>{nm(r.imp)}</td><td>{nm(r.exporter)}</td><td>{usd(r.observed_usd)}</td><td>{usd(r.model_usd)}</td><td>{r.observed_over_model.toFixed(2)}</td><td>{r.distance_km.toLocaleString()} km</td></tr>)}
           </tbody>
-        </table>
+        </table></div>
       )}
       <p className="tiny dim">{m.note} The figures are for the whole HS chapter, not this single product. Distance data: {g.meta?.source?.name}, {g.meta?.source?.licence?.split('(')[0]}.</p>
     </>
@@ -123,14 +123,14 @@ export function Mapping({ d }: { d: ProductIntel }) {
       <p><span className={`chip ${m.category === 'direct' ? 'on' : m.category === 'unresolved' ? 'error' : 'warning'}`}>{CATEGORY_TEXT[m.category] ?? m.category}</span>
         <span className="tiny dim" style={{ marginLeft: 8 }}>HS basis {map.hs_basis}; relationship to HS2017: {map.hs2022_hs2017_relationship.join(', ') || 'n/a'}; mapping {m.version}</span></p>
       {map.industries.length === 0 ? <p className="small">{map.unresolved_reason ?? 'No industry could be reached.'} Nothing is forced into an industry.</p> : (
-        <table className="data-table">
+        <div style={{ overflowX: 'auto' }}><table className="data-table">
           <thead><tr><th>Industry (FIGARO)</th><th>ISIC Rev.4</th><th>CPC 2.1</th><th>Partial links</th></tr></thead>
           <tbody>
             {map.industries.map((i) => (
               <tr key={i.figaro}><td><strong>{i.figaro}</strong> {m.industries[i.figaro] ?? ''}</td><td>{i.isic4.join(', ')}</td><td>{i.cpc21.join(', ')}</td><td>{i.any_partial ? 'Yes: only part of the product or industry is covered by this pairing' : 'No'}</td></tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
       <ul className="tiny dim">{map.caveats.map((c) => <li key={c}>{c}</li>)}</ul>
       <p className="tiny dim">Sources: {m.sources.map((s) => s.name).join('; ')}. Retrieved {m.sources[0]?.retrieved_at ?? 'n/a'}.</p>
@@ -194,25 +194,25 @@ export function Network({ d }: { d: ProductIntel }) {
             <div className="stat"><div className="label">Supplied from the same country</div><div className="value">{x.domestic_share_total == null ? 'n/a' : `${(x.domestic_share_total * 100).toFixed(0)}%`}</div><div className="tiny dim">{x.domestic_share_direct == null ? '' : `${(x.domestic_share_direct * 100).toFixed(0)}% of direct inputs`}</div></div>
           </div>
           <h3>Largest direct suppliers</h3>
-          <table className="data-table">
+          <div style={{ overflowX: 'auto' }}><table className="data-table">
             <thead><tr><th>Supplier</th><th>Industry</th><th>Per euro of output</th><th>Value</th></tr></thead>
             <tbody>{x.direct_top.slice(0, 10).map((r) => <tr key={`${r.country}-${r.industry}`}><td>{cname(r.country, r.iso3)}</td><td>{r.industry} {r.industry_name}{r.self ? ' (own industry)' : ''}</td><td>{cents(r.coef)}</td><td>EUR {(r.value_meur ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}m</td></tr>)}</tbody>
-          </table>
+          </table></div>
           <h3>Largest suppliers including indirect (the whole chain)</h3>
-          <table className="data-table">
+          <div style={{ overflowX: 'auto' }}><table className="data-table">
             <thead><tr><th>Supplier</th><th>Industry</th><th>Total</th><th>Of which direct</th><th>Of which indirect</th></tr></thead>
             <tbody>{x.total_top.slice(0, 10).map((r) => <tr key={`${r.country}-${r.industry}`}><td>{cname(r.country, r.iso3)}</td><td>{r.industry} {r.industry_name}</td><td>{cents(r.total)}</td><td>{cents(r.direct)}</td><td>{cents(r.indirect)}</td></tr>)}</tbody>
-          </table>
+          </table></div>
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: 280 }}>
+            <div style={{ flex: 1, minWidth: 280, maxWidth: '100%' }}>
               <h3>By supplier country (total)</h3>
-              <table className="data-table"><thead><tr><th>Country</th><th>Direct</th><th>Total</th></tr></thead>
-                <tbody>{x.by_supplier_country.slice(0, 10).map((r) => <tr key={r.country}><td>{cname(r.country, r.iso3)}</td><td>{cents(r.direct)}</td><td>{cents(r.total)}</td></tr>)}</tbody></table>
+              <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Country</th><th>Direct</th><th>Total</th></tr></thead>
+                <tbody>{x.by_supplier_country.slice(0, 10).map((r) => <tr key={r.country}><td>{cname(r.country, r.iso3)}</td><td>{cents(r.direct)}</td><td>{cents(r.total)}</td></tr>)}</tbody></table></div>
             </div>
-            <div style={{ flex: 1, minWidth: 280 }}>
+            <div style={{ flex: 1, minWidth: 280, maxWidth: '100%' }}>
               <h3>By supplier industry (total)</h3>
-              <table className="data-table"><thead><tr><th>Industry</th><th>Direct</th><th>Total</th></tr></thead>
-                <tbody>{x.by_supplier_industry.slice(0, 10).map((r) => <tr key={r.industry}><td>{r.industry} {r.industry_name}</td><td>{cents(r.direct)}</td><td>{cents(r.total)}</td></tr>)}</tbody></table>
+              <div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Industry</th><th>Direct</th><th>Total</th></tr></thead>
+                <tbody>{x.by_supplier_industry.slice(0, 10).map((r) => <tr key={r.industry}><td>{r.industry} {r.industry_name}</td><td>{cents(r.direct)}</td><td>{cents(r.total)}</td></tr>)}</tbody></table></div>
             </div>
           </div>
           <p className="tiny dim">Cents of input per euro of the industry's output, {x.price_basis}. Direct requirement is input bought straight from the supplier industry. Total requirement comes from the Leontief inverse and also counts what those suppliers had to buy in turn; indirect is the total minus the direct. A country coverage note: {io?.source?.coverage_note}</p>

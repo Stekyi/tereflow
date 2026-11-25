@@ -113,7 +113,11 @@ Every HS6 product with reported imports has a page at `/intel/<HS6>`: global dem
 
 **Pressure signals.** Positions in the cross-product distribution (top or bottom fifth of products over USD 100,000 imports), recomputed each full run. No fixed thresholds, no composite score. "Potential supply pressure" is a labelled heuristic.
 
-**Checks.** The CMS effects add up to the change in sales (checked for every supplier in the live run, gap under USD 1). The papers named in the brief could not be downloaded here, so the decomposition is the standard form and is still to be checked against them. Not implemented: Armington elasticities, gravity model, opportunity screening, HS to industry bridge, input-output network.
+**Checks.** The CMS effects add up to the change in sales (checked for every supplier in the live run, gap under USD 1). The papers named in the brief could not be downloaded here, so the CMS and gravity specifications are the standard ones and are still to be checked against them.
+
+**Industry mapping and production network.** `pipeline.cmd intel-io --init --concordance --mrio` downloads the UN correspondence tables (HS to CPC 2.1 to ISIC Rev.4) and the Eurostat FIGARO input-output table (naio_10_fcp_ii4, 46 regions, 64 industries, year 2024), maps every HS6 to FIGARO industries, and stores direct and Leontief total upstream requirements for every country-industry. The UN tables carry no weights, so none are shown; a product reaching several industries shows each. Re-run when Eurostat publishes a new year; every year is stored separately. Eurostat reuse needs the source acknowledged and any modification stated; both are on the page. Africa is covered only by South Africa and a rest-of-world block. OECD ICIO refused downloads from this machine, so it is not integrated; to add it someone downloads the ICIO zip by hand and a loader is written for it.
+
+**Gravity and opportunities.** `pipeline.cmd intel-gravity --geo dist_cepii.xls` once (CEPII distances, Etalab open licence), then `pipeline.cmd intel-gravity` fits a PPML gravity model per HS chapter and stores model-expected trade beside observed imports, each chapter validated on a 20 percent hold-out against a no-trade-cost baseline. Slow (tens of minutes); run after a new trade year. Market opportunities (in `product-intel`) are screening signals, not forecasts. Armington elasticities are not estimated: that needs a long price and quantity panel and an identification design.
 
 ## Other config files (no code change needed)
 

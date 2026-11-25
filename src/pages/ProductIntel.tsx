@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { Empty, Skeletons } from '../components/ui';
 import { ISO3_NAME } from '../../shared/country-names';
 import type { IntelListRow, ProductIntel } from '../lib/intel-types';
+import { Mapping, Network, Opportunities } from './IntelParts';
 
 const TABS = [
   { k: 'overview', label: 'Overview' }, { k: 'demand', label: 'Global demand' }, { k: 'supply', label: 'Global supply' },
@@ -88,7 +89,9 @@ export default function ProductIntelPage() {
       {tab === 'pressure' && <Pressure d={data} />}
       {tab === 'competitiveness' && <Competitiveness d={data} />}
       {tab === 'method' && <Method d={data} />}
-      {(tab === 'opportunities' || tab === 'mapping' || tab === 'network') && <NotBuilt which={tab} d={data} />}
+      {tab === 'opportunities' && <Opportunities d={data} />}
+      {tab === 'mapping' && <Mapping d={data} />}
+      {tab === 'network' && <Network d={data} />}
     </>
   );
 }
@@ -242,20 +245,6 @@ function Competitiveness({ d }: { d: ProductIntel }) {
         </tbody>
       </table>
       <p className="tiny dim">The four effects add up to the change in sales. RCA above 1 means the product is a larger share of that supplier's sales into these countries than of all imports into them; it is not a measure of productivity or profit. Hover an RCA value to see its four terms.</p>
-    </>
-  );
-}
-
-function NotBuilt({ which, d }: { which: string; d: ProductIntel }) {
-  const text = d.methods?.not_implemented ?? [];
-  const title = which === 'opportunities' ? 'Market opportunities' : which === 'mapping' ? 'Industry mapping' : 'Production network';
-  const hint = which === 'opportunities'
-    ? 'Opportunity screening by target market is the next step and is not calculated yet. Nothing is shown rather than an illustration.'
-    : 'This needs an HS to industry concordance and a licensed input-output source, neither of which is loaded. Nothing is shown rather than an illustration.';
-  return (
-    <>
-      <Empty title={`${title}: not built yet`} hint={hint} />
-      {text.length > 0 && <ul className="tiny dim">{text.map((t) => <li key={t}>{t}</li>)}</ul>}
     </>
   );
 }

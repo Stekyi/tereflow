@@ -37,7 +37,7 @@ import type { Severity, ValidationReport } from '../../shared/csv/validate';
 import type { DatasetCode } from '../../shared/csv/schema';
 import type { TradeSandboxResponse } from '../../shared/trade-sandbox';
 import type { CountryCoverage } from '../../shared/coverage';
-import type { IntelListRow, ProductIntel } from './intel-types';
+import type { IntelGravity, IntelIo, IntelListRow, IntelMapping, IntelRegion, ProductIntel } from './intel-types';
 import type { CreditAdminOverview, CreditCountry, CreditCountryRow, CreditHistory, CreditQueueFile } from './credit-types';
 
 const ADMIN_TOKEN_KEY = 'tf_admin_token';
@@ -1161,6 +1161,10 @@ export const api = {
   intel: {
     list: (hs = '') => req<{ products: IntelListRow[] }>(`/api/intel${hs ? `?hs=${encodeURIComponent(hs)}` : ''}`),
     product: (hs6: string) => req<ProductIntel>(`/api/intel/${encodeURIComponent(hs6)}`),
+    mapping: (hs6: string) => req<IntelMapping>(`/api/intel/${encodeURIComponent(hs6)}/mapping`),
+    gravity: (hs6: string) => req<IntelGravity>(`/api/intel/${encodeURIComponent(hs6)}/gravity`),
+    regions: () => req<{ regions: IntelRegion[] }>('/api/intel/io/regions'),
+    io: (country: string, industry: string) => req<IntelIo>(`/api/intel/io/${encodeURIComponent(country)}/${encodeURIComponent(industry)}`),
   },
   credit: {
     countries: () => req<{ countries: CreditCountryRow[] }>('/api/credit'),

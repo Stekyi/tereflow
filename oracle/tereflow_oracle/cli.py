@@ -301,6 +301,17 @@ def main(argv=None):
     pi.add_argument("--limit", type=int, help="stop after this many products")
     pi.add_argument("--dry-run", action="store_true", help="compute and print, write nothing")
     pi.add_argument("--init", action="store_true", help="create the tables first")
+    ig = sub.add_parser("intel-gravity", help="fit the PPML gravity model per HS chapter and store trade potential vs observed (needs the CEPII file once)")
+    io = sub.add_parser("intel-io", help="HS to industry concordance and the FIGARO production network (Leontief) tables")
+    io.add_argument("--init", action="store_true", help="create the tables first")
+    io.add_argument("--concordance", action="store_true", help="download the UN correspondence tables and map every HS6 product")
+    io.add_argument("--mrio", action="store_true", help="download FIGARO, compute direct and total requirements, store them")
+    io.add_argument("--year", type=int, help="FIGARO year (default: latest)")
+    io.add_argument("--dry-run", action="store_true")
+    ig.add_argument("--geo", help="path to dist_cepii.xls: load distances into app_pi_geo")
+    ig.add_argument("--chapter", action="append", help="only this HS2 chapter (repeatable)")
+    ig.add_argument("--dry-run", action="store_true")
+    ig.add_argument("--init", action="store_true", help="create the gravity tables first")
     ci = sub.add_parser("credit-init", help="create the credit tables and register the configured series")
     ci.add_argument("--reseed", action="store_true")
     ib = sub.add_parser("ingest-inbox", help="load collector CSVs uploaded through the admin inbox")
@@ -353,6 +364,29 @@ def main(argv=None):
         from . import appschema
         (ROOT / "shared" / "app-tables.ts").write_text(appschema.export_tables_ts(), encoding="utf-8", newline="\n")
         print("wrote shared/app-tables.ts")
+        return
+    elif a.cmd == "intel-io":
+        from . import concordance, mrio
+        if a.init:
+            concordance.create_tables(conn)
+            mrio.create_tables(conn)
+        if a.concordance:
+            concordance.load_sources(conn)
+            concordance.build_map(conn, write=not a.dry_run)
+        if a.mrio:
+            r = mrio.run(conn, year=a.year, write=not a.dry_run)
+            print(json.dumps(r["meta"]["validation"], indent=1))
+        return
+    elif a.cmd == "intel-gravity":
+        from . import gravity, product_intel
+        if a.init:
+            gravity.create_tables(conn)
+        if a.geo:
+            print(f"{gravity.store_geo(conn, gravity.load_geo_file(a.geo))} distance pairs loaded")
+        if not a.geo or a.chapter:
+            ctx = product_intel.load_context(conn)
+            r = gravity.run(conn, ctx["universe"], ctx["latest"], write=not a.dry_run, only=a.chapter)
+            print(f"{r['fitted']} chapters fitted, model beats baseline in {r['beats_baseline']}, not fitted: {r['failed']}")
         return
     elif a.cmd == "product-intel":
         from . import product_intel

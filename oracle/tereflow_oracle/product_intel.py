@@ -19,6 +19,7 @@ import time
 from collections import defaultdict
 
 from . import markets
+from . import intel_extra as ie
 from . import trade_methods as tm
 
 MIN_VALUE_USD = 100_000          # products below this latest-year import value get figures but no pressure states
@@ -48,10 +49,22 @@ METHODS = {
     "mirror": "Exports reported by a supplier against imports reported by the buyer for the same pair and year. Differences are expected (freight and insurance, timing, re-exports).",
     "pressure": ("Positions in the cross-product distribution, from this run. 'potential supply pressure' is a heuristic: reported export quantity in the top "
                  "fifth while unit value is in the bottom fifth. It is not an observed shortage or surplus."),
-    "not_implemented": ["Armington substitution elasticities (needs a price and quantity panel and an identification design)",
-                        "Gravity model and trade potential (needs bilateral distance and trade-cost data not yet loaded)",
-                        "Opportunity screening by target market",
-                        "HS to industry bridge and production network (needs a licensed input-output source)"],
+    "opportunities": ("Screening of the eight largest importing markets. A candidate supplier is listed when it is not already entrenched in that market (under 5 percent share) "
+                      "and meets at least two of: Balassa RCA above 1, global growth above the market's growth, unit value below the market's, within 8000 km. "
+                      "It is a screening signal from reported trade, not a forecast and not proof of unmet demand. Tariffs, standards, logistics cost and buyers are not in the data."),
+    "armington": ("Descriptive only: supplier unit values against the market, and how supplier share changes line up with relative unit-value changes (a rank correlation). "
+                  "Armington substitution elasticities are not estimated; that needs a long price and quantity panel by buyer and an identification design."),
+    "gravity": ("Poisson pseudo-maximum-likelihood gravity model per HS chapter, with importer and exporter fixed effects (which absorb size and multilateral resistance) and CEPII "
+                "distance, contiguity, common language and colonial tie. Fitted values are model-expected trade, an estimate kept apart from observed imports. A gap is not unmet demand. "
+                "Each chapter is validated on a random 20 percent hold-out against a no-trade-cost baseline and the result is shown whether or not the model wins. "
+                "The two source papers could not be retrieved here, so the specification is the standard one and is not yet checked against them."),
+    "mapping": ("HS to industry through official UN correspondence tables: HS to CPC 2.1 to ISIC Rev.4 to the Eurostat FIGARO industry. The tables give possible pairings with no weights, "
+                "so none are shown. Category is direct (one industry reached), derived multiple (several, unweighted) or unresolved."),
+    "network": ("Eurostat FIGARO inter-country input-output table (industry by industry, current basic prices, million EUR). Direct requirement a = input from supplier industry per euro of the "
+                "industry's output. Total requirement is from the Leontief inverse (I - A)^-1; indirect = total - direct. These are industry averages, not a bill of materials for the product."),
+    "not_implemented": ["Armington substitution elasticities (needs a long price and quantity panel by buyer and an identification design)",
+                        "OECD ICIO and other input-output sources (the OECD site refused downloads from this machine; Eurostat FIGARO is the primary source)",
+                        "Tariffs, standards and logistics cost in opportunity screening (no data loaded)"],
 }
 
 
@@ -227,6 +240,9 @@ def build_product(hs6: str, desc, imp: dict, exp: dict, ctx: dict) -> tuple:
         "competitiveness": comp, "mirror": mirror,
         "pressure": {"indicators": {k: _r(v, 4) for k, v in ind.items() if k != "demand_usd"}, "states": [], "note": None},
     }
+    rca_by = {p: tm.balassa_rca(sup_L[p], ctx["supplier_total"].get(p), dem_L, ctx["world_total"]) for p in sorted(sup_L, key=lambda k: -sup_L[k])[:ie.TOP_SUPPLIERS]}
+    payload["opportunities"] = ie.screen_markets(imp, U, B, L, rca_by, ctx.get("geo"))
+    payload["armington"] = ie.armington_descriptive(sup_L, sup_B, sup_kgL, sup_kgB)
     return payload, ind
 
 
@@ -305,7 +321,12 @@ def load_context(conn, log=print) -> dict:
     sup_total = {p: float(v or 0) for p, v in cur}
     world = sum(sup_total.values())
     log(f"base {base}, latest {latest}, universe {len(universe)} importers, excluded {excluded}, complete years {sorted(complete)}")
-    return {"base": base, "latest": latest, "universe": universe, "excluded_reporters": excluded, "complete_years": complete,
+    try:
+        from . import gravity
+        geo = gravity.load_geo(conn)
+    except Exception:
+        geo = {}
+    return {"base": base, "latest": latest, "universe": universe, "excluded_reporters": excluded, "complete_years": complete, "geo": geo,
             "supplier_total": sup_total, "world_total": world, "year_counts": counts}
 
 
@@ -373,7 +394,7 @@ def run(conn, prefix=None, exact=None, write=True, log=print, limit=None) -> dic
     log(f"{len(results)} products built, bands from {cuts_note}")
     if write:
         write_results(conn, results, inds, cuts, ctx, full=not (prefix or exact or limit))
-    return {"products": len(results), "results": results, "cuts": cuts, "context": {k: (sorted(v) if isinstance(v, set) else v) for k, v in ctx.items() if k not in ("supplier_total",)},
+    return {"products": len(results), "results": results, "cuts": cuts, "context": {k: (sorted(v) if isinstance(v, set) else v) for k, v in ctx.items() if k not in ("supplier_total", "geo")},
             "seconds": round(time.time() - t0, 1)}
 
 

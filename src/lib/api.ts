@@ -37,6 +37,7 @@ import type { Severity, ValidationReport } from '../../shared/csv/validate';
 import type { DatasetCode } from '../../shared/csv/schema';
 import type { TradeSandboxResponse } from '../../shared/trade-sandbox';
 import type { CountryCoverage } from '../../shared/coverage';
+import type { IntelListRow, ProductIntel } from './intel-types';
 import type { CreditAdminOverview, CreditCountry, CreditCountryRow, CreditHistory, CreditQueueFile } from './credit-types';
 
 const ADMIN_TOKEN_KEY = 'tf_admin_token';
@@ -1156,6 +1157,10 @@ export const api = {
     revert: (id: string) => req<{ ok: true }>(`/api/admin/national/uploads/${id}`, { method: 'DELETE' }),
     templateBlob: () => adminBlob('/api/admin/national/template'),
     toolkitBlob: () => adminBlob('/api/admin/toolkit/national'),
+  },
+  intel: {
+    list: (hs = '') => req<{ products: IntelListRow[] }>(`/api/intel${hs ? `?hs=${encodeURIComponent(hs)}` : ''}`),
+    product: (hs6: string) => req<ProductIntel>(`/api/intel/${encodeURIComponent(hs6)}`),
   },
   credit: {
     countries: () => req<{ countries: CreditCountryRow[] }>('/api/credit'),

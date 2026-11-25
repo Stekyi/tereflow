@@ -25,6 +25,7 @@ if /i "%~1"=="credit"       %PY% -u -m tereflow_oracle ingest-credit %2 %3 %4 %5
 if /i "%~1"=="credit-init"  %PY% -m tereflow_oracle credit-init %2 & goto :eof
 if /i "%~1"=="credit-template" %PY% -m tereflow_oracle credit-template %2 %3 & goto :eof
 if /i "%~1"=="credit-check" %PY% -m tereflow_oracle credit-check %2 %3 %4 %5 %6 %7 %8 %9 & goto :eof
+if /i "%~1"=="intel"        %PY% -u -m tereflow_oracle product-intel %2 %3 %4 %5 %6 & goto :eof
 if /i "%~1"=="worldbank"    %PY% -u -m tereflow_oracle worldbank %2 %3 %4 & goto :eof
 if /i "%~1"=="finance"      %PY% scripts\finance\bank_load.py %2 %3 %4 %5 %6 & goto :eof
 if /i "%~1"=="finance-check" %PY% scripts\finance\bank_template.py check %2 %3 %4 & goto :eof
@@ -44,6 +45,7 @@ echo   credit --file FILE.xlsx     load a country's sector credit from a filled 
 echo   credit-template [--out F]   write the empty Excel workbook for a new country
 echo   credit-check FILE.xlsx      check a filled workbook, no database needed
 echo   credit-init                 create the credit tables and register the configured series (once)
+echo   intel [--hs 090111] [--dry-run]   product intelligence: demand, supply, concentration, competitiveness and pressure for every HS6 product (about 5 minutes)
 echo   worldbank                   refresh World Bank indicators
 echo   finance-check FILE.xlsx     check a bank workbook;  finance load FILE.xlsx [--dry-run] [--replace] loads it
 echo   national load FILE.xlsx     load national statistics (see README)

@@ -102,6 +102,19 @@ The Finance page now reports where the banking system's credit is outstanding ac
 **Sector to trade map.** Admin, Sector credit, Sector to trade map: which HS codes (2 to 6 digit prefixes) relate to each credit sector, and whether the link is direct or indicative. A sector with no defensible link shows credit alone.
 
 **Data checks.** A missing value is never read as zero. A long non-zero history followed by zeros is flagged (Ghana's Cocoa marketing has reported zero since January 2025). Large jumps and gaps are flagged. Sector shares and the total are shown only where the sectors add up to the reported total.
+
+## Product intelligence (/intel)
+
+Every HS6 product with reported imports has a page at `/intel/<HS6>`: global demand, supply, market pressure, competitiveness (constant market share and Balassa RCA), and a methodology tab. Industry mapping, production network and market opportunities are shown as "not built yet", never as illustrations.
+
+**Run it.** `pipeline.cmd intel` (about 5 minutes for all products; `--hs 090111 --dry-run` prints one product without writing). It is also part of the nightly `run-refresh.cmd`. First time only: `python -m tereflow_oracle product-intel --init`.
+
+**What "global" means.** Only the countries Tereflow ingests. The comparison universe is the importers that reported in both the base and the latest year; the page lists them and the reporters left out. Base year is the latest year minus three (or the nearest year with enough importers).
+
+**Pressure signals.** Positions in the cross-product distribution (top or bottom fifth of products over USD 100,000 imports), recomputed each full run. No fixed thresholds, no composite score. "Potential supply pressure" is a labelled heuristic.
+
+**Checks.** The CMS effects add up to the change in sales (checked for every supplier in the live run, gap under USD 1). The papers named in the brief could not be downloaded here, so the decomposition is the standard form and is still to be checked against them. Not implemented: Armington elasticities, gravity model, opportunity screening, HS to industry bridge, input-output network.
+
 ## Other config files (no code change needed)
 
 - `shared/config/sectors.json`: sector choices.

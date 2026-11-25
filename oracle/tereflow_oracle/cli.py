@@ -295,6 +295,12 @@ def main(argv=None):
     ct.add_argument("--out", default="tereflow-credit-template.xlsx")
     cc = sub.add_parser("credit-check", help="check a filled workbook without touching the database")
     cc.add_argument("files", nargs="+")
+    pi = sub.add_parser("product-intel", help="compute demand, supply, concentration, competitiveness and pressure indicators per HS6 product")
+    pi.add_argument("--hs", help="one HS6 code")
+    pi.add_argument("--prefix", help="only products whose code starts with this")
+    pi.add_argument("--limit", type=int, help="stop after this many products")
+    pi.add_argument("--dry-run", action="store_true", help="compute and print, write nothing")
+    pi.add_argument("--init", action="store_true", help="create the tables first")
     ci = sub.add_parser("credit-init", help="create the credit tables and register the configured series")
     ci.add_argument("--reseed", action="store_true")
     ib = sub.add_parser("ingest-inbox", help="load collector CSVs uploaded through the admin inbox")
@@ -347,6 +353,15 @@ def main(argv=None):
         from . import appschema
         (ROOT / "shared" / "app-tables.ts").write_text(appschema.export_tables_ts(), encoding="utf-8", newline="\n")
         print("wrote shared/app-tables.ts")
+        return
+    elif a.cmd == "product-intel":
+        from . import product_intel
+        if a.init:
+            product_intel.create_tables(conn)
+        r = product_intel.run(conn, prefix=a.prefix, exact=a.hs, write=not a.dry_run, limit=a.limit)
+        if a.dry_run and a.hs:
+            print(json.dumps(r["results"].get(a.hs), indent=1))
+        print(f"{r['products']} products in {r['seconds']}s")
         return
     elif a.cmd == "credit-init":
         from . import credit, credit_db

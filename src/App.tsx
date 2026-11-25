@@ -46,6 +46,8 @@ const CanvasStart = lazy(() => import('./pages/Canvas').then((m) => ({ default: 
 const PlaybookDetail = lazy(() => import('./pages/PlaybookDetail'));
 const Upgrade = lazy(() => import('./pages/Upgrade'));
 const TradeSandbox = lazy(() => import('./pages/TradeSandbox'));
+const IntelIndex = lazy(() => import('./pages/ProductIntel').then((m) => ({ default: m.IntelIndex })));
+const ProductIntelPage = lazy(() => import('./pages/ProductIntel'));
 const TradeNews = lazy(() => import('./pages/TradeNews'));
 
 const TITLES: Record<string, string> = {
@@ -59,6 +61,7 @@ const TITLES: Record<string, string> = {
   '/playbooks': 'How to start',
   '/outlook': 'Growth outlook',
   '/finance': 'Finance',
+  '/intel': 'Product intelligence',
   '/canvas': 'Business Model Canvas',
   '/data-sources': 'Data sources',
   '/upgrade': 'Premium',
@@ -207,6 +210,8 @@ export default function App() {
             <Route path="/playbooks/:slug" element={<PlaybookDetail />} />
             <Route path="/upgrade" element={<Upgrade />} />
             <Route path="/sandbox" element={<TradeSandbox />} />
+          <Route path="/intel" element={<IntelIndex />} />
+          <Route path="/intel/:hs6" element={<ProductIntelPage />} />
             <Route path="/news" element={<TradeNews />} />
 
             <Route path="/admin" element={<Portal />} />

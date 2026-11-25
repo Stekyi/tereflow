@@ -47,6 +47,8 @@ export const APP_TABLES: readonly string[] = [
   'nat_sources',
   'nat_uploads',
   'notifications',
+  'pi_meta',
+  'pi_product',
   'playbooks',
   'posts',
   'premium_grants',
